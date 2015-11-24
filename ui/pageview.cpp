@@ -2615,6 +2615,8 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             menu.addTitle( i18n( "Image (%1 by %2 pixels)", selectionRect.width(), selectionRect.height() ) );
             imageToClipboard = menu.addAction( KIcon("image-x-generic"), i18n( "Copy to Clipboard" ) );
             imageToFile = menu.addAction( KIcon("document-save"), i18n( "Save to File..." ) );
+            menu.addTitle ( i18n( "Tag selection: X = %1, Y = %2, W = %3 H = %4", selectionRect.left(), selectionRect.top(), selectionRect.width(), selectionRect.height() ) );
+            menu.addAction ( KIcon("tag"), i18n ("Tag") );
             QAction *choice = menu.exec( e->globalPos() );
             // check if the user really selected an action
             if ( choice )
