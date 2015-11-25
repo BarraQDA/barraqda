@@ -61,6 +61,7 @@
 #include "pageviewutils.h"
 #include "pagepainter.h"
 #include "core/annotations.h"
+#include "core/tagging.h"
 #include "annotwindow.h"
 #include "guiutils.h"
 #include "annotationpopup.h"
@@ -961,6 +962,7 @@ void PageView::notifySetup( const QVector< Okular::Page * > & pageSet, int setup
                 }
             }
         }
+
     }
 
     // invalidate layout so relayout/repaint will happen on next viewport change
@@ -1609,6 +1611,21 @@ void PageView::paintEvent(QPaintEvent *pe)
                     screenPainter.drawRect( contentsRect );
                 }
             }
+        
+            Okular::Tagging tagging = Okular::TaggingUtils::retrieveTagging();
+            if (tagging.x != 0)
+            {
+                kWarning() << "Begin tagging";
+                QRect taggingRect ( tagging.x, tagging.y, tagging.x+tagging.w, tagging.y+tagging.h );
+                
+                QPainter screenPainter( viewport() );
+                
+                screenPainter.setPen( palette().color( QPalette::Active, QPalette::Highlight ).dark(110) );
+                screenPainter.drawRect( taggingRect );
+                kWarning() << "End tagging";
+                
+            }            
+            
         }
 }
 
@@ -2594,7 +2611,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
             // popup that ask to copy:text and copy/save:image
             KMenu menu( this );
-            QAction *textToClipboard = 0, *speakText = 0, *imageToClipboard = 0, *imageToFile = 0;
+            QAction *textToClipboard = 0, *speakText = 0, *imageToClipboard = 0, *imageToFile = 0, *tagSelection = 0;
             if ( d->document->supportsSearching() && !selectedText.isEmpty() )
             {
                 menu.addTitle( i18np( "Text (1 character)", "Text (%1 characters)", selectedText.length() ) );
@@ -2616,7 +2633,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             imageToClipboard = menu.addAction( KIcon("image-x-generic"), i18n( "Copy to Clipboard" ) );
             imageToFile = menu.addAction( KIcon("document-save"), i18n( "Save to File..." ) );
             menu.addTitle ( i18n( "Tag selection: X = %1, Y = %2, W = %3 H = %4", selectionRect.left(), selectionRect.top(), selectionRect.width(), selectionRect.height() ) );
-            menu.addAction ( KIcon("tag"), i18n ("Tag") );
+            tagSelection = menu.addAction ( KIcon("tag"), i18n ("Tag") );
             QAction *choice = menu.exec( e->globalPos() );
             // check if the user really selected an action
             if ( choice )
@@ -2675,6 +2692,13 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 {
                     // [2] speech selection using KTTSD
                     d->tts()->say( selectedText );
+                }
+                else if ( choice == tagSelection )
+                {
+                    Okular::TaggingUtils::storeTagging ( selectionRect.left(),
+                                                 selectionRect.top(),
+                                                 selectionRect.width(),
+                                                 selectionRect.height() );
                 }
             }
             }

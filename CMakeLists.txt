@@ -69,6 +69,7 @@ set(okularcore_SRCS
    core/scripter.cpp
    core/sound.cpp
    core/sourcereference.cpp
+   core/tagging.cpp
    core/textdocumentgenerator.cpp
    core/textdocumentsettings.cpp
    core/textpage.cpp
