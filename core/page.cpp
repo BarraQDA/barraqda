@@ -36,6 +36,7 @@
 #include "pagesize.h"
 #include "pagetransition.h"
 #include "rotationjob_p.h"
+#include "tagging.h"
 #include "textpage.h"
 #include "textpage_p.h"
 #include "tile.h"

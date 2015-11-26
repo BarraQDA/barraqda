@@ -28,6 +28,7 @@
 #include "core/page.h"
 #include "core/page_p.h"
 #include "core/annotations.h"
+#include "core/tagging.h"
 #include "core/utils.h"
 #include "guiutils.h"
 #include "settings.h"
@@ -122,6 +123,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
     bool canDrawHighlights = (flags & Highlights) && !page->m_highlights.isEmpty();
     bool canDrawTextSelection = (flags & TextSelection) && page->textSelection();
     bool canDrawAnnotations = (flags & Annotations) && !page->m_annotations.isEmpty();
+    bool canDrawTaggings = true;
     bool enhanceLinks = (flags & EnhanceLinks) && Okular::Settings::highlightLinks();
     bool enhanceImages = (flags & EnhanceImages) && Okular::Settings::highlightImages();
     // vectors containing objects to draw
@@ -130,9 +132,11 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
     QList< QPair<QColor, Okular::NormalizedRect> > * bufferedHighlights = 0;
     QList< Okular::Annotation * > * bufferedAnnotations = 0;
     QList< Okular::Annotation * > * unbufferedAnnotations = 0;
+    QList< Okular::Tagging * > * bufferedTaggings = 0;
+    QList< Okular::Tagging * > * unbufferedTaggings = 0;
     Okular::Annotation *boundingRectOnlyAnn = 0; // Paint the bounding rect of this annotation
     // fill up lists with visible annotation/highlight objects/text selections
-    if ( canDrawHighlights || canDrawTextSelection || canDrawAnnotations )
+    if ( canDrawHighlights || canDrawTextSelection || canDrawAnnotations || canDrawTaggings)
     {
         // precalc normalized 'limits rect' for intersection
         double nXMin = ( (double)limits.left() / (double)scaledWidth ) + crop.left,
@@ -229,6 +233,30 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                 }
             }
         }
+        // append taggings inside limits to the un/buffered list
+        if ( canDrawTaggings )
+        {
+            QLinkedList< Okular::Tagging * >::const_iterator tIt = page->m_taggings.constBegin(), tEnd = page->m_taggings.constEnd();
+            for ( ; tIt != tEnd; ++tIt )
+            {
+                Okular::Tagging * tag = *tIt;
+                bool intersects = tag->transformedBoundingRectangle().intersects( nXMin, nYMin, nXMax, nYMax );
+                if ( tag->subType() == Okular::Tagging::TText )
+                {
+                    Okular::NormalizedRect iconrect( tag->transformedBoundingRectangle().left,
+                                                    tag->transformedBoundingRectangle().top,
+                                                    tag->transformedBoundingRectangle().left + TEXTANNOTATION_ICONSIZE / page->width(),
+                                                    tag->transformedBoundingRectangle().top + TEXTANNOTATION_ICONSIZE / page->height() );
+                    intersects = iconrect.intersects( nXMin, nYMin, nXMax, nYMax );
+                }
+                if ( intersects )
+                {
+                    if ( !bufferedTaggings )
+                        bufferedTaggings = new QList< Okular::Tagging * >();
+                    bufferedTaggings->append( tag );
+                }
+            }
+        }        
         // end of intersections checking
     }
 
