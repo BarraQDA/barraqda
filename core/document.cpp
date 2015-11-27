@@ -2648,6 +2648,8 @@ void Document::closeDocument()
     AudioPlayer::instance()->d->m_currentDocument = KUrl();
 
     d->m_undoStack->clear();
+    
+    d->m_taggings.clear();
 }
 
 void Document::addObserver( DocumentObserver * pObserver )
@@ -3339,13 +3341,13 @@ void Document::removePageAnnotations( int page, const QList<Annotation*> &annota
 
 QLinkedList< Tagging* > Document::taggings() const
 {
-    return m_taggings;
+    return d->m_taggings;
 }
 
 void Document::addTagging( Tagging * tagging )
 {
     tagging->d_ptr->m_doc = d;
-    m_taggings.append( tagging );
+    d->m_taggings.append( tagging );
 
     TaggingObjectRect *rect = new TaggingObjectRect( tagging );
 
@@ -3366,10 +3368,10 @@ bool Document::removeTagging( Tagging * tagging )
 void Document::deleteTaggings()
 {
     // delete all stored taggings
-    QLinkedList< Tagging * >::const_iterator aIt = m_taggings.begin(), aEnd = m_taggings.end();
+    QLinkedList< Tagging * >::const_iterator aIt = d->m_taggings.begin(), aEnd = d->m_taggings.end();
     for ( ; aIt != aEnd; ++aIt )
         delete *aIt;
-    m_taggings.clear();
+    d->m_taggings.clear();
 }
 
 

@@ -287,6 +287,8 @@ class DocumentPrivate
         QDomNode m_prevPropsOfAnnotBeingModified;
 
         synctex_scanner_t m_synctex_scanner;
+        
+        QLinkedList< Tagging* > m_taggings;
 };
 
 class DocumentInfoPrivate

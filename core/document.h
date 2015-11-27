@@ -1116,8 +1116,6 @@ class OKULAR_EXPORT Document : public QObject
         friend class EditFormButtonsCommand;
         /// @endcond
         DocumentPrivate *const d;
-        
-        QLinkedList< Tagging* > m_taggings;
 
         Q_DISABLE_COPY( Document )
 
