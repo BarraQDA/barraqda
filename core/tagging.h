@@ -43,7 +43,7 @@ class OKULAR_EXPORT TaggingUtils
 
         /**
          */
-        static void storeTagging( const Tagging * tagging, Okular::Document * doc );
+        static void storeTagging( Tagging * tagging, Okular::Document * doc );
 
         /**
          * Returns the geometry of the given @p tagging scaled by

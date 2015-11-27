@@ -1218,7 +1218,9 @@ void DocumentPrivate::performSetAnnotationContents( const QString & newContents,
 
 void DocumentPrivate::performAddTagging( int page, Tagging * tagging )
 {
-    // add tagging to the page
+    kDebug() << "Adding tagging to document";
+
+    // add tagging to the tagging
     m_parent->addTagging( tagging );
 }
 

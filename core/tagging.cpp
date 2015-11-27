@@ -30,9 +30,9 @@ Tagging * TaggingUtils::createTagging( int left, int top, int width, int height 
     return tagging;
 }
 
-void TaggingUtils::storeTagging( const Tagging * tag, Document * doc )
+void TaggingUtils::storeTagging( Tagging * tag, Document * doc )
 {
-    doc->d->m_taggings.append ( tag );
+    doc->addTagging ( tag );
 }
 
 
