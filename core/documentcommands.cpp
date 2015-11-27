@@ -15,6 +15,7 @@
 #include "form.h"
 #include "utils_p.h"
 #include "page.h"
+#include "tagging.h"
 
 #include <KLocalizedString>
 
@@ -204,6 +205,162 @@ Okular::NormalizedPoint TranslateAnnotationCommand::minusDelta()
 Okular::NormalizedRect TranslateAnnotationCommand::translateBoundingRectangle( const Okular::NormalizedPoint & delta )
 {
     Okular::NormalizedRect annotBoundingRect = m_annotation->boundingRectangle();
+    double left = qMin<double>( annotBoundingRect.left, annotBoundingRect.left + delta.x );
+    double right = qMax<double>( annotBoundingRect.right, annotBoundingRect.right + delta.x );
+    double top = qMin<double>( annotBoundingRect.top, annotBoundingRect.top + delta.y );
+    double bottom = qMax<double>( annotBoundingRect.bottom, annotBoundingRect.bottom + delta.y );
+    Okular::NormalizedRect boundingRect( left, top, right, bottom );
+    return boundingRect;
+}
+
+AddTaggingCommand::AddTaggingCommand( Okular::DocumentPrivate * docPriv,  Okular::Tagging* tagging, int pageNumber )
+ : m_docPriv( docPriv ),
+   m_tagging( tagging ),
+   m_pageNumber( pageNumber ),
+   m_done( false )
+{
+    setText( i18nc ("Add an tagging to the page", "add tagging" ) );
+}
+
+AddTaggingCommand::~AddTaggingCommand()
+{
+    if ( !m_done )
+    {
+        delete m_tagging;
+    }
+}
+
+void AddTaggingCommand::undo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_docPriv->performRemovePageTagging( m_pageNumber, m_tagging );
+    m_done = false;
+}
+
+void AddTaggingCommand::redo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_docPriv->performAddPageTagging( m_pageNumber,  m_tagging );
+    m_done = true;
+}
+
+
+RemoveTaggingCommand::RemoveTaggingCommand(Okular::DocumentPrivate * doc,  Okular::Tagging* tagging, int pageNumber)
+ : m_docPriv( doc ),
+   m_tagging( tagging ),
+   m_pageNumber( pageNumber ),
+   m_done( false )
+{
+    setText( i18nc( "Remove an tagging from the page", "remove tagging" ) );
+}
+
+RemoveTaggingCommand::~RemoveTaggingCommand()
+{
+    if ( m_done )
+    {
+        delete m_tagging;
+    }
+}
+
+void RemoveTaggingCommand::undo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_docPriv->performAddPageTagging( m_pageNumber,  m_tagging );
+    m_done = false;
+}
+
+void RemoveTaggingCommand::redo(){
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_docPriv->performRemovePageTagging( m_pageNumber, m_tagging );
+    m_done = true;
+}
+
+
+ModifyTaggingPropertiesCommand::ModifyTaggingPropertiesCommand( DocumentPrivate* docPriv,
+                                                                      Tagging* tagging,
+                                                                      int pageNumber,
+                                                                      QDomNode oldProperties,
+                                                                      QDomNode newProperties )
+ : m_docPriv( docPriv ),
+   m_tagging( tagging ),
+   m_pageNumber( pageNumber ),
+   m_prevProperties( oldProperties ),
+   m_newProperties( newProperties )
+{
+    setText(i18nc("Modify an tagging's internal properties (Color, line-width, etc.)", "modify tagging properties"));
+}
+
+void ModifyTaggingPropertiesCommand::undo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_tagging->setTaggingProperties( m_prevProperties );
+    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+}
+
+void ModifyTaggingPropertiesCommand::redo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_tagging->setTaggingProperties( m_newProperties );
+    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+}
+
+TranslateTaggingCommand::TranslateTaggingCommand( DocumentPrivate* docPriv,
+                                                        Tagging* tagging,
+                                                        int pageNumber,
+                                                        const Okular::NormalizedPoint & delta,
+                                                        bool completeDrag )
+ : m_docPriv( docPriv ),
+   m_tagging( tagging ),
+   m_pageNumber( pageNumber ),
+   m_delta( delta ),
+   m_completeDrag( completeDrag )
+{
+    setText( i18nc( "Translate an tagging's position on the page", "translate tagging" ) );
+}
+
+void TranslateTaggingCommand::undo()
+{
+    moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle(  minusDelta() ), m_docPriv, m_pageNumber );
+    m_tagging->translate( minusDelta() );
+    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+}
+
+void TranslateTaggingCommand::redo()
+{
+    moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle( m_delta ), m_docPriv, m_pageNumber );
+    m_tagging->translate( m_delta );
+    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+}
+
+int TranslateTaggingCommand::id() const
+{
+    return 1;
+}
+
+bool TranslateTaggingCommand::mergeWith( const QUndoCommand* uc )
+{
+    TranslateTaggingCommand *tuc = (TranslateTaggingCommand*)uc;
+
+    if ( tuc->m_tagging != m_tagging )
+        return false;
+
+    if ( m_completeDrag )
+    {
+        return false;
+    }
+    m_delta = Okular::NormalizedPoint( tuc->m_delta.x + m_delta.x, tuc->m_delta.y + m_delta.y );
+    m_completeDrag = tuc->m_completeDrag;
+    return true;
+}
+
+Okular::NormalizedPoint TranslateTaggingCommand::minusDelta()
+{
+    return Okular::NormalizedPoint( -m_delta.x, -m_delta.y );
+}
+
+Okular::NormalizedRect TranslateTaggingCommand::translateBoundingRectangle( const Okular::NormalizedPoint & delta )
+{
+    Okular::NormalizedRect annotBoundingRect = m_tagging->boundingRectangle();
     double left = qMin<double>( annotBoundingRect.left, annotBoundingRect.left + delta.x );
     double right = qMax<double>( annotBoundingRect.right, annotBoundingRect.right + delta.x );
     double top = qMin<double>( annotBoundingRect.top, annotBoundingRect.top + delta.y );

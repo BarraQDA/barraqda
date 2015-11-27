@@ -1611,21 +1611,6 @@ void PageView::paintEvent(QPaintEvent *pe)
                     screenPainter.drawRect( contentsRect );
                 }
             }
-        
-            Okular::Tagging tagging = Okular::TaggingUtils::retrieveTagging();
-            if (tagging.x != 0)
-            {
-                kWarning() << "Begin tagging";
-                QRect taggingRect ( tagging.x, tagging.y, tagging.x+tagging.w, tagging.y+tagging.h );
-                
-                QPainter screenPainter( viewport() );
-                
-                screenPainter.setPen( palette().color( QPalette::Active, QPalette::Highlight ).dark(110) );
-                screenPainter.drawRect( taggingRect );
-                kWarning() << "End tagging";
-                
-            }            
-            
         }
 }
 
@@ -2695,7 +2680,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 }
                 else if ( choice == tagSelection )
                 {
-                    Okular::TaggingUtils::storeTagging ( selectionRect.left(),
+                    Okular::TaggingUtils::createTagging ( selectionRect.left(),
                                                  selectionRect.top(),
                                                  selectionRect.width(),
                                                  selectionRect.height() );

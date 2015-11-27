@@ -39,7 +39,7 @@ class OKULAR_EXPORT TaggingUtils
          *
          * Returns a pointer to the complete tagging or 0 if element is invalid.
          */
-        static Tagging * createTagging( const QDomElement & element );
+        static Tagging * createTagging( int left, int top, int width, int height );
 
         /**
          * Saves the @p tagging as a child of @p element taking
@@ -64,6 +64,15 @@ class OKULAR_EXPORT TaggingUtils
  */
 class OKULAR_EXPORT Tagging
 {
+    /// @cond PRIVATE
+    friend class TaggingObjectRect;
+    friend class Document;
+    friend class DocumentPrivate;
+    friend class ObjectRect;
+    friend class Page;
+    friend class PagePrivate;
+    /// @endcond
+  
     public:
         /**
          * Describes the type of tagging.
@@ -244,7 +253,7 @@ class OKULAR_EXPORT BoxTagging : public Tagging
 {
     public:
         /**
-         * Creates a new text tagging.
+         * Creates a new box tagging.
          */
         BoxTagging();
 
@@ -262,6 +271,11 @@ class OKULAR_EXPORT BoxTagging : public Tagging
          * Returns the sub type of the box tagging.
          */
         SubType subType() const;
+	
+        /**
+         * Set box coordinates
+         */
+        void setcoords( int left, int top, int width, int height );
 	
     private:
         Q_DECLARE_PRIVATE( BoxTagging )

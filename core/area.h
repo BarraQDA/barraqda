@@ -28,6 +28,7 @@ namespace Okular {
 class Annotation;
 class Action;
 class NormalizedShape;
+class Tagging;
 
 /**
  * NormalizedPoint is a helper class which stores the coordinates
@@ -345,6 +346,7 @@ class OKULAR_EXPORT ObjectRect
             Action,      ///< An action
             Image,       ///< An image
             OAnnotation, ///< An annotation
+            OTagging,    ///< A tagging
             SourceRef    ///< A source reference
         };
 
@@ -466,6 +468,49 @@ class OKULAR_EXPORT AnnotationObjectRect : public ObjectRect
 
     private:
         Annotation * m_annotation;
+};
+
+/**
+ * This class describes the object rectangle for an tagging.
+ */
+class OKULAR_EXPORT TaggingObjectRect : public ObjectRect
+{
+    public:
+        /**
+         * Creates a new tagging object rectangle with the
+         * given @p tagging.
+         */
+        TaggingObjectRect( Tagging *tagging );
+
+        /**
+         * Destroys the tagging object rectangle.
+         */
+        virtual ~TaggingObjectRect();
+
+        /**
+         * Returns the tagging object of the tagging object rectangle.
+         */
+        Tagging *tagging() const;
+
+        /**
+         * Returns the bounding rect of the tagging object rectangle for the
+         * scaling factor @p xScale and @p yScale.
+         */
+        virtual QRect boundingRect( double xScale, double yScale ) const;
+
+        /**
+         * Returns whether the tagging object rectangle contains the point @p x, @p y for the
+         * scaling factor @p xScale and @p yScale.
+         */
+        virtual bool contains( double x, double y, double xScale, double yScale ) const;
+
+        /**
+         * Transforms the tagging object rectangle with the operations defined by @p matrix.
+         */
+        virtual void transform( const QTransform &matrix );
+
+    private:
+        Tagging * m_tagging;
 };
 
 /**

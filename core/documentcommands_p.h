@@ -23,6 +23,7 @@ class DocumentPrivate;
 class FormFieldText;
 class FormFieldButton;
 class FormFieldChoice;
+class Tagging;
 
 class AddAnnotationCommand : public QUndoCommand
 {
@@ -95,6 +96,82 @@ class TranslateAnnotationCommand : public QUndoCommand
     private:
         Okular::DocumentPrivate * m_docPriv;
         Okular::Annotation* m_annotation;
+        int m_pageNumber;
+        Okular::NormalizedPoint m_delta;
+        bool m_completeDrag;
+};
+
+class AddTaggingCommand : public QUndoCommand
+{
+    public:
+        AddTaggingCommand(Okular::DocumentPrivate * docPriv,  Okular::Tagging* tagging, int pageNumber);
+
+        virtual ~AddTaggingCommand();
+
+        virtual void undo();
+
+        virtual void redo();
+
+    private:
+        Okular::DocumentPrivate * m_docPriv;
+        Okular::Tagging* m_tagging;
+        int m_pageNumber;
+        bool m_done;
+};
+
+class RemoveTaggingCommand : public QUndoCommand
+{
+    public:
+        RemoveTaggingCommand(Okular::DocumentPrivate * doc,  Okular::Tagging* tagging, int pageNumber);
+        virtual ~RemoveTaggingCommand();
+        virtual void undo();
+        virtual void redo();
+
+    private:
+        Okular::DocumentPrivate * m_docPriv;
+        Okular::Tagging* m_tagging;
+        int m_pageNumber;
+        bool m_done;
+};
+
+class ModifyTaggingPropertiesCommand : public QUndoCommand
+{
+    public:
+        ModifyTaggingPropertiesCommand( Okular::DocumentPrivate* docPriv,  Okular::Tagging*  tagging,
+                                                                  int pageNumber,
+                                                                  QDomNode oldProperties,
+                                                                  QDomNode newProperties );
+
+        virtual void undo();
+        virtual void redo();
+
+    private:
+        Okular::DocumentPrivate * m_docPriv;
+        Okular::Tagging* m_tagging;
+        int m_pageNumber;
+        QDomNode m_prevProperties;
+        QDomNode m_newProperties;
+};
+
+class TranslateTaggingCommand : public QUndoCommand
+{
+    public:
+        TranslateTaggingCommand(Okular::DocumentPrivate* docPriv,
+                                   Okular::Tagging*  tagging,
+                                   int pageNumber,
+                                   const Okular::NormalizedPoint & delta,
+                                   bool completeDrag
+                                  );
+        virtual void undo();
+        virtual void redo();
+        virtual int id() const;
+        virtual bool mergeWith(const QUndoCommand *uc);
+        Okular::NormalizedPoint minusDelta();
+        Okular::NormalizedRect translateBoundingRectangle( const Okular::NormalizedPoint & delta );
+
+    private:
+        Okular::DocumentPrivate * m_docPriv;
+        Okular::Tagging* m_tagging;
         int m_pageNumber;
         Okular::NormalizedPoint m_delta;
         bool m_completeDrag;

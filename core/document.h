@@ -560,6 +560,23 @@ class OKULAR_EXPORT Document : public QObject
         void removePageAnnotations( int page, const QList<Annotation*> &annotations );
 
         /**
+         * Tests if the @p tagging can be removed
+         *
+         * @since 0.15 (KDE 4.9)
+         */
+        bool canRemovePageTagging( const Tagging * tagging ) const;
+
+        /**
+         * Removes the given @p tagging from the given @p page.
+         */
+        void removePageTagging( int page, Tagging *tagging );
+
+        /**
+         * Removes the given @p taggings from the given @p page.
+         */
+        void removePageTaggings( int page, const QList<Tagging*> &taggings );
+
+        /**
          * Sets the text selection for the given @p page.
          *
          * @param rect The rectangle of the selection.

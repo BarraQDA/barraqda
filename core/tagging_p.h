@@ -37,6 +37,13 @@ class TaggingPrivate
         virtual void setTaggingProperties( const QDomNode& node );
         virtual TaggingPrivate* getNewTaggingPrivate() = 0;
 
+        /**
+         * Determines the distance of the closest point of the annotation to the
+         * given point @p x @p y @p xScale @p yScale
+         * @since 0.17
+         */
+        virtual double distanceSqr( double x, double y, double xScale, double yScale );
+	
         PagePrivate * m_page;
 
         QString m_author;

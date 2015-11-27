@@ -172,6 +172,11 @@ class OKULAR_EXPORT Page
         bool hasAnnotations() const;
 
         /**
+         * Returns whether the page provides taggings.
+         */
+        bool hasTaggings() const;
+
+        /**
          * Returns the bounding rect of the text which matches the following criteria
          * or 0 if the search is not successful.
          *
@@ -249,6 +254,11 @@ class OKULAR_EXPORT Page
          * Returns the list of annotations of the page.
          */
         QLinkedList< Annotation* > annotations() const;
+
+        /**
+         * Returns the list of taggings of the page.
+         */
+        QLinkedList< Tagging* > taggings() const;
 
         /**
          * Returns the @ref Action object which is associated with the given page @p action
@@ -330,6 +340,16 @@ class OKULAR_EXPORT Page
         bool removeAnnotation( Annotation * annotation );
 
         /**
+         * Adds a new @p tagging to the page.
+         */
+        void addTagging( Tagging * tagging );
+
+        /**
+         * Removes the @p tagging from the page.
+         */
+        bool removeTagging( Tagging * tagging );
+
+        /**
          * Sets the page @p transition effect.
          */
         void setTransition( PageTransition * transition );
@@ -368,6 +388,11 @@ class OKULAR_EXPORT Page
          * Deletes all annotations of the page.
          */
         void deleteAnnotations();
+
+        /**
+         * Deletes all taggings of the page.
+         */
+        void deleteTaggings();
 
         /**
          * Returns whether pixmaps for the tiled observer are handled by a

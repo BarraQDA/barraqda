@@ -20,24 +20,11 @@
 using namespace Okular;
 
 //BEGIN TaggingUtils implementation
-Tagging * TaggingUtils::createTagging( const QDomElement & tagElement )
+Tagging * TaggingUtils::createTagging( int left, int top, int width, int height )
 {
-    // safety check on tagging element
-    if ( !tagElement.hasAttribute( "type" ) )
-        return 0;
-
     // build tagging of given type
-    Tagging * tagging = 0;
-    int typeNumber = tagElement.attribute( "type" ).toInt();
-    switch ( typeNumber )
-    {
-        case Tagging::TText:
-            tagging = new TextTagging( tagElement );
-            break;
-        case Tagging::TBox:
-            tagging = new BoxTagging( tagElement );
-            break;
-    }
+    BoxTagging * tagging = new BoxTagging( );
+    tagging->setcoords(left, top, width, height);
 
     // return created tagging
     return tagging;
@@ -241,12 +228,15 @@ void Tagging::setTaggingProperties( const QDomNode& node )
     d_ptr->transform( d_ptr->m_page->rotationMatrix() );
 }
 
-void TaggingPrivate::translate( const NormalizedPoint &coord )
+double TaggingPrivate::distanceSqr( double x, double y, double xScale, double yScale )
 {
-    m_boundary.left = m_boundary.left + coord.x;
-    m_boundary.right = m_boundary.right + coord.x;
-    m_boundary.top = m_boundary.top + coord.y;
-    m_boundary.bottom = m_boundary.bottom + coord.y;
+    return m_transformedBoundary.distanceSqr( x, y, xScale, yScale );
+}
+
+void TaggingPrivate::taggingTransform( const QTransform &matrix )
+{
+    resetTransformation();
+    transform( matrix );
 }
 
 void TaggingPrivate::transform( const QTransform &matrix )
@@ -262,6 +252,14 @@ void TaggingPrivate::baseTransform( const QTransform &matrix )
 void TaggingPrivate::resetTransformation()
 {
     m_transformedBoundary = m_boundary;
+}
+
+void TaggingPrivate::translate( const NormalizedPoint &coord )
+{
+    m_boundary.left = m_boundary.left + coord.x;
+    m_boundary.right = m_boundary.right + coord.x;
+    m_boundary.top = m_boundary.top + coord.y;
+    m_boundary.bottom = m_boundary.bottom + coord.y;
 }
 
 void TaggingPrivate::setTaggingProperties( const QDomNode& node )
@@ -280,11 +278,6 @@ class Okular::TextTaggingPrivate : public Okular::TaggingPrivate
 	
         NormalizedPoint m_inplaceCallout[3];
 };
-
-TextTagging::TextTagging()
-    : Tagging( *new TextTaggingPrivate() )
-{
-}
 
 TextTagging::TextTagging( const QDomNode & node )
     : Tagging( *new TextTaggingPrivate(), node )
@@ -327,11 +320,17 @@ class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
     public:
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
+	void setcoords ( int a_left, int top, int width, int height );
 	
         NormalizedPoint m_inplaceCallout[3];
+	
+	int left;
+	int top;
+	int width;
+	int height;
 };
 
-BoxTagging::BoxTagging()
+BoxTagging::BoxTagging(  )
     : Tagging( *new BoxTaggingPrivate() )
 {
 }
@@ -348,6 +347,21 @@ BoxTagging::~BoxTagging()
 Tagging::SubType BoxTagging::subType() const
 {
     return TBox;
+}
+
+void BoxTagging::setcoords( int left, int top, int width, int height )
+{
+    Q_D( BoxTagging );
+    d->setcoords( left, top, width, height );
+}
+
+void BoxTaggingPrivate::setcoords( int a_left, int a_top, int a_width, int a_height )
+{
+    kDebug() << "Setting tagging coordinates";
+    left = a_left;
+    top = a_top;
+    width = a_width;
+    height = a_height;
 }
 
 void BoxTaggingPrivate::translate( const NormalizedPoint &coord )

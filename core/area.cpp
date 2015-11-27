@@ -18,6 +18,8 @@
 #include "action.h"
 #include "annotations.h"
 #include "annotations_p.h"
+#include "tagging.h"
+#include "tagging_p.h"
 #include "debug_p.h"
 #include "sourcereference.h"
 
@@ -390,6 +392,10 @@ double ObjectRect::distanceSqr( double x, double y, double xScale, double yScale
         {
             return static_cast<Annotation*>(m_object)->d_func()->distanceSqr( x, y, xScale, yScale );
         }
+        case OTagging:
+        {
+            return static_cast<Tagging*>(m_object)->d_func()->distanceSqr( x, y, xScale, yScale );
+        }
         case SourceRef:
         {
             const SourceRefObjectRect * sr = static_cast< const SourceRefObjectRect * >( this );
@@ -464,6 +470,48 @@ AnnotationObjectRect::~AnnotationObjectRect()
 void AnnotationObjectRect::transform( const QTransform &matrix )
 {
     m_annotation->d_func()->annotationTransform( matrix );
+}
+
+/** class TaggingObjectRect **/
+
+TaggingObjectRect::TaggingObjectRect( Tagging * tagging )
+    : ObjectRect( QPolygonF(), OTagging, tagging ), m_tagging( tagging )
+{
+}
+
+Tagging *TaggingObjectRect::tagging() const
+{
+    return m_tagging;
+}
+
+QRect TaggingObjectRect::boundingRect( double xScale, double yScale ) const
+{
+    const QRect annotRect = TaggingUtils::taggingGeometry( m_tagging, xScale, yScale );
+    const QPoint center = annotRect.center();
+
+    // Make sure that the rectangle has a minimum size, so that it's possible
+    // to click on it
+    const int minSize = 14;
+    const QRect minRect( center.x()-minSize/2, center.y()-minSize/2, minSize, minSize );
+
+    return annotRect | minRect;
+}
+
+bool TaggingObjectRect::contains( double x, double y, double xScale, double yScale ) const
+{
+    return boundingRect( xScale, yScale ).contains( (int)( x * xScale ), (int)( y * yScale ), false );
+}
+
+TaggingObjectRect::~TaggingObjectRect()
+{
+    // the tagging pointer is kept elsewehere (in Page, most probably),
+    // so just release its pointer
+    m_object = 0;
+}
+
+void TaggingObjectRect::transform( const QTransform &matrix )
+{
+    m_tagging->d_func()->taggingTransform( matrix );
 }
 
 /** class SourceRefObjectRect **/
