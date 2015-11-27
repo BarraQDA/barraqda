@@ -36,8 +36,6 @@
 #include "pagesize.h"
 #include "pagetransition.h"
 #include "rotationjob_p.h"
-#include "tagging.h"
-#include "tagging_p.h"
 #include "textpage.h"
 #include "textpage_p.h"
 #include "tile.h"
@@ -137,7 +135,6 @@ Page::~Page()
     deleteRects();
     d->deleteHighlights();
     deleteAnnotations();
-    deleteTaggings();
     d->deleteTextSelections();
     deleteSourceReferences();
 
@@ -286,11 +283,6 @@ bool Page::hasTransition() const
 bool Page::hasAnnotations() const
 {
     return !m_annotations.isEmpty();
-}
-
-bool Page::hasTaggings() const
-{
-    return !m_taggings.isEmpty();
 }
 
 RegularAreaRect * Page::findText( int id, const QString & text, SearchDirection direction,
@@ -492,11 +484,6 @@ QLinkedList< Annotation* > Page::annotations() const
     return m_annotations;
 }
 
-QLinkedList< Tagging* > Page::taggings() const
-{
-    return m_taggings;
-}
-
 const Action * Page::pageAction( PageAction action ) const
 {
     switch ( action )
@@ -661,20 +648,6 @@ void Page::addAnnotation( Annotation * annotation )
     m_rects.append( rect );
 }
 
-void Page::addTagging( Tagging * tagging )
-{
-    tagging->d_ptr->m_page = d;
-    m_taggings.append( tagging );
-
-    TaggingObjectRect *rect = new TaggingObjectRect( tagging );
-
-    // Rotate the annotation on the page.
-    const QTransform matrix = d->rotationMatrix();
-    tagging->d_ptr->taggingTransform( matrix );
-
-    m_rects.append( rect );
-}
-
 bool Page::removeAnnotation( Annotation * annotation )
 {
     if ( !d->m_doc->m_parent->canRemovePageAnnotation(annotation) )
@@ -704,34 +677,6 @@ bool Page::removeAnnotation( Annotation * annotation )
     return true;
 }
 
-bool Page::removeTagging( Tagging * tagging )
-{
-    if ( !d->m_doc->m_parent->canRemovePageTagging(tagging) )
-        return false;
-
-//     QLinkedList< Tagging * >::iterator aIt = m_taggings.begin(), aEnd = m_taggings.end();
-//     for ( ; aIt != aEnd; ++aIt )
-//     {
-//         if((*aIt) && (*aIt)->uniqueName()==tagging->uniqueName())
-//         {
-//             int rectfound = false;
-//             QLinkedList< ObjectRect * >::iterator it = m_rects.begin(), end = m_rects.end();
-//             for ( ; it != end && !rectfound; ++it )
-//                 if ( ( (*it)->objectType() == ObjectRect::OTagging ) && ( (*it)->object() == (*aIt) ) )
-//                 {
-//                     delete *it;
-//                     it = m_rects.erase( it );
-//                     rectfound = true;
-//                 }
-//             kDebug(OkularDebug) << "removed tagging";
-//             tagging->d_ptr->m_page = 0;
-//             m_taggings.erase( aIt );
-//             break;
-//         }
-//     }
-
-    return true;
-}
 void Page::setTransition( PageTransition * transition )
 {
     delete d->m_transition;
@@ -838,17 +783,6 @@ void Page::deleteAnnotations()
     for ( ; aIt != aEnd; ++aIt )
         delete *aIt;
     m_annotations.clear();
-}
-
-void Page::deleteTaggings()
-{
-    // delete ObjectRects of type Tagging
-    deleteObjectRects( m_rects, QSet<ObjectRect::ObjectType>() << ObjectRect::OTagging );
-    // delete all stored taggings
-    QLinkedList< Tagging * >::const_iterator aIt = m_taggings.begin(), aEnd = m_taggings.end();
-    for ( ; aIt != aEnd; ++aIt )
-        delete *aIt;
-    m_taggings.clear();
 }
 
 void PagePrivate::restoreLocalContents( const QDomNode & pageNode )

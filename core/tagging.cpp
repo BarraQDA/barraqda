@@ -139,10 +139,10 @@ void Tagging::setBoundingRectangle( const NormalizedRect &rectangle )
     Q_D( Tagging );
     d->m_boundary = rectangle;
     d->resetTransformation();
-    if ( d->m_page )
-    {
-        d->transform( d->m_page->rotationMatrix() );
-    }
+//     if ( d->m_page )
+//     {
+//         d->transform( d->m_page->rotationMatrix() );
+//     }
 }
 
 NormalizedRect Tagging::boundingRectangle() const
@@ -162,10 +162,10 @@ void Tagging::translate( const NormalizedPoint &coord )
     Q_D( Tagging );
     d->translate( coord );
     d->resetTransformation();
-    if ( d->m_page )
-    {
-        d->transform( d->m_page->rotationMatrix() );
-    }
+//     if ( d->m_page )
+//     {
+//         d->transform( d->m_page->rotationMatrix() );
+//     }
 }
 
 void Tagging::setDisposeDataFunction( DisposeDataFunction func )
@@ -205,7 +205,7 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
 void Tagging::setTaggingProperties( const QDomNode& node )
 {
     // Save off internal properties that aren't contained in node
-    Okular::PagePrivate *p = d_ptr->m_page;
+//    Okular::PagePrivate *p = d_ptr->m_page;
     QVariant nativeID = d_ptr->m_nativeId;
     int internalFlags = d_ptr->m_flags;
     Tagging::DisposeDataFunction disposeFunc = d_ptr->m_disposeFunc;
@@ -219,13 +219,13 @@ void Tagging::setTaggingProperties( const QDomNode& node )
     d_ptr->setTaggingProperties(node);
 
     // Restore internal properties
-    d_ptr->m_page = p;
+//    d_ptr->m_page = p;
     d_ptr->m_nativeId = nativeID;
     d_ptr->m_flags = d_ptr->m_flags | internalFlags;
     d_ptr->m_disposeFunc = disposeFunc;
 
     // Transform annotation to current page rotation
-    d_ptr->transform( d_ptr->m_page->rotationMatrix() );
+//    d_ptr->transform( d_ptr->m_page->rotationMatrix() );
 }
 
 double TaggingPrivate::distanceSqr( double x, double y, double xScale, double yScale )
@@ -330,7 +330,7 @@ class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
 	int height;
 };
 
-BoxTagging::BoxTagging(  )
+BoxTagging::BoxTagging()
     : Tagging( *new BoxTaggingPrivate() )
 {
 }

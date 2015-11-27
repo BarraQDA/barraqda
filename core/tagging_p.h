@@ -11,6 +11,7 @@
 #define OKULAR_TAGGINGS_P_H
 
 #include "area.h"
+#include "document.h"
 #include "tagging.h"
 
 namespace Okular {
@@ -44,7 +45,7 @@ class TaggingPrivate
          */
         virtual double distanceSqr( double x, double y, double xScale, double yScale );
 	
-        PagePrivate * m_page;
+        DocumentPrivate * m_doc;
 
         QString m_author;
         QString m_contents;

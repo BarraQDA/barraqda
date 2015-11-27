@@ -2680,10 +2680,11 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 }
                 else if ( choice == tagSelection )
                 {
-                    Okular::TaggingUtils::createTagging ( selectionRect.left(),
+                    Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( selectionRect.left(),
                                                  selectionRect.top(),
                                                  selectionRect.width(),
                                                  selectionRect.height() );
+                    Okular::TaggingUtils::storeTagging (tag, 
                 }
             }
             }

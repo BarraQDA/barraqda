@@ -233,14 +233,14 @@ AddTaggingCommand::~AddTaggingCommand()
 void AddTaggingCommand::undo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
-    m_docPriv->performRemovePageTagging( m_pageNumber, m_tagging );
+    m_docPriv->performRemoveTagging( m_pageNumber, m_tagging );
     m_done = false;
 }
 
 void AddTaggingCommand::redo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
-    m_docPriv->performAddPageTagging( m_pageNumber,  m_tagging );
+    m_docPriv->performAddTagging( m_pageNumber,  m_tagging );
     m_done = true;
 }
 
@@ -265,13 +265,13 @@ RemoveTaggingCommand::~RemoveTaggingCommand()
 void RemoveTaggingCommand::undo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
-    m_docPriv->performAddPageTagging( m_pageNumber,  m_tagging );
+    m_docPriv->performAddTagging( m_pageNumber,  m_tagging );
     m_done = false;
 }
 
 void RemoveTaggingCommand::redo(){
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
-    m_docPriv->performRemovePageTagging( m_pageNumber, m_tagging );
+    m_docPriv->performRemoveTagging( m_pageNumber, m_tagging );
     m_done = true;
 }
 
@@ -294,14 +294,14 @@ void ModifyTaggingPropertiesCommand::undo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
     m_tagging->setTaggingProperties( m_prevProperties );
-    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+    m_docPriv->performModifyTagging( m_pageNumber,  m_tagging, true );
 }
 
 void ModifyTaggingPropertiesCommand::redo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
     m_tagging->setTaggingProperties( m_newProperties );
-    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+    m_docPriv->performModifyTagging( m_pageNumber,  m_tagging, true );
 }
 
 TranslateTaggingCommand::TranslateTaggingCommand( DocumentPrivate* docPriv,
@@ -322,14 +322,14 @@ void TranslateTaggingCommand::undo()
 {
     moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle(  minusDelta() ), m_docPriv, m_pageNumber );
     m_tagging->translate( minusDelta() );
-    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+    m_docPriv->performModifyTagging( m_pageNumber,  m_tagging, true );
 }
 
 void TranslateTaggingCommand::redo()
 {
     moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle( m_delta ), m_docPriv, m_pageNumber );
     m_tagging->translate( m_delta );
-    m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
+    m_docPriv->performModifyTagging( m_pageNumber,  m_tagging, true );
 }
 
 int TranslateTaggingCommand::id() const

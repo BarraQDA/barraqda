@@ -1216,57 +1216,19 @@ void DocumentPrivate::performSetAnnotationContents( const QString & newContents,
     performModifyPageAnnotation( pageNumber,  annot, appearanceChanged );
 }
 
-void DocumentPrivate::performAddPageTagging( int page, Tagging * tagging )
+void DocumentPrivate::performAddTagging( int page, Tagging * tagging )
 {
-    // find out the page to attach tagging
-    Page * kp = m_pagesVector[ page ];
-    if ( !m_generator || !kp )
-        return;
-
-    // the tagging belongs already to a page
-    if ( tagging->d_ptr->m_page )
-        return;
-
     // add tagging to the page
-    kp->addTagging( tagging );
-
-    // notify observers about the change
-    notifyTaggingChanges( page );
+    m_parent->addTagging( tagging );
 }
 
-void DocumentPrivate::performRemovePageTagging( int page, Tagging * tagging )
+void DocumentPrivate::performRemoveTagging( int page, Tagging * tagging )
 {
-    // find out the page
-    Page * kp = m_pagesVector[ page ];
-    if ( !m_generator || !kp )
-        return;
-
-    // try to remove the tagging
-    if ( m_parent->canRemovePageTagging( tagging ) )
-    {
-        kp->removeTagging( tagging ); // Also destroys the object
-
-        // in case of success, notify observers about the change
-        notifyTaggingChanges( page );
-    }
+    m_parent->removeTagging( tagging ); // Also destroys the object
 }
 
-void DocumentPrivate::performModifyPageTagging( int page, Tagging * tagging, bool appearanceChanged )
+void DocumentPrivate::performModifyTagging( int page, Tagging * tagging, bool appearanceChanged )
 {
-    Page * kp = m_pagesVector[ page ];
-    if ( !m_generator || !kp )
-        return;
-
-    // notify observers about the change
-    notifyTaggingChanges( page );
-}
-
-void DocumentPrivate::performSetTaggingContents( const QString & newContents, Tagging *tag, int pageNumber )
-{
-    bool appearanceChanged = false;
-
-    // Tell the document the tagging has been modified
-    performModifyPageTagging( pageNumber,  tag, appearanceChanged );
 }
 
 void DocumentPrivate::saveDocumentInfo() const
@@ -2272,6 +2234,9 @@ Document::~Document()
     for ( ; it != itEnd; ++it )
         d->unloadGenerator( it.value() );
     d->m_loadedGenerators.clear();
+    
+    // delete the taggings
+    deleteTaggings();
 
     // delete the private structure
     delete d;
@@ -3372,43 +3337,47 @@ void Document::removePageAnnotations( int page, const QList<Annotation*> &annota
     d->m_undoStack->endMacro();
 }
 
+QLinkedList< Tagging* > Document::taggings() const
+{
+    return m_taggings;
+}
+
+void Document::addTagging( Tagging * tagging )
+{
+    tagging->d_ptr->m_doc = d;
+    m_taggings.append( tagging );
+
+    TaggingObjectRect *rect = new TaggingObjectRect( tagging );
+
+    // Rotate the annotation on the page.
+//    const QTransform matrix = d->rotationMatrix();
+//    tagging->d_ptr->taggingTransform( matrix );
+
+//    m_rects.append( rect );
+}
+
+bool Document::removeTagging( Tagging * tagging )
+{
+//  TBD
+    
+    return true;
+}
+
+void Document::deleteTaggings()
+{
+    // delete all stored taggings
+    QLinkedList< Tagging * >::const_iterator aIt = m_taggings.begin(), aEnd = m_taggings.end();
+    for ( ; aIt != aEnd; ++aIt )
+        delete *aIt;
+    m_taggings.clear();
+}
+
+
 void DocumentPrivate::notifyTaggingChanges( int page )
 {
     int flags = DocumentObserver::Taggings;
 
     foreachObserverD( notifyPageChanged( page, flags ) );
-}
-
-bool Document::canRemovePageTagging( const Tagging * tagging ) const
-{
-    if ( !tagging )
-        return false;
-
-    switch ( tagging->subType() )
-    {
-        case Tagging::TText:
-        case Tagging::TBox:
-            return true;
-        default:
-            return false;
-    }
-}
-
-void Document::removePageTagging( int page, Tagging * tagging )
-{
-    QUndoCommand *uc = new RemoveTaggingCommand(this->d, tagging, page);
-    d->m_undoStack->push(uc);
-}
-
-void Document::removePageTaggings( int page, const QList<Tagging*> &taggings )
-{
-    d->m_undoStack->beginMacro(i18nc("remove a collection of taggings from the page", "remove taggings"));
-    foreach(Tagging* tagging, taggings)
-    {
-        QUndoCommand *uc = new RemoveTaggingCommand(this->d, tagging, page);
-        d->m_undoStack->push(uc);
-    }
-    d->m_undoStack->endMacro();
 }
 
 bool DocumentPrivate::canAddAnnotationsNatively() const
