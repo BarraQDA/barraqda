@@ -22,7 +22,8 @@
 #include "area.h"
 
 namespace Okular {
-  
+
+class Document;  
 class Tagging;
 class TaggingPrivate;
 class TextTaggingPrivate;
@@ -35,18 +36,14 @@ class OKULAR_EXPORT TaggingUtils
 {
     public:
         /**
-         * Restore a tagging (with revisions if needed) from the dom @p element.
          *
          * Returns a pointer to the complete tagging or 0 if element is invalid.
          */
         static Tagging * createTagging( int left, int top, int width, int height );
 
         /**
-         * Saves the @p tagging as a child of @p element taking
-         * care of saving all revisions if it has any.
          */
-        static void storeTagging( const Tagging * tagging,
-                                     QDomElement & element, QDomDocument & document );
+        static void storeTagging( const Tagging * tagging, Okular::Document * doc );
 
         /**
          * Returns the geometry of the given @p tagging scaled by

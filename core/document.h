@@ -71,6 +71,7 @@ class VisiblePageRect;
 class OKULAR_EXPORT DocumentInfo
 {
     friend class Document;
+    friend class Tagging;
 
     public:
         /**

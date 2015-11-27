@@ -30,14 +30,9 @@ Tagging * TaggingUtils::createTagging( int left, int top, int width, int height 
     return tagging;
 }
 
-void TaggingUtils::storeTagging( const Tagging * tag, QDomElement & tagElement,
-    QDomDocument & document )
+void TaggingUtils::storeTagging( const Tagging * tag, Document * doc )
 {
-    // save tagging's type as element's attribute
-    tagElement.setAttribute( "type", (uint)tag->subType() );
-
-    // append all tagging data as children of this node
-    tag->store( tagElement, document );
+    doc->d->m_taggings.append ( tag );
 }
 
 

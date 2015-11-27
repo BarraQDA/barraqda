@@ -2684,7 +2684,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                                  selectionRect.top(),
                                                  selectionRect.width(),
                                                  selectionRect.height() );
-// ###                    Okular::TaggingUtils::storeTagging (tag, ???)
+                    Okular::TaggingUtils::storeTagging (tag, ???)
                 }
             }
             }
