@@ -45,7 +45,7 @@ class TaggingPrivate
          */
         virtual double distanceSqr( double x, double y, double xScale, double yScale );
 	
-        DocumentPrivate * m_doc;
+        PagePrivate * m_page;
 
         QString m_author;
         QString m_contents;

@@ -2680,11 +2680,14 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 }
                 else if ( choice == tagSelection )
                 {
-                    Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( selectionRect.left(),
-                                                 selectionRect.top(),
-                                                 selectionRect.width(),
-                                                 selectionRect.height() );
-                    Okular::TaggingUtils::storeTagging (tag, d->document );
+                    Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (selectionRect, contentAreaWidth(), contentAreaHeight() );
+                    Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( tagRect );
+
+                    QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
+                    PageViewItem * item = *iIt;
+                    Okular::Page * okularPage = (Okular::Page *) item->page();
+
+                    Okular::TaggingUtils::storeTagging (tag, okularPage );
                 }
             }
             }

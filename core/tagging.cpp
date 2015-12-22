@@ -15,24 +15,23 @@
 // local includes
 #include "document.h"
 #include "document_p.h"
+#include "page.h"
 #include "page_p.h"
 
 using namespace Okular;
 
 //BEGIN TaggingUtils implementation
-Tagging * TaggingUtils::createTagging( int left, int top, int width, int height )
+Tagging * TaggingUtils::createTagging( NormalizedRect *rect )
 {
     // build tagging of given type
-    BoxTagging * tagging = new BoxTagging( );
-    tagging->setcoords(left, top, width, height);
-
+    Tagging * tagging = new BoxTagging( rect );
     // return created tagging
     return tagging;
 }
 
-void TaggingUtils::storeTagging( Tagging * tag, Document * doc )
+void TaggingUtils::storeTagging( Tagging * tag, Page * page )
 {
-    doc->addTagging ( tag );
+    page->addTagging ( tag );
 }
 
 
@@ -59,6 +58,10 @@ TaggingPrivate::TaggingPrivate()
 }
 
 TaggingPrivate::~TaggingPrivate()
+{
+}
+
+Tagging::Tagging( )
 {
 }
 
@@ -134,10 +137,10 @@ void Tagging::setBoundingRectangle( const NormalizedRect &rectangle )
     Q_D( Tagging );
     d->m_boundary = rectangle;
     d->resetTransformation();
-//     if ( d->m_page )
-//     {
-//         d->transform( d->m_page->rotationMatrix() );
-//     }
+    if ( d->m_page )
+    {
+        d->transform( d->m_page->rotationMatrix() );
+    }
 }
 
 NormalizedRect Tagging::boundingRectangle() const
@@ -157,10 +160,10 @@ void Tagging::translate( const NormalizedPoint &coord )
     Q_D( Tagging );
     d->translate( coord );
     d->resetTransformation();
-//     if ( d->m_page )
-//     {
-//         d->transform( d->m_page->rotationMatrix() );
-//     }
+    if ( d->m_page )
+    {
+        d->transform( d->m_page->rotationMatrix() );
+    }
 }
 
 void Tagging::setDisposeDataFunction( DisposeDataFunction func )
@@ -220,7 +223,7 @@ void Tagging::setTaggingProperties( const QDomNode& node )
     d_ptr->m_disposeFunc = disposeFunc;
 
     // Transform annotation to current page rotation
-//    d_ptr->transform( d_ptr->m_page->rotationMatrix() );
+   d_ptr->transform( d_ptr->m_page->rotationMatrix() );
 }
 
 double TaggingPrivate::distanceSqr( double x, double y, double xScale, double yScale )
@@ -315,14 +318,11 @@ class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
     public:
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
-	void setcoords ( int a_left, int top, int width, int height );
+	void setcoords ( NormalizedRect *rect );
 	
         NormalizedPoint m_inplaceCallout[3];
 	
-	int left;
-	int top;
-	int width;
-	int height;
+	NormalizedRect* m_rect;
 };
 
 BoxTagging::BoxTagging()
@@ -330,10 +330,12 @@ BoxTagging::BoxTagging()
 {
 }
 
-BoxTagging::BoxTagging( const QDomNode & node )
-    : Tagging( *new BoxTaggingPrivate(), node )
+BoxTagging::BoxTagging( NormalizedRect *rect )
+    : Tagging( *new BoxTaggingPrivate() )
 {
+    setcoords(rect);
 }
+
 
 BoxTagging::~BoxTagging()
 {
@@ -344,19 +346,17 @@ Tagging::SubType BoxTagging::subType() const
     return TBox;
 }
 
-void BoxTagging::setcoords( int left, int top, int width, int height )
+void BoxTagging::setcoords( NormalizedRect *rect )
 {
     Q_D( BoxTagging );
-    d->setcoords( left, top, width, height );
+    d->setcoords( rect );
 }
 
-void BoxTaggingPrivate::setcoords( int a_left, int a_top, int a_width, int a_height )
+void BoxTaggingPrivate::setcoords( NormalizedRect *rect )
 {
     kDebug() << "Setting tagging coordinates";
-    left = a_left;
-    top = a_top;
-    width = a_width;
-    height = a_height;
+    m_rect = rect;
+    m_boundary = *rect;
 }
 
 void BoxTaggingPrivate::translate( const NormalizedPoint &coord )

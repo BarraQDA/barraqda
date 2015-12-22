@@ -241,7 +241,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
             {
                 Okular::Tagging * tag = *tIt;
                 bool intersects = tag->transformedBoundingRectangle().intersects( nXMin, nYMin, nXMax, nYMax );
-                if ( tag->subType() == Okular::Tagging::TText )
+                if ( tag->subType() == Okular::Tagging::TBox )
                 {
                     Okular::NormalizedRect iconrect( tag->transformedBoundingRectangle().left,
                                                     tag->transformedBoundingRectangle().top,

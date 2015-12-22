@@ -36,6 +36,8 @@
 #include "pagesize.h"
 #include "pagetransition.h"
 #include "rotationjob_p.h"
+#include "tagging.h"
+#include "tagging_p.h"
 #include "textpage.h"
 #include "textpage_p.h"
 #include "tile.h"
@@ -673,6 +675,26 @@ bool Page::removeAnnotation( Annotation * annotation )
             break;
         }
     }
+
+    return true;
+}
+
+void Page::addTagging( Tagging * tagging)
+{
+    tagging->d_ptr->m_page = d;
+    d->m_doc->m_taggings.append( tagging );
+
+    TaggingObjectRect *rect = new TaggingObjectRect( tagging );
+
+    // Rotate the tagging on the page.
+    const QTransform matrix = d->rotationMatrix();
+    tagging->d_ptr->taggingTransform( matrix );
+
+    m_rects.append( rect );
+}
+
+bool Page::removeTagging( Tagging * tagging )
+{
 
     return true;
 }

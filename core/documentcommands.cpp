@@ -240,7 +240,7 @@ void AddTaggingCommand::undo()
 void AddTaggingCommand::redo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
-    m_docPriv->performAddTagging( m_pageNumber,  m_tagging );
+    m_docPriv->performAddPageTagging( m_pageNumber,  m_tagging );
     m_done = true;
 }
 
@@ -265,7 +265,7 @@ RemoveTaggingCommand::~RemoveTaggingCommand()
 void RemoveTaggingCommand::undo()
 {
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
-    m_docPriv->performAddTagging( m_pageNumber,  m_tagging );
+    m_docPriv->performAddPageTagging( m_pageNumber,  m_tagging );
     m_done = false;
 }
 

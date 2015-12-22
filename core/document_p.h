@@ -150,7 +150,7 @@ class DocumentPrivate
         void performRemovePageAnnotation( int page, Annotation * annotation );
         void performModifyPageAnnotation( int page, Annotation * annotation, bool appearanceChanged );
         void performSetAnnotationContents( const QString & newContents, Annotation *annot, int pageNumber );
-        void performAddTagging( int page, Tagging *tagging );
+        void performAddPageTagging( int page, Tagging *tagging );
         void performRemoveTagging( int page, Tagging * tagging );
         void performModifyTagging( int page, Tagging * tagging, bool appearanceChanged );
 

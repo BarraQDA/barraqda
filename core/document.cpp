@@ -1216,12 +1216,19 @@ void DocumentPrivate::performSetAnnotationContents( const QString & newContents,
     performModifyPageAnnotation( pageNumber,  annot, appearanceChanged );
 }
 
-void DocumentPrivate::performAddTagging( int page, Tagging * tagging )
+void DocumentPrivate::performAddPageTagging( int page, Tagging * tagging )
 {
-    kDebug() << "Adding tagging to document";
+    // find out the page to attach tagging
+    Page * kp = m_pagesVector[ page ];
+    if ( !m_generator || !kp )
+        return;
 
-    // add tagging to the tagging
-    m_parent->addTagging( tagging );
+    // the tagging belongs already to a page
+    if ( tagging->d_ptr->m_page )
+        return;
+
+    // add tagging to the page
+    kp->addTagging( tagging );
 }
 
 void DocumentPrivate::performRemoveTagging( int page, Tagging * tagging )
@@ -3344,20 +3351,6 @@ void Document::removePageAnnotations( int page, const QList<Annotation*> &annota
 QLinkedList< Tagging* > Document::taggings() const
 {
     return d->m_taggings;
-}
-
-void Document::addTagging( Tagging * tagging )
-{
-    tagging->d_ptr->m_doc = d;
-    d->m_taggings.append( tagging );
-
-    TaggingObjectRect *rect = new TaggingObjectRect( tagging );
-
-    // Rotate the annotation on the page.
-//    const QTransform matrix = d->rotationMatrix();
-//    tagging->d_ptr->taggingTransform( matrix );
-
-//    m_rects.append( rect );
 }
 
 bool Document::removeTagging( Tagging * tagging )

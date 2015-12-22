@@ -329,6 +329,16 @@ class OKULAR_EXPORT Page
         bool removeAnnotation( Annotation * annotation );
 
         /**
+         * Adds a new @p tagging to the page.
+         */
+        void addTagging( Tagging * tagging);
+
+        /**
+         * Removes the @p tagging from the page.
+         */
+        bool removeTagging( Tagging * tagging );
+
+        /**
          * Sets the page @p transition effect.
          */
         void setTransition( PageTransition * transition );

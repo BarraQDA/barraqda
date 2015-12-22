@@ -23,7 +23,7 @@
 
 namespace Okular {
 
-class Document;  
+class Page;
 class Tagging;
 class TaggingPrivate;
 class TextTaggingPrivate;
@@ -39,11 +39,11 @@ class OKULAR_EXPORT TaggingUtils
          *
          * Returns a pointer to the complete tagging or 0 if element is invalid.
          */
-        static Tagging * createTagging( int left, int top, int width, int height );
+        static Tagging * createTagging( NormalizedRect *rect );
 
         /**
          */
-        static void storeTagging( Tagging * tagging, Okular::Document * doc );
+	static void storeTagging( Tagging * tag, Page * page );
 
         /**
          * Returns the geometry of the given @p tagging scaled by
@@ -106,6 +106,9 @@ class OKULAR_EXPORT Tagging
          * Destroys the tagging.
          */
         virtual ~Tagging();
+
+	Tagging( );
+	Tagging( NormalizedRect *rect );
 
         /**
          * Sets the @p author of the tagging.
@@ -252,12 +255,9 @@ class OKULAR_EXPORT BoxTagging : public Tagging
         /**
          * Creates a new box tagging.
          */
-        BoxTagging();
-
-        /**
-         * Creates a new box tagging from the xml @p description
-         */
-        BoxTagging( const QDomNode &description );
+        BoxTagging( );
+	
+        BoxTagging( NormalizedRect *rect );
 
         /**
          * Destroys the text tagging.
@@ -272,7 +272,7 @@ class OKULAR_EXPORT BoxTagging : public Tagging
         /**
          * Set box coordinates
          */
-        void setcoords( int left, int top, int width, int height );
+        void setcoords( NormalizedRect *rect );
 	
     private:
         Q_DECLARE_PRIVATE( BoxTagging )
