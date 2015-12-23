@@ -7,6 +7,8 @@ include(MacroOptionalAddSubdirectory)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
 
+set(CMAKE_CXX_FLAGS_DEBUG          "-g -O0 -fno-reorder-blocks -fno-schedule-insns -fno-inline")
+
 macro_optional_find_package(QImageBlitz)
 macro_log_feature(QIMAGEBLITZ_FOUND "QImageBlitz" "An image effects library" "http://sourceforge.net/projects/qimageblitz" TRUE "kdesupport" "Required to build Okular.")
 

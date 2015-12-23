@@ -75,6 +75,7 @@
 #include "core/document_p.h"
 #include "core/form.h"
 #include "core/page.h"
+#include "core/page_p.h"
 #include "core/misc.h"
 #include "core/generator.h"
 #include "core/movie.h"
@@ -2680,14 +2681,22 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 }
                 else if ( choice == tagSelection )
                 {
-                    Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (selectionRect, contentAreaWidth(), contentAreaHeight() );
-                    Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( tagRect );
-
+                    //  FIX: Just taking first page view item.
                     QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
-                    PageViewItem * item = *iIt;
-                    Okular::Page * okularPage = (Okular::Page *) item->page();
+                    for ( ; iIt < iEnd; ++iIt )
+                    {
+                        PageViewItem * item = *iIt;
 
-                    Okular::TaggingUtils::storeTagging (tag, okularPage );
+                        Okular::Page * okularPage = (Okular::Page *) item->page();
+                        QRect intersect = selectionRect & item->croppedGeometry();
+                        if (! intersect.isNull( ) )
+                        {
+                            intersect.translate( -item->uncroppedGeometry().topLeft() );
+                            Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
+                            Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( tagRect );
+                            Okular::TaggingUtils::storeTagging (tag, okularPage );
+                        }
+                    }
                 }
             }
             }
