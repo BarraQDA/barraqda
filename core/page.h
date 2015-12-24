@@ -20,7 +20,6 @@
 class QPixmap;
 
 class PagePainter;
-class PageView;
 
 namespace Okular {
 
@@ -409,7 +408,6 @@ class OKULAR_EXPORT Page
          * member variables directly.
          */
         friend class ::PagePainter;
-	friend class ::PageView;
         /// @endcond
 
         const QPixmap * _o_nearestPixmap( DocumentObserver *, int, int ) const;
