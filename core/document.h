@@ -15,7 +15,6 @@
 #include "area.h"
 #include "global.h"
 #include "pagesize.h"
-#include "tagging.h"
 
 #include <QtCore/QObject>
 #include <QtCore/QStringList>
@@ -560,26 +559,6 @@ class OKULAR_EXPORT Document : public QObject
          */
         void removePageAnnotations( int page, const QList<Annotation*> &annotations );
 
-        /**
-         * Returns the list of taggings of the document.
-         */
-        QLinkedList< Tagging* > taggings() const;
-
-        /**
-         * Adds a new @p tagging to the document.
-         */
-        void addTagging( Tagging * tagging );
-
-        /**
-         * Removes the @p tagging from the document.
-         */
-        bool removeTagging( Tagging * tagging );
-
-        /**
-         * Deletes all taggings of the document.
-         */
-        void deleteTaggings();
-        
         /**
          * Sets the text selection for the given @p page.
          *

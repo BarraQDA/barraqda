@@ -151,8 +151,8 @@ class DocumentPrivate
         void performModifyPageAnnotation( int page, Annotation * annotation, bool appearanceChanged );
         void performSetAnnotationContents( const QString & newContents, Annotation *annot, int pageNumber );
         void performAddPageTagging( int page, Tagging *tagging );
-        void performRemoveTagging( int page, Tagging * tagging );
-        void performModifyTagging( int page, Tagging * tagging, bool appearanceChanged );
+        void performRemovePageTagging( int page, Tagging * tagging );
+        void performModifyPageTagging( int page, Tagging * tagging, bool appearanceChanged );
 
         // private slots
         void saveDocumentInfo() const;
@@ -287,8 +287,6 @@ class DocumentPrivate
         QDomNode m_prevPropsOfAnnotBeingModified;
 
         synctex_scanner_t m_synctex_scanner;
-        
-        QLinkedList< Tagging* > m_taggings;
 };
 
 class DocumentInfoPrivate

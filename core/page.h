@@ -15,6 +15,7 @@
 #include "okular_export.h"
 #include "area.h"
 #include "global.h"
+#include "tagging.h"
 #include "textpage.h"
 
 class QPixmap;
@@ -31,6 +32,7 @@ class FormField;
 class PagePrivate;
 class PageTransition;
 class SourceReference;
+class Tagging;
 class TextSelection;
 class Tile;
 
@@ -329,15 +331,25 @@ class OKULAR_EXPORT Page
         bool removeAnnotation( Annotation * annotation );
 
         /**
-         * Adds a new @p tagging to the page.
+         * Returns the list of taggings of the document.
          */
-        void addTagging( Tagging * tagging);
+        QLinkedList< Tagging* > taggings() const;
 
         /**
-         * Removes the @p tagging from the page.
+         * Adds a new @p tagging to the document.
+         */
+        void addTagging( Tagging * tagging );
+
+        /**
+         * Removes the @p tagging from the document.
          */
         bool removeTagging( Tagging * tagging );
 
+        /**
+         * Deletes all taggings of the document.
+         */
+        void deleteTaggings();
+        
         /**
          * Sets the page @p transition effect.
          */

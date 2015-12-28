@@ -139,6 +139,7 @@ Page::~Page()
     deleteAnnotations();
     d->deleteTextSelections();
     deleteSourceReferences();
+    deleteTaggings();
 
     delete d;
 }
@@ -682,7 +683,7 @@ bool Page::removeAnnotation( Annotation * annotation )
 void Page::addTagging( Tagging * tagging)
 {
     tagging->d_ptr->m_page = d;
-    d->m_doc->m_taggings.append( tagging );
+    d->m_taggings.append( tagging );
 
     TaggingObjectRect *rect = new TaggingObjectRect( tagging );
 
@@ -697,6 +698,15 @@ bool Page::removeTagging( Tagging * tagging )
 {
 
     return true;
+}
+
+void Page::deleteTaggings()
+{
+    // delete all stored taggings
+    QLinkedList< Tagging * >::const_iterator aIt = d->m_taggings.begin(), aEnd = d->m_taggings.end();
+    for ( ; aIt != aEnd; ++aIt )
+        delete *aIt;
+    d->m_taggings.clear();
 }
 
 void Page::setTransition( PageTransition * transition )

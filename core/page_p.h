@@ -142,6 +142,8 @@ class PagePrivate
 
         bool m_isBoundingBoxKnown : 1;
         QDomDocument restoredLocalAnnotationList; // <annotationList>...</annotationList>
+        
+        QLinkedList< Tagging* > m_taggings;
 };
 
 }

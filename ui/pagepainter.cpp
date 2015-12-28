@@ -236,7 +236,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
         // append taggings inside limits to the un/buffered list
         if ( canDrawTaggings )
         {
-            QLinkedList< Okular::Tagging * >::const_iterator tIt = page->d->m_doc->m_taggings.constBegin(), tEnd = page->d->m_doc->m_taggings.constEnd();
+            QLinkedList< Okular::Tagging * >::const_iterator tIt = page->d->m_taggings.constBegin(), tEnd = page->d->m_taggings.constEnd();
             for ( ; tIt != tEnd; ++tIt )
             {
                 Okular::Tagging * tag = *tIt;

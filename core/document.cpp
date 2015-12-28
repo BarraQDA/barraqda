@@ -1231,12 +1231,16 @@ void DocumentPrivate::performAddPageTagging( int page, Tagging * tagging )
     kp->addTagging( tagging );
 }
 
-void DocumentPrivate::performRemoveTagging( int page, Tagging * tagging )
+void DocumentPrivate::performRemovePageTagging( int page, Tagging * tagging )
 {
-    m_parent->removeTagging( tagging ); // Also destroys the object
+    Page * kp = m_pagesVector[ page ];
+    kp->removeTagging( tagging ); // Also destroys the object
+
+    // in case of success, notify observers about the change
+    notifyTaggingChanges( page );
 }
 
-void DocumentPrivate::performModifyTagging( int page, Tagging * tagging, bool appearanceChanged )
+void DocumentPrivate::performModifyPageTagging( int page, Tagging * tagging, bool appearanceChanged )
 {
 }
 
@@ -2244,9 +2248,6 @@ Document::~Document()
         d->unloadGenerator( it.value() );
     d->m_loadedGenerators.clear();
     
-    // delete the taggings
-    deleteTaggings();
-
     // delete the private structure
     delete d;
 }
@@ -2657,8 +2658,6 @@ void Document::closeDocument()
     AudioPlayer::instance()->d->m_currentDocument = KUrl();
 
     d->m_undoStack->clear();
-    
-    d->m_taggings.clear();
 }
 
 void Document::addObserver( DocumentObserver * pObserver )
@@ -3347,28 +3346,6 @@ void Document::removePageAnnotations( int page, const QList<Annotation*> &annota
     }
     d->m_undoStack->endMacro();
 }
-
-QLinkedList< Tagging* > Document::taggings() const
-{
-    return d->m_taggings;
-}
-
-bool Document::removeTagging( Tagging * tagging )
-{
-//  TBD
-    
-    return true;
-}
-
-void Document::deleteTaggings()
-{
-    // delete all stored taggings
-    QLinkedList< Tagging * >::const_iterator aIt = d->m_taggings.begin(), aEnd = d->m_taggings.end();
-    for ( ; aIt != aEnd; ++aIt )
-        delete *aIt;
-    d->m_taggings.clear();
-}
-
 
 void DocumentPrivate::notifyTaggingChanges( int page )
 {
