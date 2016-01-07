@@ -31,7 +31,7 @@ Tagging * TaggingUtils::createTagging( NormalizedRect *rect )
 
 void TaggingUtils::storeTagging( Tagging * tag, Page * page )
 {
-    page->addTagging ( tag );
+//    page->addTagging ( tag );
 }
 
 

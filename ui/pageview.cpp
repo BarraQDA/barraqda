@@ -89,7 +89,8 @@
 
 static int pageflags = PagePainter::Accessibility | PagePainter::EnhanceLinks |
                        PagePainter::EnhanceImages | PagePainter::Highlights |
-                       PagePainter::TextSelection | PagePainter::Annotations;
+                       PagePainter::TextSelection | PagePainter::Annotations |
+                       PagePainter::Taggings;
 
 static const float kZoomValues[] = { 0.12, 0.25, 0.33, 0.50, 0.66, 0.75, 1.00, 1.25, 1.50, 2.00, 4.00, 8.00, 16.00 };
 
@@ -2695,6 +2696,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                             Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
                             Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( tagRect );
                             Okular::TaggingUtils::storeTagging (tag, okularPage );
+                            d->document->addPageTagging( okularPage->number(), tag );
                         }
                     }
                 }

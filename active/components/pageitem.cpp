@@ -316,7 +316,7 @@ void PageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
         m_documentItem.data()->document()->requestPixmaps(requestedPixmaps, prf);
         m_intentionalDraw = false;
     }
-    const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations;
+    const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations | PagePainter::Taggings;
     PagePainter::paintPageOnPainter(painter, m_page, observer, flags, width(), height(), option->exposedRect.toRect());
 
     if (setAA) {

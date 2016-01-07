@@ -1229,6 +1229,9 @@ void DocumentPrivate::performAddPageTagging( int page, Tagging * tagging )
 
     // add tagging to the page
     kp->addTagging( tagging );
+    
+    // notify observers about the change
+    notifyTaggingChanges( page );
 }
 
 void DocumentPrivate::performRemovePageTagging( int page, Tagging * tagging )
@@ -1540,7 +1543,7 @@ void DocumentPrivate::rotationFinished( int page, Okular::Page *okularPage )
         return;
 
     foreach(DocumentObserver *o, m_observers)
-        o->notifyPageChanged( page, DocumentObserver::Pixmap | DocumentObserver::Annotations );
+        o->notifyPageChanged( page, DocumentObserver::Pixmap | DocumentObserver::Annotations | DocumentObserver::Taggings );
 }
 
 void DocumentPrivate::fontReadingProgress( int page )
@@ -3354,6 +3357,16 @@ void DocumentPrivate::notifyTaggingChanges( int page )
     foreachObserverD( notifyPageChanged( page, flags ) );
 }
 
+void Document::addPageTagging( int page, Tagging * tagging )
+{
+    // Transform annotation's base boundary rectangle into unrotated coordinates
+    Page *p = d->m_pagesVector[page];
+    QTransform t = p->d->rotationMatrix();
+    tagging->d_ptr->baseTransform(t.inverted());
+    QUndoCommand *uc = new AddTaggingCommand(this->d, tagging, page);
+    d->m_undoStack->push(uc);
+}
+
 bool DocumentPrivate::canAddAnnotationsNatively() const
 {
     Okular::SaveInterface * iface = qobject_cast< Okular::SaveInterface * >( m_generator );
@@ -4758,7 +4771,7 @@ void DocumentPrivate::setRotationInternal( int r, bool notify )
     if ( notify )
     {
         foreachObserverD( notifySetup( m_pagesVector, DocumentObserver::NewLayoutForPages ) );
-        foreachObserverD( notifyContentsCleared( DocumentObserver::Pixmap | DocumentObserver::Highlights | DocumentObserver::Annotations ) );
+        foreachObserverD( notifyContentsCleared( DocumentObserver::Pixmap | DocumentObserver::Highlights | DocumentObserver::Annotations | DocumentObserver::Taggings ) );
     }
     kDebug(OkularDebug) << "Rotated:" << r;
 }

@@ -33,7 +33,8 @@ class PagePainter
         // you can decide whether or not to permit drawing of a certain feature.
         enum PagePainterFlags { Accessibility = 1, EnhanceLinks = 2,
                                 EnhanceImages = 4, Highlights = 8,
-                                TextSelection = 16, Annotations = 32 };
+                                TextSelection = 16, Annotations = 32,
+				Taggings = 64 };
 
         // draw (using painter 'p') the 'page' requested by 'observer' using features
         // in 'flags'. 'limits' is the bounding rect of the paint operation,

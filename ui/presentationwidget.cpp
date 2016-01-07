@@ -1055,7 +1055,7 @@ void PresentationWidget::generateContentsPage( int pageNum, QPainter & p )
     geom.translate( -geom.left(), -geom.top() );
 
     // draw the page using the shared PagePainter class
-    int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations;
+    int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations | PagePainter::Taggings;
     PagePainter::paintPageOnPainter( &p, frame->page, this, flags,
                                      geom.width(), geom.height(), geom );
 

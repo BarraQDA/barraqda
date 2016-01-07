@@ -338,7 +338,7 @@ void ThumbnailList::notifyCurrentPageChanged( int previousPage, int currentPage 
 
 void ThumbnailList::notifyPageChanged( int pageNumber, int changedFlags )
 {
-    static int interestingFlags = DocumentObserver::Pixmap | DocumentObserver::Bookmark | DocumentObserver::Highlights | DocumentObserver::Annotations;
+    static int interestingFlags = DocumentObserver::Pixmap | DocumentObserver::Bookmark | DocumentObserver::Highlights | DocumentObserver::Annotations | DocumentObserver::Taggings;
     // only handle change notifications we are interested in
     if ( !( changedFlags & interestingFlags ) )
         return;
@@ -943,7 +943,7 @@ void ThumbnailWidget::paint( QPainter &p, const QRect &_clipRect )
         if ( clipRect.isValid() )
         {
             int flags = PagePainter::Accessibility | PagePainter::Highlights |
-                        PagePainter::Annotations;
+                        PagePainter::Annotations | PagePainter::Taggings;
             PagePainter::paintPageOnPainter( &p, m_page, m_parent->q, flags, m_pixmapWidth, m_pixmapHeight, clipRect );
         }
 
