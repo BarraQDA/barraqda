@@ -2167,6 +2167,22 @@ void PageView::mousePressEvent( QMouseEvent * e )
 
                         popup.exec( e->globalPos() );
                     }
+                    else
+                    {
+                        const QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
+                        if ( !orects.isEmpty() )
+                        {
+                            KMenu menu( this );
+                            foreach ( const Okular::ObjectRect * orect, orects )
+                            {
+                                Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
+                                Okular::NormalizedRect rect = tag->boundingRectangle();
+                                
+                                menu.addAction( KIcon("tag"), i18n( "Tag: L = %1, T = %2, R = %3 B = %4", rect.left, rect.right, rect.top, rect.bottom ));
+                            }
+                            menu.exec( e->globalPos() );
+                        }
+                    }
                 }
             }
             break;

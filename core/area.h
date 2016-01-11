@@ -334,6 +334,7 @@ KDE_DUMMY_QHASH_FUNCTION(NormalizedRect)
  *  - Action    : class Action: description of an action
  *  - Image     : class Image : description of an image (n/a)
  *  - Annotation: class Annotation: description of an annotation
+ *  - Tagging   : class Tagging: description of a tagging
  */
 class OKULAR_EXPORT ObjectRect
 {
