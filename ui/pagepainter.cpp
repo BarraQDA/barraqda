@@ -653,42 +653,42 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                 QRect taggingRect = r.geometry( scaledWidth, scaledHeight ).translated( -scaledCrop.topLeft() ).intersect( limits );
                 taggingRect.translate( -limits.left(), -limits.top() );
 
-                // tagging composition (product: tagging color * destcolor)
-                unsigned int * data = (unsigned int *)backImage.bits();
-                int val, newR, newG, newB,
-                    rh = 128,
-                    gh = 0,
-                    bh = 0,
-                    offset = taggingRect.top() * backImage.width();
-                for( int y = taggingRect.top(); y <= taggingRect.bottom(); ++y )
-                {
-                    for( int x = taggingRect.left(); x <= taggingRect.right(); ++x )
-                    {
-                        val = data[ x + offset ];
-                        //for odt or epub
-                        if(has_alpha)
-                        {
-                            newR = qRed(val);
-                            newG = qGreen(val);
-                            newB = qBlue(val);
-
-                            if(newR == newG && newG == newB && newR == 0)
-                                newR = newG = newB = 255;
-
-                            newR = (newR * rh) / 255;
-                            newG = (newG * gh) / 255;
-                            newB = (newB * bh) / 255;
-                        }
-                        else
-                        {
-                            newR = (qRed(val) * rh) / 255;
-                            newG = (qGreen(val) * gh) / 255;
-                            newB = (qBlue(val) * bh) / 255;
-                        }
-                        data[ x + offset ] = qRgba( newR, newG, newB, 255 );
-                    }
-                    offset += backImage.width();
-                }
+//                 // tagging composition (product: tagging color * destcolor)
+//                 unsigned int * data = (unsigned int *)backImage.bits();
+//                 int val, newR, newG, newB,
+//                     rh = 32,
+//                     gh = 0,
+//                     bh = 0,
+//                     offset = taggingRect.top() * backImage.width();
+//                 for( int y = taggingRect.top(); y <= taggingRect.bottom(); ++y )
+//                 {
+//                     for( int x = taggingRect.left(); x <= taggingRect.right(); ++x )
+//                     {
+//                         val = data[ x + offset ];
+//                         //for odt or epub
+//                         if(has_alpha)
+//                         {
+//                             newR = qRed(val);
+//                             newG = qGreen(val);
+//                             newB = qBlue(val);
+// 
+//                             if(newR == newG && newG == newB && newR == 0)
+//                                 newR = newG = newB = 255;
+// 
+//                             newR = (newR * rh) / 255;
+//                             newG = (newG * gh) / 255;
+//                             newB = (newB * bh) / 255;
+//                         }
+//                         else
+//                         {
+//                             newR = (qRed(val) * rh) / 255;
+//                             newG = (qGreen(val) * gh) / 255;
+//                             newB = (qBlue(val) * bh) / 255;
+//                         }
+//                         data[ x + offset ] = qRgba( newR, newG, newB, 255 );
+//                     }
+//                     offset += backImage.width();
+//                 }
             }
         }
 
