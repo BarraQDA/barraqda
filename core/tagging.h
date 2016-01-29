@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2015 by Jonathan Schultz <jonathan@imatix.com>          *
+ *   Copyright (C) 2016 by Jonathan Schultz <jonathan@imatix.com>          *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -20,6 +20,7 @@
 
 #include "okular_export.h"
 #include "area.h"
+#include "kicon.h"
 
 namespace Okular {
 
@@ -28,6 +29,8 @@ class Tagging;
 class TaggingPrivate;
 class TextTaggingPrivate;
 class BoxTaggingPrivate;
+
+class Node;
   
 /**
  * @short Helper class for tagging retrieval/storage.
@@ -43,7 +46,7 @@ class OKULAR_EXPORT TaggingUtils
 
         /**
          */
-	static void storeTagging( Tagging * tag, Page * page );
+        static void storeTagging( Tagging * tag, Page * page );
 
         /**
          * Returns the geometry of the given @p tagging scaled by
@@ -107,8 +110,12 @@ class OKULAR_EXPORT Tagging
          */
         virtual ~Tagging();
 
-	Tagging( );
-	Tagging( NormalizedRect *rect );
+		Tagging( );
+		Tagging( NormalizedRect *rect );
+        
+        void setNode ( const Node *node );
+        
+        Node *node() const;
 
         /**
          * Sets the @p author of the tagging.
@@ -156,7 +163,7 @@ class OKULAR_EXPORT Tagging
          */
         int flags() const;
 
-	/**
+		/**
          * Sets the bounding @p rectangle of the tagging.
          */
         void setBoundingRectangle( const NormalizedRect &rectangle );
@@ -277,6 +284,16 @@ class OKULAR_EXPORT BoxTagging : public Tagging
     private:
         Q_DECLARE_PRIVATE( BoxTagging )
         Q_DISABLE_COPY( BoxTagging )
+};
+
+class OKULAR_EXPORT Node
+{
+	public:
+		Node();
+		~Node();
+  
+    KIcon
+		icon;
 };
 
 }

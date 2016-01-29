@@ -379,7 +379,20 @@ TaggingPrivate* BoxTaggingPrivate::getNewTaggingPrivate()
     return new BoxTaggingPrivate();
 }
 
+//BEGIN Node implementation
+
+Node::Node()
+{
+    QPixmap pixmap = QPixmap(20, 20);
+    icon = KIcon(QIcon(pixmap));
+}
+
+Node::~Node()
+{
+}
+
+//END Node implementation
 
 
 
-    
+
