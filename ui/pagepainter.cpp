@@ -691,7 +691,8 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
             
             QImage * scaledImage = new QImage (tagRect.width(), tagRect.height(),
                                                 QImage::Format_ARGB32 );
-            scaledImage->fill (Qt::red);
+            
+            scaledImage->fill (tag->node()->m_color);
             changeImageAlpha( *scaledImage, 128 );
 //                QPixmap pixmap = QPixmap::fromImage( *scaledImage );
             mixedPainter->drawImage( tagRect.topLeft(), *scaledImage );

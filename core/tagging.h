@@ -113,7 +113,7 @@ class OKULAR_EXPORT Tagging
 		Tagging( );
 		Tagging( NormalizedRect *rect );
         
-        void setNode ( const Node *node );
+        void setNode ( Node *node );
         
         Node *node() const;
 
@@ -291,9 +291,10 @@ class OKULAR_EXPORT Node
 	public:
 		Node();
 		~Node();
-  
-    KIcon
-		icon;
+
+    static QList<Node *> * Nodes;
+    
+    unsigned int m_color;
 };
 
 }

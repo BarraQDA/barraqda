@@ -2699,6 +2699,8 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 }
                 else if ( choice == tagSelection )
                 {
+                    Okular::Node* node = new Okular::Node();
+                    
                     //  FIX: Just taking first page view item.
                     QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
                     for ( ; iIt < iEnd; ++iIt )
@@ -2711,7 +2713,8 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         {
                             intersect.translate( -item->uncroppedGeometry().topLeft() );
                             Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
-                            Okular::Tagging * tag = Okular::TaggingUtils::createTagging ( tagRect );
+                            Okular::Tagging* tag = Okular::TaggingUtils::createTagging ( tagRect );
+                            tag->setNode (node);
                             Okular::TaggingUtils::storeTagging (tag, okularPage );
                             d->document->addPageTagging( okularPage->number(), tag );
                         }
