@@ -128,6 +128,16 @@ class OKULAR_EXPORT Tagging
         QString author() const;
 
         /**
+         * Sets the unique @p name of the annotation.
+         */
+        void setUniqueName( const QString &name );
+
+        /**
+         * Returns the unique name of the annotation.
+         */
+        QString uniqueName() const;
+
+        /**
          * Sets the last modification @p date of the tagging.
          *
          * The date must be before or equal to QDateTime::currentDateTime()

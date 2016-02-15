@@ -2168,22 +2168,6 @@ void PageView::mousePressEvent( QMouseEvent * e )
 
                         popup.exec( e->globalPos() );
                     }
-                    else
-                    {
-                        const QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
-                        if ( !orects.isEmpty() )
-                        {
-                            KMenu menu( this );
-                            foreach ( const Okular::ObjectRect * orect, orects )
-                            {
-                                Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                                Okular::NormalizedRect rect = tag->boundingRectangle();
-                                
-                                menu.addAction( KIcon("tag"), i18n( "Tag: L = %1, T = %2, R = %3 B = %4", rect.left, rect.right, rect.top, rect.bottom ));
-                            }
-                            menu.exec( e->globalPos() );
-                        }
-                    }
                 }
             }
             break;
@@ -2561,7 +2545,47 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             if ( rightButton && !d->mouseSelecting )
             {
                 PageViewItem * pageItem = pickItemOnPoint( eventPos.x(), eventPos.y() );
-                emit rightClick( pageItem ? pageItem->page() : 0, e->globalPos() );
+
+                // find out normalized mouse coords inside current item
+                const QRect & itemRect = pageItem->uncroppedGeometry();
+                double nX = pageItem->absToPageX(eventPos.x());
+                double nY = pageItem->absToPageY(eventPos.y());
+
+                const QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
+                if ( !orects.isEmpty() )
+                {
+                    KMenu menu( this );
+                    menu.addTitle ( i18n( "Delete tag" ) );
+                    QList< QAction * > * tagSelections = new QList< QAction * >();
+                    foreach ( const Okular::ObjectRect * orect, orects )
+                    {
+                        Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
+                        Okular::Node * node = tag->node();
+                        QPixmap pixmap(100,100);
+                        pixmap.fill(node->color());
+                        QAction * tagSelection = menu.addAction ( KIcon(pixmap), i18n ("Tag") );
+                        tagSelections->append( tagSelection );
+                    }
+                    QAction *choice = menu.exec( e->globalPos() );
+                    // check if the user really selected an action
+                    if ( choice )
+                    {
+                        QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
+                        foreach ( const Okular::ObjectRect * orect, orects )
+                        {
+                            if ( choice == *aIt )
+                            {
+                                Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
+                                d->document->removePageTagging ( pageItem->page(), tag );
+                                break;
+                            }
+                            aIt++;
+                        }
+                    }
+                    
+                }
+                else
+                    emit rightClick( pageItem ? pageItem->page() : 0, e->globalPos() );
                 break;
             }
 

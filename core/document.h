@@ -565,6 +565,11 @@ class OKULAR_EXPORT Document : public QObject
         void addPageTagging( int page, Tagging *tagging );
 
         /**
+         * Removes the given @p tagging from the given @p page.
+         */
+        void removePageTagging( int page, Tagging *tagging );
+        
+        /**
          * Sets the text selection for the given @p page.
          *
          * @param rect The rectangle of the selection.

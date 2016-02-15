@@ -682,6 +682,12 @@ bool Page::removeAnnotation( Annotation * annotation )
 
 void Page::addTagging( Tagging * tagging)
 {
+    // Generate uniqueName: okular-{UUID}
+    if(tagging->uniqueName().isEmpty())
+    {
+        QString uniqueName = "okular-" + QUuid::createUuid().toString();
+        tagging->setUniqueName( uniqueName );
+    }
     tagging->d_ptr->m_page = d;
     d->m_taggings.append( tagging );
 
@@ -696,6 +702,26 @@ void Page::addTagging( Tagging * tagging)
 
 bool Page::removeTagging( Tagging * tagging )
 {
+    QLinkedList< Tagging * >::iterator tIt = d->m_taggings.begin(), tEnd = d->m_taggings.end();
+    for ( ; tIt != tEnd; ++tIt )
+    {
+        if((*tIt) && (*tIt)->uniqueName()==tagging->uniqueName())
+        {
+            int rectfound = false;
+            QLinkedList< ObjectRect * >::iterator it = m_rects.begin(), end = m_rects.end();
+            for ( ; it != end && !rectfound; ++it )
+                if ( ( (*it)->objectType() == ObjectRect::OTagging ) && ( (*it)->object() == (*tIt) ) )
+                {
+                    delete *it;
+                    it = m_rects.erase( it );
+                    rectfound = true;
+                }
+            kDebug(OkularDebug) << "removed tagging:" << tagging->uniqueName();
+            tagging->d_ptr->m_page = 0;
+            d->m_taggings.erase( tIt );
+            break;
+        }
+    }
 
     return true;
 }

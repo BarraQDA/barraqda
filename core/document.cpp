@@ -3367,6 +3367,12 @@ void Document::addPageTagging( int page, Tagging * tagging )
     d->m_undoStack->push(uc);
 }
 
+void Document::removePageTagging( int page, Tagging * tagging )
+{
+    QUndoCommand *uc = new RemoveTaggingCommand(this->d, tagging, page);
+    d->m_undoStack->push(uc);
+}
+
 bool DocumentPrivate::canAddAnnotationsNatively() const
 {
     Okular::SaveInterface * iface = qobject_cast< Okular::SaveInterface * >( m_generator );

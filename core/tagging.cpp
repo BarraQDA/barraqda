@@ -108,6 +108,18 @@ QString Tagging::author() const
     return d->m_author;
 }
 
+void Tagging::setUniqueName( const QString &name )
+{
+    Q_D( Tagging );
+    d->m_uniqueName = name;
+}
+
+QString Tagging::uniqueName() const
+{
+    Q_D( const Tagging );
+    return d->m_uniqueName;
+}
+
 void Tagging::setModificationDate( const QDateTime &date )
 {
     Q_D( Tagging );
