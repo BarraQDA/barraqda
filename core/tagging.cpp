@@ -439,20 +439,25 @@ static QRgb tagColors [] = {
 
 static unsigned int lastColor = 0;
 
-QList< Node * > * Okular::Node::Nodes = 0;
+QList< Node * > * NodeUtils::Nodes = 0;
 
 Node::Node()
 {
     m_color = tagColors[lastColor++];
     
-    if ( !Nodes )
-        Nodes = new QList< Node *>();
+    if ( !NodeUtils::Nodes )
+        NodeUtils::Nodes = new QList< Node * >();
     
-    Nodes-> append(this);
+    NodeUtils::Nodes-> append(this);
 }
 
 Node::~Node()
 {
+}
+
+unsigned int Node::color() const
+{
+    return this->m_color;
 }
 
 //END Node implementation

@@ -286,15 +286,25 @@ class OKULAR_EXPORT BoxTagging : public Tagging
         Q_DISABLE_COPY( BoxTagging )
 };
 
+/**
+ * @short Helper class for node retrieval/storage.
+ */
+class OKULAR_EXPORT NodeUtils
+{
+    public:
+        static QList< Node * > * Nodes ;
+};
+
 class OKULAR_EXPORT Node
 {
 	public:
 		Node();
 		~Node();
 
-    static QList<Node *> * Nodes;
-    
-    unsigned int m_color;
+        unsigned int color() const;
+        
+    private:
+        int m_color;
 };
 
 }

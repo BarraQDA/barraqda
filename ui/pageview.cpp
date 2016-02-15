@@ -2615,7 +2615,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
             // popup that ask to copy:text and copy/save:image
             KMenu menu( this );
-            QAction *textToClipboard = 0, *speakText = 0, *imageToClipboard = 0, *imageToFile = 0, *tagSelection = 0;
+            QAction *textToClipboard = 0, *speakText = 0, *imageToClipboard = 0, *imageToFile = 0;
             if ( d->document->supportsSearching() && !selectedText.isEmpty() )
             {
                 menu.addTitle( i18np( "Text (1 character)", "Text (%1 characters)", selectedText.length() ) );
@@ -2636,8 +2636,23 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             menu.addTitle( i18n( "Image (%1 by %2 pixels)", selectionRect.width(), selectionRect.height() ) );
             imageToClipboard = menu.addAction( KIcon("image-x-generic"), i18n( "Copy to Clipboard" ) );
             imageToFile = menu.addAction( KIcon("document-save"), i18n( "Save to File..." ) );
-            menu.addTitle ( i18n( "Tag selection: X = %1, Y = %2, W = %3 H = %4", selectionRect.left(), selectionRect.top(), selectionRect.width(), selectionRect.height() ) );
-            tagSelection = menu.addAction ( KIcon("tag"), i18n ("Tag") );
+            
+            menu.addTitle ( i18n( "Tag" ) );
+            
+            QList< QAction * > * tagSelections = new QList< QAction * >();
+            if (Okular::NodeUtils::Nodes)
+            {
+                QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin(), nEnd = Okular::NodeUtils::Nodes->constEnd();
+                for ( ; nIt != nEnd; ++nIt )
+                {
+                    QPixmap pixmap(100,100);
+                    pixmap.fill((*nIt)->color());
+                    QAction * tagSelection = menu.addAction ( KIcon(pixmap), i18n ("Tag") );
+                    tagSelections->append( tagSelection );
+                }
+            }
+            QAction * newNode = menu.addAction ( KIcon("new"), i18n ("New") );
+            
             QAction *choice = menu.exec( e->globalPos() );
             // check if the user really selected an action
             if ( choice )
@@ -2697,10 +2712,26 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     // [2] speech selection using KTTSD
                     d->tts()->say( selectedText );
                 }
-                else if ( choice == tagSelection )
+                else
                 {
-                    Okular::Node* node = new Okular::Node();
-                    
+                    Okular::Node * node = 0;
+                    if ( choice == newNode )
+                        node = new Okular::Node();
+                    else
+                    {
+                        QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
+                        QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin();
+                        for ( ; aIt != aEnd; ++aIt )
+                        {
+                            if ( choice == *aIt )
+                            {
+                                node = *nIt;
+                                break;
+                            }
+                            nIt++;
+                        }
+                    }
+                            
                     //  FIX: Just taking first page view item.
                     QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
                     for ( ; iIt < iEnd; ++iIt )
