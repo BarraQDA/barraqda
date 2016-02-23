@@ -123,7 +123,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
     bool canDrawHighlights = (flags & Highlights) && !page->m_highlights.isEmpty();
     bool canDrawTextSelection = (flags & TextSelection) && page->textSelection();
     bool canDrawAnnotations = (flags & Annotations) && !page->m_annotations.isEmpty();
-    bool canDrawTaggings = !page->d->m_taggings.isEmpty();
+    bool canDrawTaggings = !page->m_taggings.isEmpty();
     bool enhanceLinks = (flags & EnhanceLinks) && Okular::Settings::highlightLinks();
     bool enhanceImages = (flags & EnhanceImages) && Okular::Settings::highlightImages();
     // vectors containing objects to draw
@@ -236,7 +236,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
         // append taggings inside limits to the un/buffered list
         if ( canDrawTaggings )
         {
-            QLinkedList< Okular::Tagging * >::const_iterator tIt = page->d->m_taggings.constBegin(), tEnd = page->d->m_taggings.constEnd();
+            QLinkedList< Okular::Tagging * >::const_iterator tIt = page->m_taggings.constBegin(), tEnd = page->m_taggings.constEnd();
             for ( ; tIt != tEnd; ++tIt )
             {
                 Okular::Tagging * tag = *tIt;

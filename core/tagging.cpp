@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2015 by Jonathan Schultz <jonathan@imatix.com>          *
+ *   Copyright (C) 2016 by Jonathan Schultz <jonathan@imatix.com>          *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -21,19 +21,51 @@
 using namespace Okular;
 
 //BEGIN TaggingUtils implementation
-Tagging * TaggingUtils::createTagging( NormalizedRect *rect )
+Tagging * TaggingUtils::createTagging( const QDomElement & tagElement )
 {
+    // safety check on tagging element
+    if ( !tagElement.hasAttribute( "type" ) )
+        return 0;
+
     // build tagging of given type
-    Tagging * tagging = new BoxTagging( rect );
+    Tagging * tagging = 0;
+    int typeNumber = tagElement.attribute( "type" ).toInt();
+    switch ( typeNumber )
+    {
+        case Tagging::TBox:
+            tagging = new BoxTagging( tagElement );
+            break;
+    }
+
     // return created tagging
     return tagging;
 }
 
-void TaggingUtils::storeTagging( Tagging * tag, Page * page )
+void TaggingUtils::storeTagging( const Tagging * tag, QDomElement & tagElement,
+    QDomDocument & document )
 {
-//    page->addTagging ( tag );
+    // save annotation's type as element's attribute
+    tagElement.setAttribute( "type", (uint)tag->subType() );
+
+    // append all annotation data as children of this node
+    tag->store( tagElement, document );
 }
 
+QDomElement TaggingUtils::findChildElement( const QDomNode & parentNode,
+    const QString & name )
+{
+    // loop through the whole children and return a 'name' named element
+    QDomNode subNode = parentNode.firstChild();
+    while( subNode.isElement() )
+    {
+        QDomElement element = subNode.toElement();
+        if ( element.tagName() == name )
+            return element;
+        subNode = subNode.nextSibling();
+    }
+    // if the name can't be found, return a dummy null element
+    return QDomElement();
+}
 
 QRect TaggingUtils::taggingGeometry( const Tagging * tag,
     double scaledWidth, double scaledHeight )
@@ -214,6 +246,8 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
     // store -other- attributes
     if ( d->m_flags ) // Strip internal flags
         e.setAttribute( "flags", d->m_flags );
+    
+    e.setAttribute( "node", this->node()->id() );
 
     // Sub-Node-1 - boundary
     QDomElement bE = document.createElement( "boundary" );
@@ -222,6 +256,7 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
     bE.setAttribute( "t", QString::number( d->m_boundary.top ) );
     bE.setAttribute( "r", QString::number( d->m_boundary.right ) );
     bE.setAttribute( "b", QString::number( d->m_boundary.bottom ) );
+    
 }
 
 void Tagging::setTaggingProperties( const QDomNode& node )
@@ -286,6 +321,35 @@ void TaggingPrivate::translate( const NormalizedPoint &coord )
 
 void TaggingPrivate::setTaggingProperties( const QDomNode& node )
 {
+    // get the [base] element of the annotation node
+    QDomElement e = TaggingUtils::findChildElement( node, "base" );
+    if ( e.isNull() )
+        return;
+
+    // parse -contents- attributes
+    if ( e.hasAttribute( "node" ) )
+        m_node = NodeUtils::retrieveNode( e.attribute( "node" ).toInt() );
+    else
+        m_node = NodeUtils::newNode ();
+
+    // parse -the-subnodes- (describing Style, Window, Revision(s) structures)
+    // Note: all subnodes if present must be 'attributes complete'
+    QDomNode eSubNode = e.firstChild();
+    while ( eSubNode.isElement() )
+    {
+        QDomElement ee = eSubNode.toElement();
+        eSubNode = eSubNode.nextSibling();
+
+        // parse boundary
+        if ( ee.tagName() == "boundary" )
+        {
+            m_boundary=NormalizedRect(ee.attribute( "l" ).toDouble(),
+                ee.attribute( "t" ).toDouble(),
+                ee.attribute( "r" ).toDouble(),
+                ee.attribute( "b" ).toDouble());
+        }
+    }
+    m_transformedBoundary = m_boundary;    
 }
 
 //END Tagging implementation
@@ -342,11 +406,12 @@ class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
     public:
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
-	void setcoords ( NormalizedRect *rect );
+        
+        void setcoords ( NormalizedRect *rect );
 	
         NormalizedPoint m_inplaceCallout[3];
 	
-	NormalizedRect* m_rect;
+        NormalizedRect* m_rect;
 };
 
 BoxTagging::BoxTagging()
@@ -360,6 +425,10 @@ BoxTagging::BoxTagging( NormalizedRect *rect )
     setcoords(rect);
 }
 
+BoxTagging::BoxTagging( const QDomNode &description )
+    : Tagging( *new BoxTaggingPrivate(), description )
+{
+}
 
 BoxTagging::~BoxTagging()
 {
@@ -374,6 +443,13 @@ void BoxTagging::setcoords( NormalizedRect *rect )
 {
     Q_D( BoxTagging );
     d->setcoords( rect );
+}
+
+void BoxTagging::store( QDomNode & node, QDomDocument & document ) const
+{
+    Q_D( const BoxTagging );
+    // recurse to parent objects storing properties
+    Tagging::store( node, document );
 }
 
 void BoxTaggingPrivate::setcoords( NormalizedRect *rect )
@@ -449,27 +525,60 @@ static QRgb tagColors [] = {
         0xFF252F99, 0xFF00CCFF, 0xFF674E60, 0xFFFC009C, 0xFF92896B
 };
 
-static unsigned int lastColor = 0;
+static unsigned int lastNode = 0;
 
 QList< Node * > * NodeUtils::Nodes = 0;
 
-Node::Node()
+Node * NodeUtils::retrieveNode ( int id )
 {
-    m_color = tagColors[lastColor++];
-    
     if ( !NodeUtils::Nodes )
         NodeUtils::Nodes = new QList< Node * >();
     
-    NodeUtils::Nodes-> append(this);
+    QList< Node * >::const_iterator nIt = NodeUtils::Nodes->constBegin(), nEnd = NodeUtils::Nodes->constEnd();
+    for ( ; nIt != nEnd; ++nIt )
+    {
+        if ( (*nIt)->m_id == id )
+            return *nIt;
+    }
+
+    Node * node = new Node();
+    node->m_id = id;
+    if ( id <= lastNode )
+        lastNode = id + 1;
+    
+    return node;
+}
+
+Node * NodeUtils::newNode()
+{
+    Node * node = new Node();
+    
+    if ( !NodeUtils::Nodes )
+        NodeUtils::Nodes = new QList< Node * >();
+
+    node->m_id = lastNode++;
+    
+    NodeUtils::Nodes-> append(node);
+    
+    return node;
+}
+
+Node::Node()
+{
 }
 
 Node::~Node()
 {
 }
 
+int Node::id() const
+{
+    return this->m_id;
+}
+
 unsigned int Node::color() const
 {
-    return this->m_color;
+    return tagColors[ this->m_id ];
 }
 
 //END Node implementation

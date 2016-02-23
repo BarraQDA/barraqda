@@ -427,6 +427,7 @@ class OKULAR_EXPORT Page
         QLinkedList< ObjectRect* > m_rects;
         QLinkedList< HighlightAreaRect* > m_highlights;
         QLinkedList< Annotation* > m_annotations;
+        QLinkedList< Tagging* > m_taggings;
 
         Q_DISABLE_COPY( Page )
 };

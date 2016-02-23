@@ -2560,7 +2560,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     foreach ( const Okular::ObjectRect * orect, orects )
                     {
                         Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                        Okular::Node * node = tag->node();
+                        Okular::Node * node  = tag->node();
                         QPixmap pixmap(100,100);
                         pixmap.fill(node->color());
                         QAction * tagSelection = menu.addAction ( KIcon(pixmap), i18n ("Tag") );
@@ -2576,7 +2576,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                             if ( choice == *aIt )
                             {
                                 Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                                d->document->removePageTagging ( pageItem->page(), tag );
+                                d->document->removePageTagging ( pageItem->page()->number(), tag );
                                 break;
                             }
                             aIt++;
@@ -2592,7 +2592,10 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             // if a selection is defined, display a popup
             if ( (!leftButton && !d->aPrevAction) || (!rightButton && d->aPrevAction) ||
                  !d->mouseSelecting )
+            {
+                //  JS: Here is where we could select tagged regions
                 break;
+            }
 
             QRect selectionRect = d->mouseSelectionRect.normalized();
             if ( selectionRect.width() <= 8 && selectionRect.height() <= 8 )
@@ -2740,7 +2743,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 {
                     Okular::Node * node = 0;
                     if ( choice == newNode )
-                        node = new Okular::Node();
+                        node = Okular::NodeUtils::newNode();
                     else
                     {
                         QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
@@ -2768,9 +2771,9 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         {
                             intersect.translate( -item->uncroppedGeometry().topLeft() );
                             Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
-                            Okular::Tagging* tag = Okular::TaggingUtils::createTagging ( tagRect );
+                            Okular::Tagging* tag = new Okular::BoxTagging( tagRect );
+                            //  TODO: Create date, user, etc.
                             tag->setNode (node);
-                            Okular::TaggingUtils::storeTagging (tag, okularPage );
                             d->document->addPageTagging( okularPage->number(), tag );
                         }
                     }

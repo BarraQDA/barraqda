@@ -42,11 +42,19 @@ class OKULAR_EXPORT TaggingUtils
          *
          * Returns a pointer to the complete tagging or 0 if element is invalid.
          */
-        static Tagging * createTagging( NormalizedRect *rect );
+        static Tagging * createTagging( const QDomElement & tagElement );
 
         /**
          */
-        static void storeTagging( Tagging * tag, Page * page );
+        static void storeTagging( const Tagging * tag,
+                                  QDomElement & element, QDomDocument & document );
+
+        /**
+         * Returns the child element with the given @p name from the direct
+         * children of @p parentNode or a null element if not found.
+         */
+        static QDomElement findChildElement( const QDomNode & parentNode,
+                                             const QString & name );
 
         /**
          * Returns the geometry of the given @p tagging scaled by
@@ -277,6 +285,11 @@ class OKULAR_EXPORT BoxTagging : public Tagging
         BoxTagging( NormalizedRect *rect );
 
         /**
+         * Creates a new box tagging from the xml @p description
+         */
+        BoxTagging( const QDomNode &description );
+
+        /**
          * Destroys the text tagging.
          */
         ~BoxTagging();
@@ -286,6 +299,11 @@ class OKULAR_EXPORT BoxTagging : public Tagging
          */
         SubType subType() const;
 	
+        /**
+         * Stores the tagging as xml in @p document under the given parent @p node.
+         */
+        void store( QDomNode &node, QDomDocument &document ) const;
+        
         /**
          * Set box coordinates
          */
@@ -303,18 +321,24 @@ class OKULAR_EXPORT NodeUtils
 {
     public:
         static QList< Node * > * Nodes ;
+        
+        static Node * newNode();
+        static Node * retrieveNode(int id);
 };
 
 class OKULAR_EXPORT Node
 {
+    friend class NodeUtils;
+    
 	public:
-		Node();
+        Node();
 		~Node();
 
         unsigned int color() const;
+        int id()             const;
         
-    private:
-        int m_color;
+    protected:
+        int m_id;
 };
 
 }
