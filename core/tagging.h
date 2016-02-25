@@ -254,6 +254,8 @@ class OKULAR_EXPORT TextTagging : public Tagging
          */
         TextTagging();
 
+        TextTagging( const RegularAreaRect * );
+
         /**
          * Creates a new text tagging from the xml @p description
          */
@@ -268,6 +270,8 @@ class OKULAR_EXPORT TextTagging : public Tagging
          * Returns the sub type of the text tagging.
          */
         SubType subType() const;
+        
+        const RegularAreaRect * transformedTextArea () const;
 
     private:
         Q_DECLARE_PRIVATE( TextTagging )
@@ -282,7 +286,7 @@ class OKULAR_EXPORT BoxTagging : public Tagging
          */
         BoxTagging( );
 	
-        BoxTagging( NormalizedRect *rect );
+        BoxTagging( const NormalizedRect *rect );
 
         /**
          * Creates a new box tagging from the xml @p description
@@ -303,11 +307,6 @@ class OKULAR_EXPORT BoxTagging : public Tagging
          * Stores the tagging as xml in @p document under the given parent @p node.
          */
         void store( QDomNode &node, QDomDocument &document ) const;
-        
-        /**
-         * Set box coordinates
-         */
-        void setcoords( NormalizedRect *rect );
 	
     private:
         Q_DECLARE_PRIVATE( BoxTagging )
@@ -322,7 +321,6 @@ class OKULAR_EXPORT NodeUtils
     public:
         static QList< Node * > * Nodes ;
         
-        static Node * newNode();
         static Node * retrieveNode(int id);
 };
 

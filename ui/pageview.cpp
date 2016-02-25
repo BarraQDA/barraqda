@@ -2665,7 +2665,6 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             imageToFile = menu.addAction( KIcon("document-save"), i18n( "Save to File..." ) );
             
             menu.addTitle ( i18n( "Tag" ) );
-            
             QList< QAction * > * tagSelections = new QList< QAction * >();
             if (Okular::NodeUtils::Nodes)
             {
@@ -2743,7 +2742,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 {
                     Okular::Node * node = 0;
                     if ( choice == newNode )
-                        node = Okular::NodeUtils::newNode();
+                        node = new Okular::Node();
                     else
                     {
                         QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
@@ -2759,22 +2758,24 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         }
                     }
                             
-                    //  FIX: Just taking first page view item.
-                    QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
-                    for ( ; iIt < iEnd; ++iIt )
+                    if (node)
                     {
-                        PageViewItem * item = *iIt;
-
-                        Okular::Page * okularPage = (Okular::Page *) item->page();
-                        QRect intersect = selectionRect & item->croppedGeometry();
-                        if (! intersect.isNull( ) )
+                        QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
+                        for ( ; iIt < iEnd; ++iIt )
                         {
-                            intersect.translate( -item->uncroppedGeometry().topLeft() );
-                            Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
-                            Okular::Tagging* tag = new Okular::BoxTagging( tagRect );
-                            //  TODO: Create date, user, etc.
-                            tag->setNode (node);
-                            d->document->addPageTagging( okularPage->number(), tag );
+                            PageViewItem * item = *iIt;
+
+                            Okular::Page * okularPage = (Okular::Page *) item->page();
+                            QRect intersect = selectionRect & item->croppedGeometry();
+                            if (! intersect.isNull( ) )
+                            {
+                                intersect.translate( -item->uncroppedGeometry().topLeft() );
+                                Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
+                                Okular::Tagging* tag = new Okular::BoxTagging( tagRect );
+                                //  TODO: Create date, user, etc.
+                                tag->setNode (node);
+                                d->document->addPageTagging( okularPage->number(), tag );
+                            }
                         }
                     }
                 }
@@ -2977,6 +2978,22 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                             const QString squeezedText = KStringHandler::rsqueeze( url, 30 );
                             httpLink = menu.addAction( i18n( "Go to '%1'", squeezedText ) );
                         }
+
+                        menu.addTitle ( i18n( "Tag" ) );
+                        QList< QAction * > * tagSelections = new QList< QAction * >();
+                        if (Okular::NodeUtils::Nodes)
+                        {
+                            QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin(), nEnd = Okular::NodeUtils::Nodes->constEnd();
+                            for ( ; nIt != nEnd; ++nIt )
+                            {
+                                QPixmap pixmap(100,100);
+                                pixmap.fill((*nIt)->color());
+                                QAction * tagSelection = menu.addAction ( KIcon(pixmap), i18n ("Tag") );
+                                tagSelections->append( tagSelection );
+                            }
+                        }
+                        QAction * newNode = menu.addAction ( KIcon("new"), i18n ("New") );
+                        
                         QAction *choice = menu.exec( e->globalPos() );
                         // check if the user really selected an action
                         if ( choice )
@@ -2990,6 +3007,43 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                             }
                             else if ( choice == httpLink )
                                 new KRun( KUrl( url ), this );
+                            else
+                            {
+                                Okular::Node * node = 0;
+                                if ( choice == newNode )
+                                    node = new Okular::Node();
+                                else
+                                {
+                                    QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
+                                    QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin();
+                                    for ( ; aIt != aEnd; ++aIt )
+                                    {
+                                        if ( choice == *aIt )
+                                        {
+                                            node = *nIt;
+                                            break;
+                                        }
+                                        nIt++;
+                                    }
+                                }
+                                
+                                if (node)
+                                {
+                                    //  JS: This code adapted from PageViewPrivate::selectedText()
+                                    QList< int > selpages = d->pagesWithTextSelection.toList();
+                                    qSort( selpages );
+                                    int end = selpages.count();
+                                    for (int i = 0; i < end; i++ )
+                                    {
+                                        const Okular::Page * pg = d->document->page( selpages.at( i ) );
+                                        Okular::Tagging* tag = new Okular::TextTagging( pg->textSelection() );
+                                        tag->setNode (node);
+                                        d->document->addPageTagging( pg->number(), tag );
+                                    }
+                                }
+                                
+                            }
+                            
                         }
                     }
                 }

@@ -330,7 +330,7 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
     if ( e.hasAttribute( "node" ) )
         m_node = NodeUtils::retrieveNode( e.attribute( "node" ).toInt() );
     else
-        m_node = NodeUtils::newNode ();
+        m_node = new Node ();
 
     // parse -the-subnodes- (describing Style, Window, Revision(s) structures)
     // Note: all subnodes if present must be 'attributes complete'
@@ -361,13 +361,50 @@ class Okular::TextTaggingPrivate : public Okular::TaggingPrivate
     public:
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
-	
-        NormalizedPoint m_inplaceCallout[3];
+        
+        ~TextTaggingPrivate();
+        
+        void setTextArea( const RegularAreaRect * textArea );
+        
+        void resetTransformation();
+        void transform( const QTransform &matrix );
+        
+        
+        RegularAreaRect * m_textArea;
+        RegularAreaRect * m_transformedTextArea;
 };
+
+TextTaggingPrivate::~TextTaggingPrivate()
+{
+    if (m_textArea)
+        delete m_textArea;
+}
+
+void TextTaggingPrivate::setTextArea( const RegularAreaRect * textArea )
+{
+    m_textArea = new RegularAreaRect;
+    *m_textArea = *textArea;
+}
 
 TextTagging::TextTagging( const QDomNode & node )
     : Tagging( *new TextTaggingPrivate(), node )
 {
+}
+
+TextTagging::TextTagging( const RegularAreaRect * textArea )
+    : Tagging( *new TextTaggingPrivate() )
+{
+    Q_D( TextTagging );
+    
+    d->setTextArea( textArea );
+    
+    NormalizedRect rect = textArea->first();
+    int end = textArea->count();
+    for (int i = 1; i < end; i++ )
+    {
+        rect |= textArea->at( i );
+    }
+    d->m_boundary = rect;
 }
 
 TextTagging::~TextTagging()
@@ -379,6 +416,41 @@ Tagging::SubType TextTagging::subType() const
     return TText;
 }
 
+
+const RegularAreaRect * TextTagging::transformedTextArea () const
+{
+    Q_D( const TextTagging );
+
+    return d->m_transformedTextArea;
+}
+
+
+void TextTaggingPrivate::resetTransformation()
+{
+    TaggingPrivate::resetTransformation();
+    
+    delete m_transformedTextArea;
+    m_transformedTextArea = new RegularAreaRect;
+    int end = m_textArea->count();
+    for (int i = 0; i < end; i++ )
+        m_transformedTextArea->append (m_textArea->at(i));
+}
+
+void TextTaggingPrivate::transform( const QTransform &matrix )
+{
+    TaggingPrivate::transform (matrix);
+
+    delete m_transformedTextArea;
+    m_transformedTextArea = new RegularAreaRect;
+    int end = m_textArea->count();
+    for (int i = 0; i < end; i++ )
+    {
+        NormalizedRect rect = m_textArea->at(i);
+        rect.transform (matrix);
+        m_transformedTextArea->append (rect);
+    }
+}
+
 void TextTaggingPrivate::translate( const NormalizedPoint &coord )
 {
     TaggingPrivate::translate( coord );
@@ -388,9 +460,6 @@ void TextTaggingPrivate::translate( const NormalizedPoint &coord )
   c1.x = c1.x + c2.x; \
   c1.y = c1.y + c2.y; \
 }
-    ADD_COORD( m_inplaceCallout[0], coord )
-    ADD_COORD( m_inplaceCallout[1], coord )
-    ADD_COORD( m_inplaceCallout[2], coord )
 #undef ADD_COORD
 }
 
@@ -407,11 +476,8 @@ class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
         
-        void setcoords ( NormalizedRect *rect );
+        void setcoords ( const NormalizedRect *rect );
 	
-        NormalizedPoint m_inplaceCallout[3];
-	
-        NormalizedRect* m_rect;
 };
 
 BoxTagging::BoxTagging()
@@ -419,10 +485,11 @@ BoxTagging::BoxTagging()
 {
 }
 
-BoxTagging::BoxTagging( NormalizedRect *rect )
+BoxTagging::BoxTagging( const NormalizedRect *rect )
     : Tagging( *new BoxTaggingPrivate() )
 {
-    setcoords(rect);
+    Q_D( BoxTagging );
+    d->m_boundary = *rect;
 }
 
 BoxTagging::BoxTagging( const QDomNode &description )
@@ -439,24 +506,11 @@ Tagging::SubType BoxTagging::subType() const
     return TBox;
 }
 
-void BoxTagging::setcoords( NormalizedRect *rect )
-{
-    Q_D( BoxTagging );
-    d->setcoords( rect );
-}
-
 void BoxTagging::store( QDomNode & node, QDomDocument & document ) const
 {
     Q_D( const BoxTagging );
     // recurse to parent objects storing properties
     Tagging::store( node, document );
-}
-
-void BoxTaggingPrivate::setcoords( NormalizedRect *rect )
-{
-    kDebug() << "Setting tagging coordinates";
-    m_rect = rect;
-    m_boundary = *rect;
 }
 
 void BoxTaggingPrivate::translate( const NormalizedPoint &coord )
@@ -468,9 +522,6 @@ void BoxTaggingPrivate::translate( const NormalizedPoint &coord )
   c1.x = c1.x + c2.x; \
   c1.y = c1.y + c2.y; \
 }
-    ADD_COORD( m_inplaceCallout[0], coord )
-    ADD_COORD( m_inplaceCallout[1], coord )
-    ADD_COORD( m_inplaceCallout[2], coord )
 #undef ADD_COORD
 }
 
@@ -549,22 +600,14 @@ Node * NodeUtils::retrieveNode ( int id )
     return node;
 }
 
-Node * NodeUtils::newNode()
+Node::Node()
 {
-    Node * node = new Node();
-    
+    this->m_id = lastNode++;
+
     if ( !NodeUtils::Nodes )
         NodeUtils::Nodes = new QList< Node * >();
 
-    node->m_id = lastNode++;
-    
-    NodeUtils::Nodes-> append(node);
-    
-    return node;
-}
-
-Node::Node()
-{
+    NodeUtils::Nodes-> append(this);
 }
 
 Node::~Node()
