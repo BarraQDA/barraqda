@@ -32,6 +32,9 @@ Tagging * TaggingUtils::createTagging( const QDomElement & tagElement )
     int typeNumber = tagElement.attribute( "type" ).toInt();
     switch ( typeNumber )
     {
+        case Tagging::TText:
+            tagging = new TextTagging( tagElement );
+            break;
         case Tagging::TBox:
             tagging = new BoxTagging( tagElement );
             break;
@@ -378,6 +381,9 @@ TextTaggingPrivate::~TextTaggingPrivate()
 {
     if (m_textArea)
         delete m_textArea;
+
+    if (m_transformedTextArea)
+        delete m_transformedTextArea;
 }
 
 void TextTaggingPrivate::setTextArea( const RegularAreaRect * textArea )
@@ -389,6 +395,26 @@ void TextTaggingPrivate::setTextArea( const RegularAreaRect * textArea )
 TextTagging::TextTagging( const QDomNode & node )
     : Tagging( *new TextTaggingPrivate(), node )
 {
+    Q_D( TextTagging );
+    
+    d->m_textArea = new Okular::RegularAreaRect();
+    QDomNode taggingNode = node.firstChild();
+    while( taggingNode.isElement() )
+    {
+        // get annotation element and advance to next annot
+        QDomElement tagElement = taggingNode.toElement();
+        taggingNode = taggingNode.nextSibling();
+
+        if ( tagElement.tagName() == "rect" )
+        {
+            NormalizedRect rect = NormalizedRect (tagElement.attribute( "l" ).toDouble(),
+                tagElement.attribute( "t" ).toDouble(),
+                tagElement.attribute( "r" ).toDouble(),
+                tagElement.attribute( "b" ).toDouble());
+            
+            d->m_textArea->append( rect );
+        }
+    }
 }
 
 TextTagging::TextTagging( const RegularAreaRect * textArea )
@@ -416,6 +442,27 @@ Tagging::SubType TextTagging::subType() const
     return TText;
 }
 
+void TextTagging::store( QDomNode & node, QDomDocument & document ) const
+{
+    Q_D( const TextTagging );
+    // recurse to parent objects storing properties
+    Tagging::store( node, document );
+    
+    NormalizedRect rect;
+    int end = d->m_textArea->count();
+    for (int i = 0; i < end; i++ )
+    {
+        rect = d->m_textArea->at( i );
+        
+        QDomElement e = document.createElement( "rect" );
+        node.appendChild( e );
+
+        e.setAttribute( "l", QString::number( rect.left ) );
+        e.setAttribute( "t", QString::number( rect.top ) );
+        e.setAttribute( "r", QString::number( rect.right ) );
+        e.setAttribute( "b", QString::number( rect.bottom ) );
+    }
+}
 
 const RegularAreaRect * TextTagging::transformedTextArea () const
 {

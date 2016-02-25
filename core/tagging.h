@@ -273,6 +273,11 @@ class OKULAR_EXPORT TextTagging : public Tagging
         
         const RegularAreaRect * transformedTextArea () const;
 
+        /**
+         * Stores the tagging as xml in @p document under the given parent @p node.
+         */
+        void store( QDomNode &node, QDomDocument &document ) const;
+        
     private:
         Q_DECLARE_PRIVATE( TextTagging )
         Q_DISABLE_COPY( TextTagging )
