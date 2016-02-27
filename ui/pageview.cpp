@@ -2556,7 +2556,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 {
                     KMenu menu( this );
                     menu.addTitle ( i18n( "Delete tag" ) );
-                    QList< QAction * > * tagSelections = new QList< QAction * >();
+                    QList< QAction * > * deleteTagSelections = new QList< QAction * >();
                     foreach ( const Okular::ObjectRect * orect, orects )
                     {
                         Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
@@ -2564,19 +2564,90 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         QPixmap pixmap(100,100);
                         pixmap.fill(node->color());
                         QAction * tagSelection = menu.addAction ( KIcon(pixmap), i18n ("Tag") );
-                        tagSelections->append( tagSelection );
+                        deleteTagSelections->append( tagSelection );
+                    }
+                    menu.addTitle ( i18n( "Copy tag" ) );
+                    QList< QAction * > * copyTagSelections = new QList< QAction * >();
+                    foreach ( const Okular::ObjectRect * orect, orects )
+                    {
+                        Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
+                        Okular::Node * node  = tag->node();
+                        QPixmap pixmap(100,100);
+                        pixmap.fill(node->color());
+                        QAction * tagSelection = menu.addAction ( KIcon(pixmap), i18n ("Tag") );
+                        copyTagSelections->append( tagSelection );
                     }
                     QAction *choice = menu.exec( e->globalPos() );
                     // check if the user really selected an action
                     if ( choice )
                     {
-                        QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
+                        QList< QAction * >::const_iterator aIt = deleteTagSelections->constBegin(), aEnd = deleteTagSelections->constEnd();
                         foreach ( const Okular::ObjectRect * orect, orects )
                         {
                             if ( choice == *aIt )
                             {
                                 Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
                                 d->document->removePageTagging ( pageItem->page()->number(), tag );
+                                break;
+                            }
+                            aIt++;
+                        }
+                        aIt = copyTagSelections->constBegin(); aEnd = copyTagSelections->constEnd();
+                        foreach ( const Okular::ObjectRect * orect, orects )
+                        {
+                            if ( choice == *aIt )
+                            {
+                                Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
+                                QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
+                                for ( ; iIt != iEnd; ++iIt )
+                                {
+                                    PageViewItem * item = *iIt;
+                                    const Okular::Page *okularPage = item->page();
+                                    if ( okularPage->number() != pageItem->page()->number() 
+                                    ||  !item->isVisible() )
+                                        continue;
+
+                                    QRect tagRect   = tag->transformedBoundingRectangle().geometry( item->uncroppedWidth(), item->uncroppedHeight() ).translated( item->uncroppedGeometry().topLeft() );
+                                    QRect itemRect  = item->croppedGeometry();
+                                    QRect intersect = tagRect.intersect (itemRect);
+                                    if ( !intersect.isNull() )
+                                    {
+                                        switch ( tag->subType() )
+                                        {
+                                            case Okular::Tagging::TText:
+                                            {
+                                                intersect.translate( -item->uncroppedGeometry().topLeft() );
+                                                Okular::RegularAreaRect rects;
+                                                rects.append( Okular::NormalizedRect( intersect, item->uncroppedWidth(), item->uncroppedHeight() ) );
+                                                QString tagText = okularPage->text( &rects );
+                                                QClipboard *cb = QApplication::clipboard();
+                                                cb->setText( tagText, QClipboard::Clipboard );
+                                                if ( cb->supportsSelection() )
+                                                    cb->setText( tagText, QClipboard::Selection );
+                                                d->messageWindow->display( i18n( "Text (%1 characters) copied to clipboard.", tagText.length() ) );
+                                                
+                                                break;
+                                            }
+                                            case Okular::Tagging::TBox:
+                                            {
+                                                // renders page into a pixmap
+                                                QPixmap copyPix( tagRect.width(), tagRect.height() );
+                                                QPainter copyPainter( &copyPix );
+                                                copyPainter.translate( -tagRect.left(), -tagRect.top() );
+                                                drawDocumentOnPainter( tagRect, &copyPainter );
+                                                copyPainter.end();
+                                                QClipboard *cb = QApplication::clipboard();
+                                                cb->setPixmap( copyPix, QClipboard::Clipboard );
+                                                if ( cb->supportsSelection() )
+                                                    cb->setPixmap( copyPix, QClipboard::Selection );
+                                                d->messageWindow->display( i18n( "Image [%1x%2] copied to clipboard.", copyPix.width(), copyPix.height() ) );
+                                                
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
                                 break;
                             }
                             aIt++;
