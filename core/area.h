@@ -475,7 +475,7 @@ class OKULARCORE_EXPORT AnnotationObjectRect : public ObjectRect
 /**
  * This class describes the object rectangle for an tagging.
  */
-class OKULAR_EXPORT TaggingObjectRect : public ObjectRect
+class OKULARCORE_EXPORT TaggingObjectRect : public ObjectRect
 {
     public:
         /**

@@ -18,7 +18,7 @@
 #include <QtXml/QDomDocument>
 #include <QtXml/QDomElement>
 
-#include "okular_export.h"
+#include "okularcore_export.h"
 #include "area.h"
 #include "kicon.h"
 
@@ -31,11 +31,11 @@ class TextTaggingPrivate;
 class BoxTaggingPrivate;
 
 class Node;
-  
+
 /**
  * @short Helper class for tagging retrieval/storage.
  */
-class OKULAR_EXPORT TaggingUtils
+class OKULARCORE_EXPORT TaggingUtils
 {
     public:
         /**
@@ -70,7 +70,7 @@ class OKULAR_EXPORT TaggingUtils
  * An Tagging is an object (text note, highlight, sound, popup window, ..)
  * contained by a Page in the document.
  */
-class OKULAR_EXPORT Tagging
+class OKULARCORE_EXPORT Tagging
 {
     /// @cond PRIVATE
     friend class TaggingObjectRect;
@@ -80,7 +80,7 @@ class OKULAR_EXPORT Tagging
     friend class Page;
     friend class PagePrivate;
     /// @endcond
-  
+
     public:
         /**
          * Describes the type of tagging.
@@ -91,7 +91,7 @@ class OKULAR_EXPORT Tagging
             TBox = 2,       ///< A box tagging
             T_BASE = 0      ///< The tagging base class
         };
-    
+
         /**
          * Describes the type of additional actions.
          *
@@ -120,9 +120,9 @@ class OKULAR_EXPORT Tagging
 
 		Tagging( );
 		Tagging( NormalizedRect *rect );
-        
+
         void setNode ( Node *node );
-        
+
         Node *node() const;
 
         /**
@@ -198,7 +198,7 @@ class OKULAR_EXPORT Tagging
          * to have them rotated correctly.
          */
         NormalizedRect transformedBoundingRectangle() const;
-    
+
         /**
          * Move the tagging by the specified coordinates.
          *
@@ -233,7 +233,7 @@ class OKULAR_EXPORT Tagging
          */
         void setTaggingProperties( const QDomNode & node );
 
-	
+
     protected:
         /// @cond PRIVATE
         Tagging( TaggingPrivate &dd );
@@ -246,7 +246,7 @@ class OKULAR_EXPORT Tagging
         Q_DISABLE_COPY( Tagging )
 };
 
-class OKULAR_EXPORT TextTagging : public Tagging
+class OKULARCORE_EXPORT TextTagging : public Tagging
 {
     public:
         /**
@@ -265,32 +265,32 @@ class OKULAR_EXPORT TextTagging : public Tagging
          * Destroys the text tagging.
          */
         ~TextTagging();
-	
+
         /**
          * Returns the sub type of the text tagging.
          */
         SubType subType() const;
-        
+
         const RegularAreaRect * transformedTextArea () const;
 
         /**
          * Stores the tagging as xml in @p document under the given parent @p node.
          */
         void store( QDomNode &node, QDomDocument &document ) const;
-        
+
     private:
         Q_DECLARE_PRIVATE( TextTagging )
         Q_DISABLE_COPY( TextTagging )
 };
 
-class OKULAR_EXPORT BoxTagging : public Tagging
+class OKULARCORE_EXPORT BoxTagging : public Tagging
 {
     public:
         /**
          * Creates a new box tagging.
          */
         BoxTagging( );
-	
+
         BoxTagging( const NormalizedRect *rect );
 
         /**
@@ -307,12 +307,12 @@ class OKULAR_EXPORT BoxTagging : public Tagging
          * Returns the sub type of the box tagging.
          */
         SubType subType() const;
-	
+
         /**
          * Stores the tagging as xml in @p document under the given parent @p node.
          */
         void store( QDomNode &node, QDomDocument &document ) const;
-	
+
     private:
         Q_DECLARE_PRIVATE( BoxTagging )
         Q_DISABLE_COPY( BoxTagging )
@@ -321,25 +321,25 @@ class OKULAR_EXPORT BoxTagging : public Tagging
 /**
  * @short Helper class for node retrieval/storage.
  */
-class OKULAR_EXPORT NodeUtils
+class OKULARCORE_EXPORT NodeUtils
 {
     public:
         static QList< Node * > * Nodes ;
-        
+
         static Node * retrieveNode(int id);
 };
 
-class OKULAR_EXPORT Node
+class OKULARCORE_EXPORT Node
 {
     friend class NodeUtils;
-    
+
 	public:
         Node();
 		~Node();
 
         unsigned int color() const;
         int id()             const;
-        
+
     protected:
         int m_id;
 };

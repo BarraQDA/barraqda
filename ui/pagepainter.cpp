@@ -150,7 +150,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                  bufferedHighlights = new QList< QPair<QColor, Okular::NormalizedRect> >();
 /*            else
             {*/
-                
+
                 Okular::NormalizedRect* limitRect = new Okular::NormalizedRect(nXMin, nYMin, nXMax, nYMax );
                 QLinkedList< Okular::HighlightAreaRect * >::const_iterator h2It = page->m_highlights.constBegin(), hEnd = page->m_highlights.constEnd();
                 Okular::HighlightAreaRect::const_iterator hIt;
@@ -248,7 +248,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                     bufferedTaggings->append( tag );
                 }
             }
-        }        
+        }
         // end of intersections checking
     }
 
@@ -683,11 +683,11 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
         for ( ; tIt != tEnd; ++tIt )
         {
             Okular::Tagging * tag = *tIt;
-            
+
             if ( tag->subType() == Okular::Tagging::TText )
             {
                 Okular::TextTagging * tTag = static_cast <Okular::TextTagging *>( tag );
-                
+
                 const Okular::RegularAreaRect * textArea = tTag->transformedTextArea();
                 int end = textArea->count();
                 for (int i = 0; i < end; i++ )
@@ -695,33 +695,33 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                     Okular::NormalizedRect rect = textArea->at( i );
                     // get tagging boundary and drawn rect
                     QRect tagBoundary = rect.geometry( scaledWidth, scaledHeight ).translated( -scaledCrop.topLeft() );
-                    QRect tagRect = tagBoundary.intersect( limits );
-                    
+                    QRect tagRect = tagBoundary & limits;
+
                     QImage * scaledImage = new QImage (tagRect.width(), tagRect.height(),
                                                         QImage::Format_ARGB32 );
-                    
+
                     scaledImage->fill ( tag->node()->color() );
                     changeImageAlpha( *scaledImage, 128 );
                     mixedPainter->drawImage( tagRect.topLeft(), *scaledImage );
                 }
-                
+
             }
             else if ( tag->subType() == Okular::Tagging::TBox )
             {
                 // get tagging boundary and drawn rect
                 QRect tagBoundary = tag->transformedBoundingRectangle().geometry( scaledWidth, scaledHeight ).translated( -scaledCrop.topLeft() );
-                QRect tagRect = tagBoundary.intersect( limits );
-                
+                QRect tagRect = tagBoundary & limits;
+
                 QImage * scaledImage = new QImage (tagRect.width(), tagRect.height(),
                                                     QImage::Format_ARGB32 );
-                
+
                 scaledImage->fill ( tag->node()->color() );
                 changeImageAlpha( *scaledImage, 128 );
                 mixedPainter->drawImage( tagRect.topLeft(), *scaledImage );
             }
         }
     }
-    
+
     /** 5 -- MIXED FLOW. Draw ANNOTATIONS [OPAQUE ONES] on ACTIVE PAINTER  **/
     if ( unbufferedAnnotations )
     {

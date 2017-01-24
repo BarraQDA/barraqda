@@ -2728,18 +2728,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 if ( !orects.isEmpty() )
                 {
                     QMenu menu( this );
-                    menu.addSection ( i18n( "Delete tag" ) );
                     QList< QAction * > * deleteTagSelections = new QList< QAction * >();
-                    foreach ( const Okular::ObjectRect * orect, orects )
-                    {
-                        Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                        Okular::Node * node  = tag->node();
-                        QPixmap pixmap(100,100);
-                        pixmap.fill(node->color());
-                        QAction * tagSelection = menu.addAction ( QIcon(pixmap), i18n ("Tag") );
-                        deleteTagSelections->append( tagSelection );
-                    }
-                    menu.addSection ( i18n( "Copy tag" ) );
                     QList< QAction * > * copyTagSelections = new QList< QAction * >();
                     foreach ( const Okular::ObjectRect * orect, orects )
                     {
@@ -2747,7 +2736,10 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         Okular::Node * node  = tag->node();
                         QPixmap pixmap(100,100);
                         pixmap.fill(node->color());
-                        QAction * tagSelection = menu.addAction ( QIcon(pixmap), i18n ("Tag") );
+                        QMenu * tagmenu = menu.addMenu( QIcon(pixmap), i18n ("Tag") );
+                        QAction * tagSelection = tagmenu->addAction ( QIcon::fromTheme(QStringLiteral("edit-delete")), "Delete" );
+                        deleteTagSelections->append( tagSelection );
+                        tagSelection = tagmenu->addAction ( QIcon::fromTheme(QStringLiteral("edit-copy")), "Copy" );
                         copyTagSelections->append( tagSelection );
                     }
                     QAction *choice = menu.exec( e->globalPos() );
@@ -2915,7 +2907,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             imageToClipboard = menu.addAction( QIcon::fromTheme(QStringLiteral("image-x-generic")), i18n( "Copy to Clipboard" ) );
             imageToFile = menu.addAction( QIcon::fromTheme(QStringLiteral("document-save")), i18n( "Save to File..." ) );
 
-            menu.addSection ( i18n( "Tag" ) );
+            QMenu * tagMenu = menu.addMenu ( i18n( "Tag" ) );
             QList< QAction * > * tagSelections = new QList< QAction * >();
             if (Okular::NodeUtils::Nodes)
             {
@@ -2924,11 +2916,11 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 {
                     QPixmap pixmap(100,100);
                     pixmap.fill((*nIt)->color());
-                    QAction * tagSelection = menu.addAction ( QIcon(pixmap), i18n ("Tag") );
+                    QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n ("Tag") );
                     tagSelections->append( tagSelection );
                 }
             }
-            QAction * newNode = menu.addAction ( QIcon("new"), i18n ("New") );
+            QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), "New" );
 
             QAction *choice = menu.exec( e->globalPos() );
             // check if the user really selected an action
@@ -3234,7 +3226,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                             httpLink = menu.addAction( i18n( "Go to '%1'", squeezedText ) );
                         }
 
-                        menu.addSection ( i18n( "Tag" ) );
+                        QMenu * tagMenu = menu.addMenu ( i18n( "Tag" ) );
                         QList< QAction * > * tagSelections = new QList< QAction * >();
                         if (Okular::NodeUtils::Nodes)
                         {
@@ -3243,11 +3235,11 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                             {
                                 QPixmap pixmap(100,100);
                                 pixmap.fill((*nIt)->color());
-                                QAction * tagSelection = menu.addAction ( QIcon(pixmap), i18n ("Tag") );
+                                QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n ("Tag") );
                                 tagSelections->append( tagSelection );
                             }
                         }
-                        QAction * newNode = menu.addAction ( QIcon("new"), i18n ("New") );
+                        QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), "New" );
 
                         QAction *choice = menu.exec( e->globalPos() );
                         // check if the user really selected an action
