@@ -10,85 +10,82 @@
 #include "shellutils.h"
 
 // qt/kde includes
-#include <qfile.h>
-#include <qregexp.h>
-#include <kcmdlineargs.h>
+#include <QUrl>
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
+#include <QDebug>
+#include <QtCore/qcommandlineparser.h>
 
 namespace ShellUtils
 {
 
-namespace detail
+QUrl urlFromArg( const QString& _arg, const QString& pageArg )
 {
-
-bool qfileExistFunc( const QString& fileName )
-{
-    return QFile::exists( fileName );
-}
-
-}
-
-FileExistFunc qfileExistFunc()
-{
-    return detail::qfileExistFunc;
-}
-
-KUrl urlFromArg( const QString& _arg, FileExistFunc exist_func, const QString& pageArg )
-{
-    /*
-     Rationale for the small "cut-and-paste" work being done below:
-     KCmdLineArgs::makeURL() (used by ::url() encodes any # into the URL itself,
-     so we have to find it manually and build up the URL by taking its ref,
-     if any.
-     */
-    QString arg = _arg;
-    arg.replace( QRegExp( "^file:/{1,3}"), "/" );
-    if ( arg != _arg )
-    {
-        arg = QString::fromUtf8( QByteArray::fromPercentEncoding( arg.toUtf8() ) );
+#if QT_VERSION >= 0x050400
+    QUrl url = QUrl::fromUserInput(_arg, QDir::currentPath(), QUrl::AssumeLocalFile);
+#else
+    // Code from QUrl::fromUserInput(QString, QString)
+    QUrl url = QUrl::fromUserInput(_arg);
+    QUrl testUrl = QUrl(_arg, QUrl::TolerantMode);
+    if (testUrl.isRelative() && !QDir::isAbsolutePath(_arg)) {
+        QFileInfo fileInfo(QDir::current(), _arg);
+        if (fileInfo.exists())
+            url = QUrl::fromLocalFile(fileInfo.absoluteFilePath());
     }
-    KUrl url = KCmdLineArgs::makeURL( arg.toUtf8() );
-    int sharpPos = -1;
-    if ( !url.isLocalFile() || !exist_func( url.toLocalFile() ) )
-    {
-        sharpPos = arg.lastIndexOf( QLatin1Char( '#' ) );
+#endif
+    if ( url.isLocalFile() ) {
+        // make sure something like /tmp/foo#bar.pdf is treated as a path name (default)
+        // but something like /tmp/foo.pdf#bar is foo.pdf plus an anchor "bar"
+        const QString path = url.path();
+        int hashIndex = path.lastIndexOf( QLatin1Char ( '#' ) );
+        int lastDotIndex = path.lastIndexOf( QLatin1Char ( '.' ) );
+        // make sure that we don't change the path if .pdf comes after the #
+        if ( hashIndex != -1 && hashIndex > lastDotIndex) {
+            url.setPath( path.left( hashIndex ) );
+            url.setFragment( path.mid( hashIndex + 1 ) );
+            qDebug() << "Added fragment to url:" << url.path() << url.fragment();
+        }
+    } else if ( !url.fragment().isEmpty() ) {
+        // make sure something like http://example.org/foo#bar.pdf is treated as a path name
+        // but something like http://example.org/foo.pdf#bar is foo.pdf plus an anchor "bar"
+        if ( url.fragment().contains( QLatin1Char( '.' ) ) ) {
+            url.setPath( url.path() + QLatin1Char ( '#' ) + url.fragment() );
+            url.setFragment( QString() );
+        }
     }
-    if ( sharpPos != -1 )
+    if ( !pageArg.isEmpty() )
     {
-      url = KCmdLineArgs::makeURL( arg.left( sharpPos ).toUtf8() );
-      url.setHTMLRef( arg.mid( sharpPos + 1 ) );
-    }
-    else if ( !pageArg.isEmpty() )
-    {
-      url.setHTMLRef( pageArg );
+      url.setFragment( pageArg );
     }
     return url;
 }
 
-QString serializeOptions(const KCmdLineArgs &args)
+QString serializeOptions(const QCommandLineParser &args)
 {
-    const bool startInPresentation = args.isSet( "presentation" );
-    const bool showPrintDialog = args.isSet( "print" );
-    const bool unique = args.isSet("unique") && args.count() <= 1;
-    const bool noRaise = !args.isSet("raise");
-    const QString page = args.getOption("page");
+    const bool startInPresentation = args.isSet( QStringLiteral("presentation") );
+    const bool showPrintDialog = args.isSet( QStringLiteral("print") );
+    const bool unique = args.isSet(QStringLiteral("unique")) && args.positionalArguments().count() <= 1;
+    const bool noRaise = args.isSet(QStringLiteral("noraise"));
+    const QString page = args.value(QStringLiteral("page"));
 
     return serializeOptions(startInPresentation, showPrintDialog, unique, noRaise, page);
 }
 
 QString serializeOptions(bool startInPresentation, bool showPrintDialog, bool unique, bool noRaise, const QString &page)
 {
-    return QString("%1:%2:%3:%4:%5").arg(startInPresentation).arg(showPrintDialog).arg(unique).arg(noRaise).arg(page);
+    return QStringLiteral("%1:%2:%3:%4:%5").arg(startInPresentation).arg(showPrintDialog).arg(unique).arg(noRaise).arg(page);
 }
 
 bool unserializeOptions(const QString &serializedOptions, bool *presentation, bool *print, bool *unique, bool *noraise, QString *page)
 {
-    const QStringList args = serializedOptions.split(":");
+    const QStringList args = serializedOptions.split(QStringLiteral(":"));
     if (args.count() == 5)
     {
-        *presentation = args[0] == "1";
-        *print = args[1] == "1";
-        *unique = args[2] == "1";
-        *noraise = args[3] == "1";
+        *presentation = args[0] == QLatin1String("1");
+        *print = args[1] == QLatin1String("1");
+        *unique = args[2] == QLatin1String("1");
+        *noraise = args[3] == QLatin1String("1");
         *page = args[4];
         return true;
     }

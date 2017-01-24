@@ -10,9 +10,9 @@
 #include "annotationproxymodels.h"
 
 #include <QtCore/QList>
-#include <QtGui/QItemSelection>
+#include <QtCore/QItemSelection>
 
-#include <kicon.h>
+#include <QIcon>
 
 #include "annotationmodel.h"
 
@@ -127,7 +127,7 @@ QModelIndex PageGroupProxyModel::index( int row, int column, const QModelIndex &
         return QModelIndex();
     } else {
       if ( row < mTreeIndexes.count() )
-        return createIndex( row, column, 0 );
+        return createIndex( row, column );
       else
         return QModelIndex();
     }
@@ -201,24 +201,26 @@ QModelIndex PageGroupProxyModel::mapToSource( const QModelIndex &proxyIndex ) co
 void PageGroupProxyModel::setSourceModel( QAbstractItemModel *model )
 {
   if ( sourceModel() ) {
-    disconnect( sourceModel(), SIGNAL(layoutChanged()), this, SLOT(rebuildIndexes()) );
-    disconnect( sourceModel(), SIGNAL(modelReset()), this, SLOT(rebuildIndexes()) );
-    disconnect( sourceModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
-    disconnect( sourceModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
+    disconnect( sourceModel(), &QAbstractItemModel::layoutChanged, this, &PageGroupProxyModel::rebuildIndexes );
+    disconnect( sourceModel(), &QAbstractItemModel::modelReset, this, &PageGroupProxyModel::rebuildIndexes );
+    disconnect( sourceModel(), &QAbstractItemModel::rowsInserted, this, &PageGroupProxyModel::rebuildIndexes );
+    disconnect( sourceModel(), &QAbstractItemModel::rowsRemoved, this, &PageGroupProxyModel::rebuildIndexes );
   }
 
   QAbstractProxyModel::setSourceModel( model );
 
-  connect( sourceModel(), SIGNAL(layoutChanged()), this, SLOT(rebuildIndexes()) );
-  connect( sourceModel(), SIGNAL(modelReset()), this, SLOT(rebuildIndexes()) );
-  connect( sourceModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
-  connect( sourceModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
+  connect( sourceModel(), &QAbstractItemModel::layoutChanged, this, &PageGroupProxyModel::rebuildIndexes );
+  connect( sourceModel(), &QAbstractItemModel::modelReset, this, &PageGroupProxyModel::rebuildIndexes );
+  connect( sourceModel(), &QAbstractItemModel::rowsInserted, this, &PageGroupProxyModel::rebuildIndexes );
+  connect( sourceModel(), &QAbstractItemModel::rowsRemoved, this, &PageGroupProxyModel::rebuildIndexes );
 
   rebuildIndexes();
 }
 
 void PageGroupProxyModel::rebuildIndexes()
 {
+  beginResetModel();
+
   if ( mGroupByPage ) {
     mTreeIndexes.clear();
 
@@ -243,7 +245,7 @@ void PageGroupProxyModel::rebuildIndexes()
     }
   }
 
-  reset();
+  endResetModel();
 }
 
 void PageGroupProxyModel::groupByPage( bool value )
@@ -285,7 +287,7 @@ class AuthorGroupItem
         void dump( int level = 0 )
         {
             QString prefix;
-            for ( int i = 0; i < level; ++i ) prefix += ' ';
+            for ( int i = 0; i < level; ++i ) prefix += QLatin1Char(' ');
 
             qDebug( "%s%s", qPrintable( prefix ), ( mType == Page ? "Page" : (mType == Author ? "Author" : "Annotation") ) );
 
@@ -428,18 +430,18 @@ QModelIndex AuthorGroupProxyModel::mapToSource( const QModelIndex &proxyIndex ) 
 void AuthorGroupProxyModel::setSourceModel( QAbstractItemModel *model )
 {
     if ( sourceModel() ) {
-        disconnect( sourceModel(), SIGNAL(layoutChanged()), this, SLOT(rebuildIndexes()) );
-        disconnect( sourceModel(), SIGNAL(modelReset()), this, SLOT(rebuildIndexes()) );
-        disconnect( sourceModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
-        disconnect( sourceModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
+        disconnect( sourceModel(), &QAbstractItemModel::layoutChanged, this, &AuthorGroupProxyModel::rebuildIndexes );
+        disconnect( sourceModel(), &QAbstractItemModel::modelReset, this, &AuthorGroupProxyModel::rebuildIndexes );
+        disconnect( sourceModel(), &QAbstractItemModel::rowsInserted, this, &AuthorGroupProxyModel::rebuildIndexes );
+        disconnect( sourceModel(), &QAbstractItemModel::rowsRemoved, this, &AuthorGroupProxyModel::rebuildIndexes );
     }
 
     QAbstractProxyModel::setSourceModel( model );
 
-    connect( sourceModel(), SIGNAL(layoutChanged()), this, SLOT(rebuildIndexes()) );
-    connect( sourceModel(), SIGNAL(modelReset()), this, SLOT(rebuildIndexes()) );
-    connect( sourceModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
-    connect( sourceModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)), this, SLOT(rebuildIndexes()) );
+    connect( sourceModel(), &QAbstractItemModel::layoutChanged, this, &AuthorGroupProxyModel::rebuildIndexes );
+    connect( sourceModel(), &QAbstractItemModel::modelReset, this, &AuthorGroupProxyModel::rebuildIndexes );
+    connect( sourceModel(), &QAbstractItemModel::rowsInserted, this, &AuthorGroupProxyModel::rebuildIndexes );
+    connect( sourceModel(), &QAbstractItemModel::rowsRemoved, this, &AuthorGroupProxyModel::rebuildIndexes );
 
     rebuildIndexes();
 }
@@ -478,7 +480,7 @@ QVariant AuthorGroupProxyModel::data( const QModelIndex &proxyIndex, int role ) 
         if ( role == Qt::DisplayRole )
             return item->author();
         else if ( role == Qt::DecorationRole )
-            return KIcon( item->author().isEmpty() ? "user-away" : "user-identity" );
+            return QIcon::fromTheme( item->author().isEmpty() ? QStringLiteral("user-away") : QStringLiteral("user-identity") );
         else
             return QVariant();
     } else {
@@ -516,6 +518,7 @@ void AuthorGroupProxyModel::groupByAuthor( bool value )
 
 void AuthorGroupProxyModel::rebuildIndexes()
 {
+    beginResetModel();
     delete d->mRoot;
     d->mRoot = new AuthorGroupItem( 0 );
 
@@ -594,7 +597,7 @@ void AuthorGroupProxyModel::rebuildIndexes()
         }
     }
 
-    reset();
+    endResetModel();
 }
 
-#include "annotationproxymodels.moc"
+#include "moc_annotationproxymodels.cpp"

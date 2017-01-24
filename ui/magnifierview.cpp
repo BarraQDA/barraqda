@@ -21,8 +21,6 @@
 
 #include <QPainter>
 
-#include <KLocale>
-
 #include "core/document.h"
 #include "core/generator.h"
 #include "pagepainter.h"
@@ -192,4 +190,4 @@ void MagnifierView::drawTicks( QPainter *p )
   p->restore();
 }
 
-#include "magnifierview.moc"
+#include "moc_magnifierview.cpp"

@@ -18,7 +18,7 @@
 #include <QtGui/QFontDatabase>
 #include <QtGui/QImage>
 #include <QtGui/QPainter>
-#include <QtGui/QPrinter>
+#include <QtPrintSupport/QPrinter>
 #if QT_VERSION >= 0x040500
 #include <QtGui/QTextDocumentWriter>
 #endif
@@ -106,7 +106,7 @@ Okular::TextPage* TextDocumentGeneratorPrivate::createTextPage( int pageNumber )
             QRectF rect;
             TextDocumentUtils::calculateBoundingRect( mDocument, i, i + 1, rect, pageNumber );
             if ( pageNumber == -1 )
-                text = "\n";
+                text = QStringLiteral("\n");
 
             textPage->append( text, new Okular::NormalizedRect( rect.left(), rect.top(), rect.right(), rect.bottom() ) );
         }
@@ -213,7 +213,7 @@ void TextDocumentGeneratorPrivate::generateTitleInfos()
         Okular::DocumentViewport viewport = TextDocumentUtils::calculateViewport( mDocument, position.block );
 
         QDomElement item = mDocumentSynopsis.createElement( position.title );
-        item.setAttribute( "Viewport", viewport.toString() );
+        item.setAttribute( QStringLiteral("Viewport"), viewport.toString() );
 
         int headingLevel = position.level;
 
@@ -264,27 +264,19 @@ void TextDocumentGeneratorPrivate::initializeGenerator()
     QObject::connect( mConverter, SIGNAL(addMetaData(DocumentInfo::Key,QString)),
                       q, SLOT(addMetaData(DocumentInfo::Key,QString)) );
 
-    QObject::connect( mConverter, SIGNAL(error(QString,int)),
-                      q, SIGNAL(error(QString,int)) );
-    QObject::connect( mConverter, SIGNAL(warning(QString,int)),
-                      q, SIGNAL(warning(QString,int)) );
-    QObject::connect( mConverter, SIGNAL(notice(QString,int)),
-                      q, SIGNAL(notice(QString,int)) );
+    QObject::connect( mConverter, &TextDocumentConverter::error,
+                      q, &Generator::error );
+    QObject::connect( mConverter, &TextDocumentConverter::warning,
+                      q, &Generator::warning );
+    QObject::connect( mConverter, &TextDocumentConverter::notice,
+                      q, &Generator::notice );
 }
 
-TextDocumentGenerator::TextDocumentGenerator( TextDocumentConverter *converter, const QString& configName, QObject *parent, const QVariantList &args )
+TextDocumentGenerator::TextDocumentGenerator(TextDocumentConverter *converter, const QString& configName , QObject *parent, const QVariantList &args)
     : Okular::Generator( *new TextDocumentGeneratorPrivate( converter ), parent, args )
 {
     Q_D( TextDocumentGenerator );
     d->mGeneralSettings = new TextDocumentSettings( configName, this );
-
-    d->initializeGenerator();
-}
-
-TextDocumentGenerator::TextDocumentGenerator( TextDocumentConverter *converter, QObject *parent, const QVariantList &args )
-    : Okular::Generator( *new TextDocumentGeneratorPrivate( converter ), parent, args )
-{
-    Q_D( TextDocumentGenerator );
 
     d->initializeGenerator();
 }
@@ -471,7 +463,7 @@ const Okular::DocumentSynopsis* TextDocumentGenerator::generateDocumentSynopsis(
 QVariant TextDocumentGeneratorPrivate::metaData( const QString &key, const QVariant &option ) const
 {
     Q_UNUSED( option )
-    if ( key == "DocumentTitle" )
+    if ( key == QLatin1String("DocumentTitle") )
     {
         return mDocumentInfo.get( DocumentInfo::Title );
     }
@@ -503,7 +495,7 @@ bool TextDocumentGenerator::exportTo( const QString &fileName, const Okular::Exp
     if ( !d->mDocument )
         return false;
 
-    if ( format.mimeType()->name() == QLatin1String( "application/pdf" ) ) {
+    if ( format.mimeType().name() == QLatin1String( "application/pdf" ) ) {
         QFile file( fileName );
         if ( !file.open( QIODevice::WriteOnly ) )
             return false;
@@ -514,7 +506,7 @@ bool TextDocumentGenerator::exportTo( const QString &fileName, const Okular::Exp
         d->mDocument->print( &printer );
 
         return true;
-    } else if ( format.mimeType()->name() == QLatin1String( "text/plain" ) ) {
+    } else if ( format.mimeType().name() == QLatin1String( "text/plain" ) ) {
         QFile file( fileName );
         if ( !file.open( QIODevice::WriteOnly ) )
             return false;
@@ -524,11 +516,11 @@ bool TextDocumentGenerator::exportTo( const QString &fileName, const Okular::Exp
 
         return true;
 #if QT_VERSION >= 0x040500
-    } else if ( format.mimeType()->name() == QLatin1String( "application/vnd.oasis.opendocument.text" ) ) {
+    } else if ( format.mimeType().name() == QLatin1String( "application/vnd.oasis.opendocument.text" ) ) {
         QTextDocumentWriter odfWriter( fileName, "odf" );
 
         return odfWriter.write( d->mDocument );
-    } else if ( format.mimeType()->name() == QLatin1String( "text/html" ) ) {
+    } else if ( format.mimeType().name() == QLatin1String( "text/html" ) ) {
         QTextDocumentWriter odfWriter( fileName, "html" );
 
         return odfWriter.write( d->mDocument );
@@ -552,7 +544,7 @@ bool TextDocumentGenerator::reparseConfig()
 
 void TextDocumentGenerator::addPages( KConfigDialog* /*dlg*/ )
 {
-    kWarning() << "You forgot to reimplement addPages in your TextDocumentGenerator";
+    qCWarning(OkularCoreDebug) << "You forgot to reimplement addPages in your TextDocumentGenerator";
     return;
 }
 
@@ -563,5 +555,5 @@ TextDocumentSettings* TextDocumentGenerator::generalSettings()
     return d->mGeneralSettings;
 }
 
-#include "textdocumentgenerator.moc"
+#include "moc_textdocumentgenerator.cpp"
 

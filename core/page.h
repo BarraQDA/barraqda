@@ -12,7 +12,7 @@
 
 #include <QtCore/QLinkedList>
 
-#include "okular_export.h"
+#include "okularcore_export.h"
 #include "area.h"
 #include "global.h"
 #include "tagging.h"
@@ -48,7 +48,7 @@ class Tile;
  *
  * Note: The class takes ownership of all objects.
  */
-class OKULAR_EXPORT Page
+class OKULARCORE_EXPORT Page
 {
     public:
         /**

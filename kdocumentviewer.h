@@ -10,18 +10,18 @@
 #ifndef _KDOCUMENTVIEWER_H_
 #define _KDOCUMENTVIEWER_H_
 
-#include "okular_part_export.h"
+#include "okularpart_export.h"
 
 #include <QtCore/QStringList>
 
-class KUrl;
+class QUrl;
 
 /**
  * @short Abstract interface for a document viewer
  *
- * This interface describe briefly the basic functions of a document viewer.
+ * This interface describes the basic functions of a document viewer.
  */
-class OKULAR_PART_EXPORT KDocumentViewer
+class OKULARPART_EXPORT KDocumentViewer
 {
     public:
         virtual ~KDocumentViewer() {}
@@ -29,7 +29,7 @@ class OKULAR_PART_EXPORT KDocumentViewer
         /**
          * Open the document at the specified @p url at page @p page.
          */
-        virtual bool openDocument( const KUrl& url, uint page ) = 0;
+        virtual bool openDocument( const QUrl& url, uint page ) = 0;
 
         /**
          * Change to @p page the currently shown page.
