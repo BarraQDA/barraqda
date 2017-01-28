@@ -24,7 +24,7 @@ class LatexRenderer;
 }
 
 class KTextEdit;
-class MovableTitle;
+class tagMovableTitle;
 class QMenu;
 
 class TaggingWindow : public QFrame
@@ -37,11 +37,11 @@ class TaggingWindow : public QFrame
         void reloadInfo();
 
     private:
-        MovableTitle * m_title;
+        tagMovableTitle * m_title;
         KTextEdit *textEdit;
         QColor m_color;
         GuiUtils::LatexRenderer *m_latexRenderer;
-        Okular::Annotation* m_annot;
+        Okular::Tagging* m_tagging;
         Okular::Document* m_document;
         int m_page;
         int m_prevCursorPos;
@@ -56,7 +56,7 @@ class TaggingWindow : public QFrame
         void slotOptionBtn();
         void slotsaveWindowText();
         void renderLatex( bool render );
-        void slotHandleContentsChangedByUndoRedo( Okular::Annotation* annot, QString contents, int cursorPos, int anchorPos);
+        void slotHandleContentsChangedByUndoRedo( Okular::Tagging* tagging, QString contents, int cursorPos, int anchorPos);
 
     Q_SIGNALS:
         void containsLatex( bool );

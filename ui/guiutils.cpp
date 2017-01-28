@@ -23,6 +23,7 @@
 #include "core/action.h"
 #include "core/annotations.h"
 #include "core/document.h"
+#include "core/tagging.h"
 
 #include <memory>
 
@@ -137,6 +138,30 @@ QString authorForAnnotation( const Okular::Annotation * ann )
     Q_ASSERT( ann );
 
     return !ann->author().isEmpty() ? ann->author() : i18nc( "Unknown author", "Unknown" );
+}
+
+QString captionForTagging( const Okular::Tagging * tag )
+{
+    Q_ASSERT( tag );
+
+    QString ret;
+    switch( tag->subType() )
+    {
+        case Okular::Tagging::TText:
+            ret = i18n( "Text" );
+            break;
+        case Okular::Tagging::TBox:
+            ret = i18n( "Box" );
+            break;
+    }
+    return ret;
+}
+
+QString authorForTagging( const Okular::Tagging * tag )
+{
+    Q_ASSERT( tag );
+
+    return !tag->author().isEmpty() ? tag->author() : i18nc( "Unknown author", "Unknown" );
 }
 
 QString contentsHtml( const Okular::Annotation * ann )

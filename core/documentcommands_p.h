@@ -239,6 +239,30 @@ class EditAnnotationContentsCommand : public EditTextCommand
         int m_pageNumber;
 };
 
+class EditTaggingContentsCommand : public EditTextCommand
+{
+public:
+    EditTaggingContentsCommand(Okular::DocumentPrivate* docPriv,
+                                  Okular::Tagging*  tagging,
+                                  int pageNumber,
+                                  const QString & newContents,
+                                  int newCursorPos,
+                                  const QString & prevContents,
+                                  int prevCursorPos,
+                                  int prevAnchorPos
+    );
+
+    virtual void undo();
+    virtual void redo();
+    virtual int id() const;
+    virtual bool mergeWith(const QUndoCommand *uc);
+
+private:
+    Okular::DocumentPrivate * m_docPriv;
+    Okular::Tagging* m_tagging;
+    int m_pageNumber;
+};
+
 class EditFormTextCommand : public EditTextCommand
 {
     public:

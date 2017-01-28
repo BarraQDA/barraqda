@@ -504,6 +504,55 @@ bool EditAnnotationContentsCommand::mergeWith(const QUndoCommand* uc)
     }
 }
 
+EditTaggingContentsCommand::EditTaggingContentsCommand( DocumentPrivate* docPriv,
+                                                              Tagging* tagging,
+                                                              int pageNumber,
+                                                              const QString & newContents,
+                                                              int newCursorPos,
+                                                              const QString & prevContents,
+                                                              int prevCursorPos,
+                                                              int prevAnchorPos )
+: EditTextCommand( newContents, newCursorPos, prevContents, prevCursorPos, prevAnchorPos ),
+m_docPriv( docPriv ),
+m_tagging( tagging ),
+m_pageNumber( pageNumber )
+{
+    setText( i18nc( "Edit an tagging's text contents", "edit tagging contents" ) );
+}
+
+void EditTaggingContentsCommand::undo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_docPriv->performSetTaggingContents( m_prevContents, m_tagging, m_pageNumber );
+    emit m_docPriv->m_parent->taggingContentsChangedByUndoRedo( m_tagging, m_prevContents, m_prevCursorPos, m_prevAnchorPos );
+}
+
+void EditTaggingContentsCommand::redo()
+{
+    moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
+    m_docPriv->performSetTaggingContents( m_newContents, m_tagging, m_pageNumber );
+    emit m_docPriv->m_parent->taggingContentsChangedByUndoRedo( m_tagging, m_newContents, m_newCursorPos, m_newCursorPos );
+}
+
+int EditTaggingContentsCommand::id() const
+{
+    return 2;
+}
+
+bool EditTaggingContentsCommand::mergeWith(const QUndoCommand* uc)
+{
+    EditTaggingContentsCommand *euc = (EditTaggingContentsCommand*)uc;
+    // Only attempt merge of euc into this if they modify the same tagging
+    if ( m_tagging == euc->m_tagging )
+    {
+        return EditTextCommand::mergeWith( uc );
+    }
+    else
+    {
+        return false;
+    }
+}
+
 EditFormTextCommand::EditFormTextCommand( Okular::DocumentPrivate* docPriv,
                                           Okular::FormFieldText* form,
                                           int pageNumber,

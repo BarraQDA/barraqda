@@ -566,10 +566,38 @@ class OKULARCORE_EXPORT Document : public QObject
         void addPageTagging( int page, Tagging *tagging );
 
         /**
+         *  Prepares to modify the properties of the given @p annotation.
+         *  Must be called before the annotation's properties are modified
+         *
+         */
+        void prepareToModifyTaggingProperties( Tagging * tagging );
+
+        /**
+         * Modifies the given @p annotation on the given @p page.
+         * Must be preceded by a call to prepareToModifyAnnotationProperties before
+         * the annotation's properties are modified
+         *
+         */
+        void modifyPageTaggingProperties( int page, Tagging * tagging );
+
+        /**
+         * Edits the plain text contents of the given @p tagging on the given @p page.
+         *
+         * The contents are set to @p newContents with cursor position @p newCursorPos.
+         * The previous cursor position @p prevCursorPos and previous anchor position @p prevAnchorPos
+         * must also be supplied so that they can be restored if the edit action is undone.
+         *
+         * The Tagging's internal contents should not be modified prior to calling this method.
+         *
+         */
+        void editPageTaggingContents( int page, Tagging* tagging, const QString & newContents,
+                                         int newCursorPos, int prevCursorPos, int prevAnchorPos );
+
+        /**
          * Removes the given @p tagging from the given @p page.
          */
         void removePageTagging( int page, Tagging *tagging );
-        
+
         /**
          * Sets the text selection for the given @p page.
          *
@@ -1078,6 +1106,15 @@ class OKULARCORE_EXPORT Document : public QObject
          * @since 0.17 (KDE 4.11)
          */
         void annotationContentsChangedByUndoRedo( Okular::Annotation* annotation, const QString & contents, int cursorPos, int anchorPos );
+
+        /**
+         * This signal is emmitted whenever the contents of the given @p tagging are changed by an undo
+         * or redo action.
+         *
+         * The new contents (@p contents), cursor position (@p cursorPos), and anchor position (@p anchorPos) are
+         * included
+         */
+        void taggingContentsChangedByUndoRedo( Okular::Tagging* tagging, const QString & contents, int cursorPos, int anchorPos );
 
         /**
          * This signal is emmitted whenever the text contents of the given text @p form on the given @p page

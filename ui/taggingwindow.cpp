@@ -37,13 +37,15 @@
 #include <core/utils.h>
 #include <KMessageBox>
 
-class CloseButton
+// HACK: Use a different class name, otherwise duplicate class is in annotationwindow.cpp
+
+class tagCloseButton
   : public QPushButton
 {
     Q_OBJECT
 
 public:
-    CloseButton( QWidget * parent = Q_NULLPTR )
+    tagCloseButton( QWidget * parent = Q_NULLPTR )
       : QPushButton( parent )
     {
         setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
@@ -56,13 +58,13 @@ public:
 };
 
 
-class MovableTitle
+class tagMovableTitle
   : public QWidget
 {
     Q_OBJECT
 
 public:
-    MovableTitle( QWidget * parent )
+    tagMovableTitle( QWidget * parent )
       : QWidget( parent )
     {
         QVBoxLayout * mainlay = new QVBoxLayout( this );
@@ -84,7 +86,7 @@ public:
         dateLabel->setFont( f );
         dateLabel->setCursor( Qt::SizeAllCursor );
         buttonlay->addWidget( dateLabel );
-        CloseButton * close = new CloseButton( this );
+        tagCloseButton * close = new tagCloseButton( this );
         connect( close, &QAbstractButton::clicked, parent, &QWidget::close );
         buttonlay->addWidget( close );
         // option button row
@@ -194,8 +196,6 @@ TaggingWindow::TaggingWindow( QWidget * parent, Okular::Tagging * tagging, Okula
     setFrameStyle( Panel | Raised );
     setAttribute( Qt::WA_DeleteOnClose );
 
-    const bool canEditTagging = m_document->canModifyPageTagging( tagging );
-
     textEdit = new KTextEdit( this );
     textEdit->setAcceptRichText( false );
     textEdit->setPlainText( m_tagging->contents() );
@@ -208,15 +208,12 @@ TaggingWindow::TaggingWindow( QWidget * parent, Okular::Tagging * tagging, Okula
     connect(textEdit, &KTextEdit::textChanged, this, &TaggingWindow::slotsaveWindowText);
     connect(textEdit, &KTextEdit::cursorPositionChanged, this, &TaggingWindow::slotsaveWindowText);
     connect(textEdit, &KTextEdit::aboutToShowContextMenu, this, &TaggingWindow::slotUpdateUndoAndRedoInContextMenu);
-    connect(m_document, &Okular::Document::taggingationContentsChangedByUndoRedo, this, &TaggingWindow::slotHandleContentsChangedByUndoRedo);
-
-    if (!canEditTagging)
-        textEdit->setReadOnly(true);
+    connect(m_document, &Okular::Document::taggingContentsChangedByUndoRedo, this, &TaggingWindow::slotHandleContentsChangedByUndoRedo);
 
     QVBoxLayout * mainlay = new QVBoxLayout( this );
     mainlay->setMargin( 2 );
     mainlay->setSpacing( 0 );
-    m_title = new MovableTitle( this );
+    m_title = new tagMovableTitle( this );
     mainlay->addWidget( m_title );
     mainlay->addWidget( textEdit );
     QHBoxLayout * lowerlay = new QHBoxLayout();
@@ -243,15 +240,6 @@ TaggingWindow::~TaggingWindow()
 
 void TaggingWindow::reloadInfo()
 {
-    const QColor newcolor = m_tagging->style().color().isValid() ? m_tagging->style().color() : Qt::yellow;
-    if ( newcolor != m_color )
-    {
-        m_color = newcolor;
-        setPalette( QPalette( m_color ) );
-        QPalette pl = textEdit->palette();
-        pl.setColor( QPalette::Base, m_color );
-        textEdit->setPalette( pl );
-    }
     m_title->setAuthor( m_tagging->author() );
     m_title->setDate( m_tagging->modificationDate() );
 }

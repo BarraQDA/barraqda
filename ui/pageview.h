@@ -36,6 +36,7 @@ class DocumentViewport;
 class Annotation;
 class MovieAction;
 class RenditionAction;
+class Tagging;
 }
 
 class FormWidgetIface;
@@ -118,6 +119,7 @@ Q_OBJECT
         void selectAll();
 
         void openAnnotationWindow( Okular::Annotation *annotation, int pageNumber );
+        void openTaggingWindow( Okular::Tagging *tagging, int pageNumber );
         void reloadForms();
 
     Q_SIGNALS:
@@ -257,6 +259,7 @@ Q_OBJECT
         void slotAction( Okular::Action *action );
         void externalKeyPressEvent( QKeyEvent *e );
         void slotAnnotationWindowDestroyed( QObject *window );
+        void slotTaggingWindowDestroyed( QObject *window );
         void slotProcessMovieAction( const Okular::MovieAction *action );
         void slotProcessRenditionAction( const Okular::RenditionAction *action );
         void slotToggleChangeColors();

@@ -66,10 +66,11 @@
 #include "core/annotations.h"
 #include "core/tagging.h"
 #include "annotwindow.h"
+#include "taggingwindow.h"
 #include "guiutils.h"
 #include "annotationpopup.h"
+#include "taggingpopup.h"
 #include "pageviewannotator.h"
-#include "taggingwidgets.h"
 #include "priorities.h"
 #include "toolaction.h"
 #include "okmenutitle.h"
@@ -177,6 +178,8 @@ public:
     PageViewAnnotator * annotator;
     //text annotation dialogs list
     QHash< Okular::Annotation *, AnnotWindow * > m_annowindows;
+    //text tagging dialogs list
+    QHash< Okular::Tagging *, TaggingWindow * > m_tagwindows;
     // other stuff
     QTimer * delayResizeEventTimer;
     bool dirtyLayout;
@@ -779,6 +782,47 @@ void PageView::slotAnnotationWindowDestroyed( QObject * window )
         if ( it.value() == window )
         {
             it = d->m_annowindows.erase( it );
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+void PageView::openTaggingWindow( Okular::Tagging * tagging, int pageNumber )
+{
+    if ( !tagging )
+        return;
+
+    // find the annot window
+    TaggingWindow* existWindow = 0;
+    QHash< Okular::Tagging *, TaggingWindow * >::ConstIterator it = d->m_tagwindows.constFind( tagging );
+    if ( it != d->m_tagwindows.constEnd() )
+    {
+        existWindow = *it;
+    }
+
+    if ( existWindow == 0 )
+    {
+        existWindow = new TaggingWindow( this, tagging, d->document, pageNumber );
+        connect(existWindow, &QObject::destroyed, this, &PageView::slotTaggingWindowDestroyed);
+
+        d->m_tagwindows.insert( tagging, existWindow );
+    }
+
+    existWindow->show();
+}
+
+void PageView::slotTaggingWindowDestroyed( QObject * window )
+{
+    QHash< Okular::Tagging*, TaggingWindow * >::Iterator it = d->m_tagwindows.begin();
+    QHash< Okular::Tagging*, TaggingWindow * >::Iterator itEnd = d->m_tagwindows.end();
+    while ( it != itEnd )
+    {
+        if ( it.value() == window )
+        {
+            it = d->m_tagwindows.erase( it );
         }
         else
         {
@@ -2262,8 +2306,7 @@ void PageView::mousePressEvent( QMouseEvent * e )
                     double nX = pageItem->absToPageX(eventPos.x());
                     double nY = pageItem->absToPageY(eventPos.y());
 
-                    const QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OAnnotation, nX, nY, itemRect.width(), itemRect.height() );
-
+                    QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OAnnotation, nX, nY, itemRect.width(), itemRect.height() );
                     if ( !orects.isEmpty() )
                     {
                         AnnotationPopup popup( d->document, AnnotationPopup::MultiAnnotationMode, this );
@@ -2278,6 +2321,24 @@ void PageView::mousePressEvent( QMouseEvent * e )
 
                         connect( &popup, &AnnotationPopup::openAnnotationWindow,
                                  this, &PageView::openAnnotationWindow );
+
+                        popup.exec( e->globalPos() );
+                    }
+
+                    orects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
+                    if ( !orects.isEmpty() )
+                    {
+                        TaggingPopup popup( d->document, TaggingPopup::MultiTaggingMode, this );
+
+                        foreach ( const Okular::ObjectRect * orect, orects )
+                        {
+                            Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
+                            if ( tag )
+                                popup.addTagging( tag, pageItem->pageNumber() );
+                        }
+
+                        connect( &popup, &TaggingPopup::openTaggingWindow,
+                                 this, &PageView::openTaggingWindow );
 
                         popup.exec( e->globalPos() );
                     }

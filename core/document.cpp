@@ -1134,7 +1134,7 @@ void DocumentPrivate::performAddPageTagging( int page, Tagging * tagging )
 
     // add tagging to the page
     kp->addTagging( tagging );
-    
+
     // notify observers about the change
     notifyTaggingChanges( page );
 }
@@ -1150,6 +1150,22 @@ void DocumentPrivate::performRemovePageTagging( int page, Tagging * tagging )
 
 void DocumentPrivate::performModifyPageTagging( int page, Tagging * tagging, bool appearanceChanged )
 {
+    // find out the page
+    Page * kp = m_pagesVector[ page ];
+    if ( !m_generator || !kp )
+        return;
+
+    // notify observers about the change
+    notifyTaggingChanges( page );
+}
+
+void DocumentPrivate::performSetTaggingContents( const QString & newContents, Tagging *tag, int pageNumber )
+{
+    // Set contents
+    tag->setContents( newContents );
+
+    // Tell the document the Tagging has been modified
+    performModifyPageTagging( pageNumber, tag, true );
 }
 
 void DocumentPrivate::saveDocumentInfo() const
@@ -2161,7 +2177,7 @@ Document::~Document()
     for ( ; it != itEnd; ++it )
         d->unloadGenerator( it.value() );
     d->m_loadedGenerators.clear();
-    
+
     // delete the private structure
     delete d;
 }
@@ -3361,6 +3377,48 @@ void Document::addPageTagging( int page, Tagging * tagging )
     tagging->d_ptr->baseTransform(t.inverted());
     QUndoCommand *uc = new AddTaggingCommand(this->d, tagging, page);
     d->m_undoStack->push(uc);
+}
+
+void Document::prepareToModifyTaggingProperties( Tagging * tagging )
+{
+    Q_ASSERT(d->m_prevPropsOfAnnotBeingModified.isNull());
+    if (!d->m_prevPropsOfAnnotBeingModified.isNull())
+    {
+        qCCritical(OkularCoreDebug) << "Error: Document::prepareToModifyTaggingProperties has already been called since last call to Document::modifyPageTaggingProperties";
+        return;
+    }
+    d->m_prevPropsOfAnnotBeingModified = tagging->getTaggingPropertiesDomNode();
+}
+
+void Document::modifyPageTaggingProperties( int page, Tagging * tagging )
+{
+    Q_ASSERT(!d->m_prevPropsOfAnnotBeingModified.isNull());
+    if (d->m_prevPropsOfAnnotBeingModified.isNull())
+    {
+        qCCritical(OkularCoreDebug) << "Error: Document::prepareToModifyTaggingProperties must be called before Tagging is modified";
+        return;
+    }
+    QDomNode prevProps = d->m_prevPropsOfAnnotBeingModified;
+    QUndoCommand *uc = new Okular::ModifyTaggingPropertiesCommand( d,
+                                                                      tagging,
+                                                                      page,
+                                                                      prevProps,
+                                                                      tagging->getTaggingPropertiesDomNode() );
+    d->m_undoStack->push( uc );
+    d->m_prevPropsOfAnnotBeingModified.clear();
+}
+
+void Document::editPageTaggingContents( int page, Tagging* tagging,
+                                           const QString & newContents,
+                                           int newCursorPos,
+                                           int prevCursorPos,
+                                           int prevAnchorPos
+)
+{
+    QString prevContents = tagging->contents();
+    QUndoCommand *uc = new EditTaggingContentsCommand( d, tagging, page, newContents, newCursorPos,
+                                                          prevContents, prevCursorPos, prevAnchorPos );
+    d->m_undoStack->push( uc );
 }
 
 void Document::removePageTagging( int page, Tagging * tagging )

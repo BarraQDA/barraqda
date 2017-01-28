@@ -25,6 +25,7 @@ class Annotation;
 class EmbeddedFile;
 class Movie;
 class ScreenAnnotation;
+class Tagging;
 }
 
 namespace GuiUtils
@@ -34,6 +35,12 @@ namespace GuiUtils
      */
     QString captionForAnnotation( const Okular::Annotation * annotation );
     QString authorForAnnotation( const Okular::Annotation * annotation );
+
+    /**
+     * Returns the translated string with the type of the given @p tagging.
+     */
+    QString captionForTagging( const Okular::Tagging * tagging );
+    QString authorForTagging( const Okular::Tagging * tagging );
 
     QString contentsHtml( const Okular::Annotation * annotation );
 

@@ -87,6 +87,107 @@ QRect TaggingUtils::taggingGeometry( const Tagging * tag,
 }
 //END TaggingUtils implementation
 
+class Tagging::Window::Private
+{
+public:
+    Private()
+    : m_flags( -1 ), m_width( 0 ), m_height( 0 )
+    {
+    }
+
+    int m_flags;
+    NormalizedPoint m_topLeft;
+    int m_width;
+    int m_height;
+    QString m_title;
+    QString m_summary;
+};
+
+Tagging::Window::Window()
+: d( new Private )
+{
+}
+
+Tagging::Window::~Window()
+{
+    delete d;
+}
+
+Tagging::Window::Window( const Window &other )
+: d( new Private )
+{
+    *d = *other.d;
+}
+
+Tagging::Window& Tagging::Window::operator=( const Window &other )
+{
+    if ( this != &other )
+        *d = *other.d;
+
+    return *this;
+}
+
+void Tagging::Window::setFlags( int flags )
+{
+    d->m_flags = flags;
+}
+
+int Tagging::Window::flags() const
+{
+    return d->m_flags;
+}
+
+void Tagging::Window::setTopLeft( const NormalizedPoint &point )
+{
+    d->m_topLeft = point;
+}
+
+NormalizedPoint Tagging::Window::topLeft() const
+{
+    return d->m_topLeft;
+}
+
+void Tagging::Window::setWidth( int width )
+{
+    d->m_width = width;
+}
+
+int Tagging::Window::width() const
+{
+    return d->m_width;
+}
+
+void Tagging::Window::setHeight( int height )
+{
+    d->m_height = height;
+}
+
+int Tagging::Window::height() const
+{
+    return d->m_height;
+}
+
+void Tagging::Window::setTitle( const QString &title )
+{
+    d->m_title = title;
+}
+
+QString Tagging::Window::title() const
+{
+    return d->m_title;
+}
+
+void Tagging::Window::setSummary( const QString &summary )
+{
+    d->m_summary = summary;
+}
+
+QString Tagging::Window::summary() const
+{
+    return d->m_summary;
+}
+
+
 //BEGIN Tagging implementation
 TaggingPrivate::TaggingPrivate()
 {
@@ -141,6 +242,18 @@ QString Tagging::author() const
 {
     Q_D( const Tagging );
     return d->m_author;
+}
+
+void Tagging::setContents( const QString &contents )
+{
+    Q_D( Tagging );
+    d->m_contents = contents;
+}
+
+QString Tagging::contents() const
+{
+    Q_D( const Tagging );
+    return d->m_contents;
 }
 
 void Tagging::setUniqueName( const QString &name )
@@ -225,6 +338,18 @@ void Tagging::translate( const NormalizedPoint &coord )
     }
 }
 
+Tagging::Window & Tagging::window()
+{
+    Q_D( Tagging );
+    return d->m_window;
+}
+
+const Tagging::Window & Tagging::window() const
+{
+    Q_D( const Tagging );
+    return d->m_window;
+}
+
 void Tagging::setDisposeDataFunction( DisposeDataFunction func )
 {
     Q_D( Tagging );
@@ -249,7 +374,7 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
     // store -other- attributes
     if ( d->m_flags ) // Strip internal flags
         e.setAttribute( "flags", d->m_flags );
-    
+
     e.setAttribute( "node", this->node()->id() );
 
     // Sub-Node-1 - boundary
@@ -259,7 +384,16 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
     bE.setAttribute( "t", QString::number( d->m_boundary.top ) );
     bE.setAttribute( "r", QString::number( d->m_boundary.right ) );
     bE.setAttribute( "b", QString::number( d->m_boundary.bottom ) );
-    
+
+}
+
+QDomNode Tagging::getTaggingPropertiesDomNode() const
+{
+    QDomDocument doc( QStringLiteral("documentInfo") );
+    QDomElement node = doc.createElement( QStringLiteral("annotation") );
+
+    store(node, doc);
+    return node;
 }
 
 void Tagging::setTaggingProperties( const QDomNode& node )
@@ -352,7 +486,7 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
                 ee.attribute( "b" ).toDouble());
         }
     }
-    m_transformedBoundary = m_boundary;    
+    m_transformedBoundary = m_boundary;
 }
 
 //END Tagging implementation
@@ -364,15 +498,15 @@ class Okular::TextTaggingPrivate : public Okular::TaggingPrivate
     public:
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
-        
+
         ~TextTaggingPrivate();
-        
+
         void setTextArea( const RegularAreaRect * textArea );
-        
+
         void resetTransformation();
         void transform( const QTransform &matrix );
-        
-        
+
+
         RegularAreaRect * m_textArea;
         RegularAreaRect * m_transformedTextArea;
 };
@@ -396,7 +530,7 @@ TextTagging::TextTagging( const QDomNode & node )
     : Tagging( *new TextTaggingPrivate(), node )
 {
     Q_D( TextTagging );
-    
+
     d->m_textArea = new Okular::RegularAreaRect();
     QDomNode taggingNode = node.firstChild();
     while( taggingNode.isElement() )
@@ -411,7 +545,7 @@ TextTagging::TextTagging( const QDomNode & node )
                 tagElement.attribute( "t" ).toDouble(),
                 tagElement.attribute( "r" ).toDouble(),
                 tagElement.attribute( "b" ).toDouble());
-            
+
             d->m_textArea->append( rect );
         }
     }
@@ -421,9 +555,9 @@ TextTagging::TextTagging( const RegularAreaRect * textArea )
     : Tagging( *new TextTaggingPrivate() )
 {
     Q_D( TextTagging );
-    
+
     d->setTextArea( textArea );
-    
+
     NormalizedRect rect = textArea->first();
     int end = textArea->count();
     for (int i = 1; i < end; i++ )
@@ -447,13 +581,13 @@ void TextTagging::store( QDomNode & node, QDomDocument & document ) const
     Q_D( const TextTagging );
     // recurse to parent objects storing properties
     Tagging::store( node, document );
-    
+
     NormalizedRect rect;
     int end = d->m_textArea->count();
     for (int i = 0; i < end; i++ )
     {
         rect = d->m_textArea->at( i );
-        
+
         QDomElement e = document.createElement( "rect" );
         node.appendChild( e );
 
@@ -475,7 +609,7 @@ const RegularAreaRect * TextTagging::transformedTextArea () const
 void TextTaggingPrivate::resetTransformation()
 {
     TaggingPrivate::resetTransformation();
-    
+
     delete m_transformedTextArea;
     m_transformedTextArea = new RegularAreaRect;
     int end = m_textArea->count();
@@ -522,9 +656,9 @@ class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
     public:
         virtual void translate( const NormalizedPoint &coord );
         virtual TaggingPrivate* getNewTaggingPrivate();
-        
+
         void setcoords ( const NormalizedRect *rect );
-	
+
 };
 
 BoxTagging::BoxTagging()
@@ -591,7 +725,7 @@ static QRgb tagColors [] = {
         0xFF372101, 0xFFFFB500, 0xFFC2FFED, 0xFFA079BF, 0xFFCC0744, 0xFFC0B9B2, 0xFFC2FF99, 0xFF001E09,
         0xFF00489C, 0xFF6F0062, 0xFF0CBD66, 0xFFEEC3FF, 0xFF456D75, 0xFFB77B68, 0xFF7A87A1, 0xFF788D66,
         0xFF885578, 0xFFFAD09F, 0xFFFF8A9A, 0xFFD157A0, 0xFFBEC459, 0xFF456648, 0xFF0086ED, 0xFF886F4C,
-        
+
         0xFF34362D, 0xFFB4A8BD, 0xFF00A6AA, 0xFF452C2C, 0xFF636375, 0xFFA3C8C9, 0xFFFF913F, 0xFF938A81,
         0xFF575329, 0xFF00FECF, 0xFFB05B6F, 0xFF8CD0FF, 0xFF3B9700, 0xFF04F757, 0xFFC8A1A1, 0xFF1E6E00,
         0xFF7900D7, 0xFFA77500, 0xFF6367A9, 0xFFA05837, 0xFF6B002C, 0xFF772600, 0xFFD790FF, 0xFF9B9700,
@@ -600,7 +734,7 @@ static QRgb tagColors [] = {
         0xFF83AB58, 0xFF001C1E, 0xFFD1F7CE, 0xFF004B28, 0xFFC8D0F6, 0xFFA3A489, 0xFF806C66, 0xFF222800,
         0xFFBF5650, 0xFFE83000, 0xFF66796D, 0xFFDA007C, 0xFFFF1A59, 0xFF8ADBB4, 0xFF1E0200, 0xFF5B4E51,
         0xFFC895C5, 0xFF320033, 0xFFFF6832, 0xFF66E1D3, 0xFFCFCDAC, 0xFFD0AC94, 0xFF7ED379, 0xFF012C58,
-        
+
         0xFF7A7BFF, 0xFFD68E01, 0xFF353339, 0xFF78AFA1, 0xFFFEB2C6, 0xFF75797C, 0xFF837393, 0xFF943A4D,
         0xFFB5F4FF, 0xFFD2DCD5, 0xFF9556BD, 0xFF6A714A, 0xFF001325, 0xFF02525F, 0xFF0AA3F7, 0xFFE98176,
         0xFFDBD5DD, 0xFF5EBCD1, 0xFF3D4F44, 0xFF7E6405, 0xFF02684E, 0xFF962B75, 0xFF8D8546, 0xFF9695C5,
@@ -618,7 +752,7 @@ static QRgb tagColors [] = {
         0xFF1A3A2A, 0xFF494B5A, 0xFFA88C85, 0xFFF4ABAA, 0xFFA3F3AB, 0xFF00C6C8, 0xFFEA8B66, 0xFF958A9F,
         0xFFBDC9D2, 0xFF9FA064, 0xFFBE4700, 0xFF658188, 0xFF83A485, 0xFF453C23, 0xFF47675D, 0xFF3A3F00,
         0xFF061203, 0xFFDFFB71, 0xFF868E7E, 0xFF98D058, 0xFF6C8F7D, 0xFFD7BFC2, 0xFF3C3E6E, 0xFFD83D66,
-        
+
         0xFF2F5D9B, 0xFF6C5E46, 0xFFD25B88, 0xFF5B656C, 0xFF00B57F, 0xFF545C46, 0xFF866097, 0xFF365D25,
         0xFF252F99, 0xFF00CCFF, 0xFF674E60, 0xFFFC009C, 0xFF92896B
 };
@@ -631,7 +765,7 @@ Node * NodeUtils::retrieveNode ( int id )
 {
     if ( !NodeUtils::Nodes )
         NodeUtils::Nodes = new QList< Node * >();
-    
+
     QList< Node * >::const_iterator nIt = NodeUtils::Nodes->constBegin(), nEnd = NodeUtils::Nodes->constEnd();
     for ( ; nIt != nEnd; ++nIt )
     {
@@ -643,7 +777,7 @@ Node * NodeUtils::retrieveNode ( int id )
     node->m_id = id;
     if ( id <= lastNode )
         lastNode = id + 1;
-    
+
     return node;
 }
 

@@ -44,7 +44,7 @@ class TaggingPrivate
          * @since 0.17
          */
         virtual double distanceSqr( double x, double y, double xScale, double yScale );
-	
+
         PagePrivate * m_page;
         Node * m_node;
 
@@ -57,6 +57,8 @@ class TaggingPrivate
         int m_flags;
         NormalizedRect m_boundary;
         NormalizedRect m_transformedBoundary;
+
+        Okular::Tagging::Window m_window;
 
         Tagging::DisposeDataFunction m_disposeFunc;
         QVariant m_nativeId;

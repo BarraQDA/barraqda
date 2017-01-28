@@ -151,6 +151,7 @@ class DocumentPrivate
         void performAddPageTagging( int page, Tagging *tagging );
         void performRemovePageTagging( int page, Tagging * tagging );
         void performModifyPageTagging( int page, Tagging * tagging, bool appearanceChanged );
+        void performSetTaggingContents( const QString & newContents, Tagging *tag, int pageNumber );
 
         // private slots
         void saveDocumentInfo() const;

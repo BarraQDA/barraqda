@@ -136,12 +136,22 @@ class OKULARCORE_EXPORT Tagging
         QString author() const;
 
         /**
-         * Sets the unique @p name of the annotation.
+         * Sets the @p contents of the tagging.
+         */
+        void setContents( const QString &contents );
+
+        /**
+         * Returns the contents of the tagging.
+         */
+        QString contents() const;
+
+        /**
+         * Sets the unique @p name of the tagging.
          */
         void setUniqueName( const QString &name );
 
         /**
-         * Returns the unique name of the annotation.
+         * Returns the unique name of the tagging.
          */
         QString uniqueName() const;
 
@@ -207,6 +217,101 @@ class OKULARCORE_EXPORT Tagging
         void translate( const NormalizedPoint &coord );
 
         /**
+         * The Window class contains all information about the popup window
+         * of the tagging that is used to edit the content and properties.
+         */
+        class OKULARCORE_EXPORT Window
+        {
+        public:
+            /**
+             * Creates a new window.
+             */
+            Window();
+
+            /**
+             * Destroys the window.
+             */
+            ~Window();
+
+            Window( const Window &other );
+            Window& operator=( const Window &other );
+
+            /**
+             * Sets the @p flags of the window.
+             */
+            void setFlags( int flags );
+
+            /**
+             * Returns the flags of the window.
+             */
+            int flags() const;
+
+            /**
+             * Sets the top-left @p point of the window.
+             */
+            void setTopLeft( const NormalizedPoint &point );
+
+            /**
+             * Returns the top-left point of the window.
+             */
+            NormalizedPoint topLeft() const;
+
+            /**
+             * Sets the @p width of the window.
+             */
+            void setWidth( int width );
+
+            /**
+             * Returns the width of the window.
+             */
+            int width() const;
+
+            /**
+             * Sets the @p height of the window.
+             */
+            void setHeight( int height );
+
+            /**
+             * Returns the height of the window.
+             */
+            int height() const;
+
+            /**
+             * Sets the @p title of the window.
+             */
+            void setTitle( const QString &title );
+
+            /**
+             * Returns the title of the window.
+             */
+            QString title() const;
+
+            /**
+             * Sets the @p summary of the window.
+             */
+            void setSummary( const QString &summary );
+
+            /**
+             * Returns the summary of the window.
+             */
+            QString summary() const;
+
+        private:
+            class Private;
+            Private* const d;
+        };
+
+        /**
+         * Returns a reference to the window object of the tagging.
+         */
+        Window & window();
+
+        /**
+         * Returns a const reference to the window object of the tagging.
+         */
+        const Window & window() const;
+
+        /**
          * Sets a function to be called when the tagging is destroyed.
          *
          * @warning the function must *not* call any virtual function,
@@ -227,9 +332,14 @@ class OKULARCORE_EXPORT Tagging
         virtual void store( QDomNode & node, QDomDocument & document ) const;
 
         /**
-         * Sets annotations internal properties according to the contents of @p node
+         * Retrieve the QDomNode representing this tagging's properties
          *
-         * @since 0.17 (KDE 4.11)
+         */
+        QDomNode getTaggingPropertiesDomNode() const;
+
+        /**
+         * Sets taggings internal properties according to the contents of @p node
+         *
          */
         void setTaggingProperties( const QDomNode & node );
 

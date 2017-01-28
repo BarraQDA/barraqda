@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2006 by Tobias Koenig <tokoe@kde.org>                   *
+ *   Copyright (C) 2017 by Jonathan Schultz <jonathan@schultz.la>          *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -15,14 +15,12 @@
 
 #include "taggingpropertiesdialog.h"
 
-#include "core/taggings.h"
+#include "core/tagging.h"
 #include "core/document.h"
 #include "guiutils.h"
 #include "okmenutitle.h"
 
 Q_DECLARE_METATYPE( TaggingPopup::TagPagePair )
-
-namespace {
 
 TaggingPopup::TaggingPopup( Okular::Document *document, MenuMode mode,
                                   QWidget *parent )
@@ -75,20 +73,6 @@ void TaggingPopup::exec( const QPoint &point )
         action->setData( QVariant::fromValue( pair ) );
         action->setEnabled( onlyOne );
         action->setProperty( actionTypeId, propertiesId );
-
-        if ( onlyOne && taggingHasFileAttachment( pair.tagging ) )
-        {
-            const Okular::EmbeddedFile *embeddedFile = embeddedFileFromTagging( pair.tagging );
-            if ( embeddedFile )
-            {
-                const QString saveText = i18nc( "%1 is the name of the file to save", "&Save '%1'...", embeddedFile->name() );
-
-                menu.addSeparator();
-                action = menu.addAction( QIcon::fromTheme( QStringLiteral("document-save") ), saveText );
-                action->setData( QVariant::fromValue( pair ) );
-                action->setProperty( actionTypeId, saveId );
-            }
-        }
     }
     else
     {
@@ -108,20 +92,6 @@ void TaggingPopup::exec( const QPoint &point )
             action = menu.addAction( QIcon::fromTheme( QStringLiteral("configure") ), i18n( "&Properties" ) );
             action->setData( QVariant::fromValue( pair ) );
             action->setProperty( actionTypeId, propertiesId );
-
-            if ( taggingHasFileAttachment( pair.tagging ) )
-            {
-                const Okular::EmbeddedFile *embeddedFile = embeddedFileFromTagging( pair.tagging );
-                if ( embeddedFile )
-                {
-                    const QString saveText = i18nc( "%1 is the name of the file to save", "&Save '%1'...", embeddedFile->name() );
-
-                    menu.addSeparator();
-                    action = menu.addAction( QIcon::fromTheme( QStringLiteral("document-save") ), saveText );
-                    action->setData( QVariant::fromValue( pair ) );
-                    action->setProperty( actionTypeId, saveId );
-                }
-            }
         }
     }
 
@@ -145,12 +115,9 @@ void TaggingPopup::exec( const QPoint &point )
             }
         } else if( actionType == propertiesId ) {
             if ( pair.pageNumber != -1 ) {
-                AnnotsPropertiesDialog propdialog( mParent, mDocument, pair.pageNumber, pair.tagging );
+                TagsPropertiesDialog propdialog( mParent, mDocument, pair.pageNumber, pair.tagging );
                 propdialog.exec();
             }
-        } else if( actionType == saveId ) {
-            Okular::EmbeddedFile *embeddedFile = embeddedFileFromTagging( pair.tagging );
-            GuiUtils::saveEmbeddedFile( embeddedFile, mParent );
         }
     }
 }
