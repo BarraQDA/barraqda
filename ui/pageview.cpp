@@ -3080,6 +3080,9 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 Okular::Tagging* tag = new Okular::BoxTagging( tagRect );
                                 //  TODO: Create date, user, etc.
                                 tag->setNode (node);
+                                tag->setCreationDate( QDateTime::currentDateTime() );
+                                tag->setAuthor( Okular::Settings::identityAuthor() );
+
                                 d->document->addPageTagging( okularPage->number(), tag );
                             }
                         }
@@ -3348,6 +3351,8 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                         const Okular::Page * pg = d->document->page( selpages.at( i ) );
                                         Okular::Tagging* tag = new Okular::TextTagging( pg->textSelection() );
                                         tag->setNode (node);
+                                        tag->setCreationDate( QDateTime::currentDateTime() );
+                                        tag->setAuthor( Okular::Settings::identityAuthor() );
                                         d->document->addPageTagging( pg->number(), tag );
                                     }
                                 }
