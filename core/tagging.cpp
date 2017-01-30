@@ -47,10 +47,10 @@ Tagging * TaggingUtils::createTagging( const QDomElement & tagElement )
 void TaggingUtils::storeTagging( const Tagging * tag, QDomElement & tagElement,
     QDomDocument & document )
 {
-    // save annotation's type as element's attribute
+    // save tagging's type as element's attribute
     tagElement.setAttribute( "type", (uint)tag->subType() );
 
-    // append all annotation data as children of this node
+    // append all tagging data as children of this node
     tag->store( tagElement, document );
 }
 
@@ -190,6 +190,7 @@ QString Tagging::Window::summary() const
 
 //BEGIN Tagging implementation
 TaggingPrivate::TaggingPrivate()
+    : m_page( 0 ), m_flags( 0 ), m_disposeFunc( 0 )
 {
 }
 
@@ -365,32 +366,29 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
 
     // store -contents- attributes
     if ( !d->m_author.isEmpty() )
-        e.setAttribute( "author", d->m_author );
+        e.setAttribute( QStringLiteral("author"), d->m_author );
+    if ( !d->m_contents.isEmpty() )
+        e.setAttribute( QStringLiteral("contents"), d->m_contents );
     if ( d->m_modifyDate.isValid() )
-        e.setAttribute( "modifyDate", d->m_modifyDate.toString(Qt::ISODate) );
+        e.setAttribute( QStringLiteral("modifyDate"), d->m_modifyDate.toString(Qt::ISODate) );
     if ( d->m_creationDate.isValid() )
-        e.setAttribute( "creationDate", d->m_creationDate.toString(Qt::ISODate) );
-
-    // store -other- attributes
-    if ( d->m_flags ) // Strip internal flags
-        e.setAttribute( "flags", d->m_flags );
-
-    e.setAttribute( "node", this->node()->id() );
+        e.setAttribute( QStringLiteral("creationDate"), d->m_creationDate.toString(Qt::ISODate) );
+    // QSR node
+    e.setAttribute( QStringLiteral("node"), this->node()->id() );
 
     // Sub-Node-1 - boundary
     QDomElement bE = document.createElement( "boundary" );
     e.appendChild( bE );
-    bE.setAttribute( "l", QString::number( d->m_boundary.left ) );
-    bE.setAttribute( "t", QString::number( d->m_boundary.top ) );
-    bE.setAttribute( "r", QString::number( d->m_boundary.right ) );
-    bE.setAttribute( "b", QString::number( d->m_boundary.bottom ) );
-
+    bE.setAttribute( QStringLiteral("l"), QString::number( d->m_boundary.left ) );
+    bE.setAttribute( QStringLiteral("t"), QString::number( d->m_boundary.top ) );
+    bE.setAttribute( QStringLiteral("r"), QString::number( d->m_boundary.right ) );
+    bE.setAttribute( QStringLiteral("b"), QString::number( d->m_boundary.bottom ) );
 }
 
 QDomNode Tagging::getTaggingPropertiesDomNode() const
 {
     QDomDocument doc( QStringLiteral("documentInfo") );
-    QDomElement node = doc.createElement( QStringLiteral("annotation") );
+    QDomElement node = doc.createElement( QStringLiteral("tagging") );
 
     store(node, doc);
     return node;
@@ -399,27 +397,27 @@ QDomNode Tagging::getTaggingPropertiesDomNode() const
 void Tagging::setTaggingProperties( const QDomNode& node )
 {
     // Save off internal properties that aren't contained in node
-//    Okular::PagePrivate *p = d_ptr->m_page;
-    QVariant nativeID = d_ptr->m_nativeId;
-    int internalFlags = d_ptr->m_flags;
-    Tagging::DisposeDataFunction disposeFunc = d_ptr->m_disposeFunc;
+    Okular::PagePrivate         *p             = d_ptr->m_page;
+    QVariant                     nativeID      = d_ptr->m_nativeId;
+    int                          internalFlags = d_ptr->m_flags;
+    Tagging::DisposeDataFunction disposeFunc   = d_ptr->m_disposeFunc;
 
     // Replace TaggingPrivate object with a fresh copy
     TaggingPrivate *new_d_ptr = d_ptr->getNewTaggingPrivate();
     delete( d_ptr );
     d_ptr = new_d_ptr;
 
-    // Set the annotations properties from node
+    // Set the taggings properties from node
     d_ptr->setTaggingProperties(node);
 
     // Restore internal properties
-//    d_ptr->m_page = p;
-    d_ptr->m_nativeId = nativeID;
-    d_ptr->m_flags = d_ptr->m_flags | internalFlags;
+    d_ptr->m_page        = p;
+    d_ptr->m_nativeId    = nativeID;
+    d_ptr->m_flags       = d_ptr->m_flags | internalFlags;
     d_ptr->m_disposeFunc = disposeFunc;
 
-    // Transform annotation to current page rotation
-   d_ptr->transform( d_ptr->m_page->rotationMatrix() );
+    // Transform tagging to current page rotation
+    d_ptr->transform( d_ptr->m_page->rotationMatrix() );
 }
 
 double TaggingPrivate::distanceSqr( double x, double y, double xScale, double yScale )
@@ -458,14 +456,25 @@ void TaggingPrivate::translate( const NormalizedPoint &coord )
 
 void TaggingPrivate::setTaggingProperties( const QDomNode& node )
 {
-    // get the [base] element of the annotation node
+    // get the [base] element of the tagging node
     QDomElement e = TaggingUtils::findChildElement( node, "base" );
     if ( e.isNull() )
         return;
 
     // parse -contents- attributes
+    if ( e.hasAttribute( QStringLiteral("author") ) )
+        m_author = e.attribute( QStringLiteral("author") );
+    if ( e.hasAttribute( QStringLiteral("contents") ) )
+        m_contents = e.attribute( QStringLiteral("contents") );
+    if ( e.hasAttribute( QStringLiteral("uniqueName") ) )
+        m_uniqueName = e.attribute( QStringLiteral("uniqueName") );
+    if ( e.hasAttribute( QStringLiteral("modifyDate") ) )
+        m_modifyDate = QDateTime::fromString( e.attribute(QStringLiteral("modifyDate")), Qt::ISODate );
+    if ( e.hasAttribute( QStringLiteral("creationDate") ) )
+        m_creationDate = QDateTime::fromString( e.attribute(QStringLiteral("creationDate")), Qt::ISODate );
+    // QSR node
     if ( e.hasAttribute( "node" ) )
-        m_node = NodeUtils::retrieveNode( e.attribute( "node" ).toInt() );
+        m_node = NodeUtils::retrieveNode( e.attribute( QStringLiteral("node") ).toInt() );
     else
         m_node = new Node ();
 
@@ -478,12 +487,12 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
         eSubNode = eSubNode.nextSibling();
 
         // parse boundary
-        if ( ee.tagName() == "boundary" )
+        if ( ee.tagName() == QLatin1String("boundary") )
         {
-            m_boundary=NormalizedRect(ee.attribute( "l" ).toDouble(),
-                ee.attribute( "t" ).toDouble(),
-                ee.attribute( "r" ).toDouble(),
-                ee.attribute( "b" ).toDouble());
+            m_boundary=NormalizedRect(ee.attribute( QStringLiteral("l") ).toDouble(),
+                                      ee.attribute( QStringLiteral("t") ).toDouble(),
+                                      ee.attribute( QStringLiteral("r") ).toDouble(),
+                                      ee.attribute( QStringLiteral("b") ).toDouble());
         }
     }
     m_transformedBoundary = m_boundary;
@@ -496,16 +505,20 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
 class Okular::TextTaggingPrivate : public Okular::TaggingPrivate
 {
     public:
-        virtual void translate( const NormalizedPoint &coord );
-        virtual TaggingPrivate* getNewTaggingPrivate();
+        TextTaggingPrivate()
+            : TaggingPrivate(),
+              m_textArea( 0 ), m_transformedTextArea( 0 )
+        {
+        }
+
+        void transform( const QTransform &matrix ) override;
+        void resetTransformation() override;
+        void translate( const NormalizedPoint &coord ) override;
+        TaggingPrivate* getNewTaggingPrivate() override;
+        void setTaggingProperties( const QDomNode& node ) override;
 
         ~TextTaggingPrivate();
-
         void setTextArea( const RegularAreaRect * textArea );
-
-        void resetTransformation();
-        void transform( const QTransform &matrix );
-
 
         RegularAreaRect * m_textArea;
         RegularAreaRect * m_transformedTextArea;
@@ -526,29 +539,33 @@ void TextTaggingPrivate::setTextArea( const RegularAreaRect * textArea )
     *m_textArea = *textArea;
 }
 
-TextTagging::TextTagging( const QDomNode & node )
-    : Tagging( *new TextTaggingPrivate(), node )
+void TextTaggingPrivate::setTaggingProperties( const QDomNode& node )
 {
-    Q_D( TextTagging );
+    Okular::TaggingPrivate::setTaggingProperties(node);
 
-    d->m_textArea = new Okular::RegularAreaRect();
+    m_textArea = new Okular::RegularAreaRect();
     QDomNode taggingNode = node.firstChild();
     while( taggingNode.isElement() )
     {
-        // get annotation element and advance to next annot
+        // get tagging element and advance to next annot
         QDomElement tagElement = taggingNode.toElement();
         taggingNode = taggingNode.nextSibling();
 
         if ( tagElement.tagName() == "rect" )
         {
             NormalizedRect rect = NormalizedRect (tagElement.attribute( "l" ).toDouble(),
-                tagElement.attribute( "t" ).toDouble(),
-                tagElement.attribute( "r" ).toDouble(),
-                tagElement.attribute( "b" ).toDouble());
+                                                  tagElement.attribute( "t" ).toDouble(),
+                                                  tagElement.attribute( "r" ).toDouble(),
+                                                  tagElement.attribute( "b" ).toDouble());
 
-            d->m_textArea->append( rect );
+            m_textArea->append( rect );
         }
     }
+}
+
+TextTagging::TextTagging( const QDomNode & node )
+    : Tagging( *new TextTaggingPrivate(), node )
+{
 }
 
 TextTagging::TextTagging( const RegularAreaRect * textArea )
@@ -654,8 +671,8 @@ TaggingPrivate* TextTaggingPrivate::getNewTaggingPrivate()
 class Okular::BoxTaggingPrivate : public Okular::TaggingPrivate
 {
     public:
-        virtual void translate( const NormalizedPoint &coord );
-        virtual TaggingPrivate* getNewTaggingPrivate();
+        void translate( const NormalizedPoint &coord );
+        TaggingPrivate* getNewTaggingPrivate();
 
         void setcoords ( const NormalizedRect *rect );
 
