@@ -131,6 +131,8 @@ public:
     OkularTTS* tts();
 #endif
     QString selectedText() const;
+    void createTextTagginssfromSelection( Okular::QDANode *node ) const;
+    void createBoxTaggingsfromSelection( QRect selectionRect, Okular::QDANode *node ) const;
 
     // the document, pageviewItems and the 'visible cache'
     PageView *q;
@@ -859,6 +861,37 @@ void PageView::displayMessage( const QString & message, const QString & details,
     d->messageWindow->display( message, details, icon, duration );
 }
 
+QString PageView::enclosedText( QRect rectArea, QVector< PageViewItem * > & items )
+{
+    QString ret;
+    // grab text in selection by extracting it from all intersected pages
+    const Okular::Page * okularPage=0;
+    QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
+    for ( ; iIt != iEnd; ++iIt )
+    {
+        PageViewItem * item = *iIt;
+        if ( !item->isVisible() )
+            continue;
+
+        const QRect & itemRect = item->croppedGeometry();
+        if ( rectArea.intersects( itemRect ) )
+        {
+            // request the textpage if there isn't one
+            okularPage= item->page();
+            qWarning() << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
+            if ( !okularPage->hasTextPage() )
+                d->document->requestTextPage( okularPage->number() );
+            // grab text in the rect that intersects itemRect
+            QRect relativeRect = rectArea.intersect( itemRect );
+            relativeRect.translate( -item->uncroppedGeometry().topLeft() );
+            Okular::RegularAreaRect rects;
+            rects.append( Okular::NormalizedRect( relativeRect, item->uncroppedWidth(), item->uncroppedHeight() ) );
+            ret += okularPage->text( &rects, Okular::TextPage::CentralPixelTextAreaInclusionBehaviour );
+        }
+    }
+    return ret;
+}
+
 void PageView::reparseConfig()
 {
     // set the scroll bars policies
@@ -944,15 +977,10 @@ QString PageViewPrivate::selectedText() const
     QString text;
     QList< int > selpages = pagesWithTextSelection.toList();
     qSort( selpages );
-    const Okular::Page * pg = 0;
-    if ( selpages.count() == 1 )
+    const Okular::Page * pg = document->page( selpages.first() );
+    text.append( pg->text( pg->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
+    if ( selpages.count() > 1 )
     {
-        pg = document->page( selpages.first() );
-        text.append( pg->text( pg->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
-    }
-    else
-    {
-        pg = document->page( selpages.first() );
         text.append( pg->text( pg->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
         int end = selpages.count() - 1;
         for( int i = 1; i < end; ++i )
@@ -964,6 +992,64 @@ QString PageViewPrivate::selectedText() const
         text.append( pg->text( pg->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
     }
     return text;
+}
+
+void PageViewPrivate::createTextTaggingsfromSelection(Okular::QDANode *node) const
+{
+    QList< int > selpages = pagesWithTextSelection.toList();
+    qSort( selpages );
+    const Okular::Page * page = document->page( selpages.first() );
+    Okular::TextTagging* tag = new Okular::TextTagging( page, page->reference( page->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
+    tag->setCreationDate( QDateTime::currentDateTime() );
+    tag->setAuthor( Okular::Settings::identityAuthor() );
+    tag->setNode (node);
+    document->addPageTagging( page->number(), tag );
+    if ( selpages.count() > 1 )
+    {
+        Okular::TextTagging * head = tag;
+        int end = selpages.count() - 1;
+        for( int i = 1; i < end; ++i )
+        {
+            page = document->page( selpages.at( i ) );
+            Okular::TextTagging* tag = new Okular::TextTagging( head, page, page->reference( 0, Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
+            document->addPageTagging( page->number(), tag );
+        }
+        page = document->page( selpages.last() );
+        Okular::TextTagging* tag = new Okular::TextTagging( head, page, page->reference( page->textSelection(), Okular::TextPage::CentralPixelTextAreaInclusionBehaviour ) );
+        document->addPageTagging( page->number(), tag );
+    }
+}
+
+void PageViewPrivate::createBoxTaggingsfromSelection( QRect selectionRect, Okular::QDANode *node) const
+{
+    Okular::BoxTagging *head = 0, *tag;
+
+    QVector< PageViewItem * >::const_iterator iIt = items.constBegin(), iEnd = items.constEnd();
+    for ( ; iIt < iEnd; ++iIt )
+    {
+        PageViewItem * item = *iIt;
+
+        Okular::Page * page = (Okular::Page *) item->page();
+        QRect intersect = selectionRect & item->croppedGeometry();
+        if (! intersect.isNull( ) )
+        {
+            intersect.translate( -item->uncroppedGeometry().topLeft() );
+            Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
+            if ( ! head )
+            {
+                tag = new Okular::BoxTagging( page, tagRect );
+                head = tag;
+
+                tag->setCreationDate( QDateTime::currentDateTime() );
+                tag->setAuthor( Okular::Settings::identityAuthor() );
+                tag->setNode (node);
+            }
+            else
+                tag = new Okular::BoxTagging( head, page, tagRect );
+
+            document->addPageTagging( page->number(), tag );
+        }
+    }
 }
 
 void PageView::copyTextSelection() const
@@ -1349,11 +1435,11 @@ void PageView::notifyPageChanged( int pageNumber, int changedFlags )
 
     if ( changedFlags & DocumentObserver::Annotations )
     {
-        const QLinkedList< Okular::Annotation * > annots = d->document->page( pageNumber )->annotations();
-        const QLinkedList< Okular::Annotation * >::ConstIterator annItEnd = annots.end();
         QHash< Okular::Annotation*, AnnotWindow * >::Iterator it = d->m_annowindows.begin();
         for ( ; it != d->m_annowindows.end(); )
         {
+            const QLinkedList< Okular::Annotation * > annots = d->document->page( pageNumber )->annotations();
+            const QLinkedList< Okular::Annotation * >::ConstIterator annItEnd = annots.end();
             QLinkedList< Okular::Annotation * >::ConstIterator annIt = qFind( annots, it.key() );
             if ( annIt != annItEnd )
             {
@@ -2296,54 +2382,6 @@ void PageView::mousePressEvent( QMouseEvent * e )
                         d->leftClickTimer.start( QApplication::doubleClickInterval() + 10 );
                 }
             }
-            else if ( rightButton && !d->mouseAnn )
-            {
-                PageViewItem * pageItem = pickItemOnPoint( eventPos.x(), eventPos.y() );
-                if ( pageItem )
-                {
-                    // find out normalized mouse coords inside current item
-                    const QRect & itemRect = pageItem->uncroppedGeometry();
-                    double nX = pageItem->absToPageX(eventPos.x());
-                    double nY = pageItem->absToPageY(eventPos.y());
-
-                    QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OAnnotation, nX, nY, itemRect.width(), itemRect.height() );
-                    if ( !orects.isEmpty() )
-                    {
-                        AnnotationPopup popup( d->document, AnnotationPopup::MultiAnnotationMode, this );
-
-                        foreach ( const Okular::ObjectRect * orect, orects )
-                        {
-                            Okular::Annotation * ann = ( (Okular::AnnotationObjectRect *)orect )->annotation();
-                            if ( ann && (ann->subType() != Okular::Annotation::AWidget) )
-                                popup.addAnnotation( ann, pageItem->pageNumber() );
-
-                        }
-
-                        connect( &popup, &AnnotationPopup::openAnnotationWindow,
-                                 this, &PageView::openAnnotationWindow );
-
-                        popup.exec( e->globalPos() );
-                    }
-
-                    orects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
-                    if ( !orects.isEmpty() )
-                    {
-                        TaggingPopup popup( d->document, TaggingPopup::MultiTaggingMode, this );
-
-                        foreach ( const Okular::ObjectRect * orect, orects )
-                        {
-                            Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                            if ( tag )
-                                popup.addTagging( tag, pageItem->pageNumber() );
-                        }
-
-                        connect( &popup, &TaggingPopup::openTaggingWindow,
-                                 this, &PageView::openTaggingWindow );
-
-                        popup.exec( e->globalPos() );
-                    }
-                }
-            }
             break;
 
         case Okular::Settings::EnumMouseMode::Zoom:     // set first corner of the zoom rect
@@ -2453,6 +2491,116 @@ void PageView::mousePressEvent( QMouseEvent * e )
                 textSelectionClear();
             }
             break;
+    }
+}
+
+void PageView::handleGenericRightButtonRelease( QMouseEvent * e )
+{
+    //  These variables are already calculated in the calling functino/
+    const QPoint eventPos = contentAreaPoint( e->pos() );
+    PageViewItem * pageItem = pickItemOnPoint( eventPos.x(), eventPos.y() );
+    const QPoint pressPos = contentAreaPoint( mapFromGlobal( d->mousePressPos ) );
+    const PageViewItem * pageItemPressPos = pickItemOnPoint( pressPos.x(), pressPos.y() );
+
+    if ( pageItem && pageItem == pageItemPressPos &&
+        ( (d->mousePressPos - e->globalPos()).manhattanLength() < QApplication::startDragDistance() ) )
+    {
+        double nX = pageItem->absToPageX(eventPos.x());
+        double nY = pageItem->absToPageY(eventPos.y());
+        const Okular::ObjectRect * rect;
+        rect = pageItem->page()->objectRect( Okular::ObjectRect::Action, nX, nY, pageItem->uncroppedWidth(), pageItem->uncroppedHeight() );
+        if ( rect )
+        {
+            // handle right click over a link
+            const Okular::Action * link = static_cast< const Okular::Action * >( rect->object() );
+            // creating the menu and its actions
+            QMenu menu( this );
+            QAction * actProcessLink = menu.addAction( i18n( "Follow This Link" ) );
+            QAction * actStopSound = 0;
+            if ( link->actionType() == Okular::Action::Sound ) {
+                actProcessLink->setText( i18n( "Play this Sound" ) );
+                if ( Okular::AudioPlayer::instance()->state() == Okular::AudioPlayer::PlayingState ) {
+                    actStopSound = menu.addAction( i18n( "Stop Sound" ) );
+                }
+            }
+            QAction * actCopyLinkLocation = 0;
+            if ( dynamic_cast< const Okular::BrowseAction * >( link ) )
+                actCopyLinkLocation = menu.addAction( QIcon::fromTheme( QStringLiteral("edit-copy") ), i18n( "Copy Link Address" ) );
+            QAction * res = menu.exec( e->globalPos() );
+            if ( res )
+            {
+                if ( res == actProcessLink )
+                {
+                    d->document->processAction( link );
+                }
+                else if ( res == actCopyLinkLocation )
+                {
+                    const Okular::BrowseAction * browseLink = static_cast< const Okular::BrowseAction * >( link );
+                    QClipboard *cb = QApplication::clipboard();
+                    cb->setText( browseLink->url().toDisplayString(), QClipboard::Clipboard );
+                    if ( cb->supportsSelection() )
+                        cb->setText( browseLink->url().toDisplayString(), QClipboard::Selection );
+                }
+                else if ( res == actStopSound )
+                {
+                    Okular::AudioPlayer::instance()->stopPlaybacks();
+                }
+            }
+        }
+        else
+        {
+            // a link can move us to another page or even to another document, there's no point in trying to
+            //  process the click on the image once we have processes the click on the link
+            rect = pageItem->page()->objectRect( Okular::ObjectRect::Image, nX, nY, pageItem->uncroppedWidth(), pageItem->uncroppedHeight() );
+            if ( rect )
+            {
+                // handle right click over a image
+            }
+            else
+            {
+                //  Handle right click over annotation
+
+                // find out normalized mouse coords inside current item
+                const QRect & itemRect = pageItem->uncroppedGeometry();
+                double nX = pageItem->absToPageX(eventPos.x());
+                double nY = pageItem->absToPageY(eventPos.y());
+
+                const QLinkedList< const Okular::ObjectRect *> annRects = pageItem->page()->objectRects( Okular::ObjectRect::OAnnotation, nX, nY, itemRect.width(), itemRect.height() );
+
+                if ( !annRects.isEmpty() )
+                {
+                    AnnotationPopup popup( d->document, AnnotationPopup::MultiAnnotationMode, this );
+
+                    foreach ( const Okular::ObjectRect * annRect, annRects )
+                    {
+                        Okular::Annotation * ann = ( (Okular::AnnotationObjectRect *)annRect )->annotation();
+                        if ( ann && (ann->subType() == Okular::Annotation::ATTag
+                            || ann->subType() == Okular::Annotation::ABTag) )
+                            popup.addAnnotation( ann->head(), ann->head()->pageNum() );
+                        else if ( ann && (ann->subType() != Okular::Annotation::AWidget) )
+                            popup.addAnnotation( ann, pageItem->pageNumber() );
+
+                    }
+
+                    connect( &popup, &AnnotationPopup::openAnnotationWindow,
+                             this, &PageView::openAnnotationWindow );
+
+                    popup.exec( this, e->globalPos() );
+                }
+                else
+                {
+                    // right click (if not within 5 px of the press point, the mode
+                    // had been already changed to 'Selection' instead of 'Normal')
+                    emit rightClick( pageItem->page(), e->globalPos() );
+                }
+            }
+        }
+    }
+    else
+    {
+        // right click (if not within 5 px of the press point, the mode
+        // had been already changed to 'Selection' instead of 'Normal')
+        emit rightClick( pageItem ? pageItem->page() : 0, e->globalPos() );
     }
 }
 
@@ -2615,76 +2763,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                 }
             }
             else if ( rightButton && !d->mouseAnn )
-            {
-                if ( pageItem && pageItem == pageItemPressPos &&
-                     ( (d->mousePressPos - e->globalPos()).manhattanLength() < QApplication::startDragDistance() ) )
-                {
-                    double nX = pageItem->absToPageX(eventPos.x());
-                    double nY = pageItem->absToPageY(eventPos.y());
-                    const Okular::ObjectRect * rect;
-                    rect = pageItem->page()->objectRect( Okular::ObjectRect::Action, nX, nY, pageItem->uncroppedWidth(), pageItem->uncroppedHeight() );
-                    if ( rect )
-                    {
-                        // handle right click over a link
-                        const Okular::Action * link = static_cast< const Okular::Action * >( rect->object() );
-                        // creating the menu and its actions
-                        QMenu menu( this );
-                        QAction * actProcessLink = menu.addAction( i18n( "Follow This Link" ) );
-                        QAction * actStopSound = 0;
-                        if ( link->actionType() == Okular::Action::Sound ) {
-                            actProcessLink->setText( i18n( "Play this Sound" ) );
-                            if ( Okular::AudioPlayer::instance()->state() == Okular::AudioPlayer::PlayingState ) {
-                                actStopSound = menu.addAction( i18n( "Stop Sound" ) );
-                            }
-                        }
-                        QAction * actCopyLinkLocation = 0;
-                        if ( dynamic_cast< const Okular::BrowseAction * >( link ) )
-                            actCopyLinkLocation = menu.addAction( QIcon::fromTheme( QStringLiteral("edit-copy") ), i18n( "Copy Link Address" ) );
-                        QAction * res = menu.exec( e->globalPos() );
-                        if ( res )
-                        {
-                            if ( res == actProcessLink )
-                            {
-                                d->document->processAction( link );
-                            }
-                            else if ( res == actCopyLinkLocation )
-                            {
-                                const Okular::BrowseAction * browseLink = static_cast< const Okular::BrowseAction * >( link );
-                                QClipboard *cb = QApplication::clipboard();
-                                cb->setText( browseLink->url().toDisplayString(), QClipboard::Clipboard );
-                                if ( cb->supportsSelection() )
-                                    cb->setText( browseLink->url().toDisplayString(), QClipboard::Selection );
-                            }
-                            else if ( res == actStopSound )
-                            {
-                                Okular::AudioPlayer::instance()->stopPlaybacks();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // a link can move us to another page or even to another document, there's no point in trying to
-                        //  process the click on the image once we have processes the click on the link
-                        rect = pageItem->page()->objectRect( Okular::ObjectRect::Image, nX, nY, pageItem->uncroppedWidth(), pageItem->uncroppedHeight() );
-                        if ( rect )
-                        {
-                            // handle right click over a image
-                        }
-                        else
-                        {
-                            // right click (if not within 5 px of the press point, the mode
-                            // had been already changed to 'Selection' instead of 'Normal')
-                            emit rightClick( pageItem->page(), e->globalPos() );
-                        }
-                    }
-                }
-                else
-                {
-                    // right click (if not within 5 px of the press point, the mode
-                    // had been already changed to 'Selection' instead of 'Normal')
-                    emit rightClick( pageItem ? pageItem->page() : 0, e->globalPos() );
-                }
-            }
+                handleGenericRightButtonRelease( e );
             }break;
 
         case Okular::Settings::EnumMouseMode::Zoom:
@@ -2794,7 +2873,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     foreach ( const Okular::ObjectRect * orect, orects )
                     {
                         Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                        Okular::Node * node  = tag->node();
+                        Okular::QDANode * node  = tag->node();
                         QPixmap pixmap(100,100);
                         pixmap.fill(node->color());
                         QMenu * tagmenu = menu.addMenu( QIcon(pixmap), i18n("Tag") );
@@ -2909,33 +2988,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             // if we support text generation
             QString selectedText;
             if (d->document->supportsSearching())
-            {
-                // grab text in selection by extracting it from all intersected pages
-                const Okular::Page * okularPage=0;
-                QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
-                for ( ; iIt != iEnd; ++iIt )
-                {
-                    PageViewItem * item = *iIt;
-                    if ( !item->isVisible() )
-                        continue;
-
-                    const QRect & itemRect = item->croppedGeometry();
-                    if ( selectionRect.intersects( itemRect ) )
-                    {
-                        // request the textpage if there isn't one
-                        okularPage= item->page();
-                        qWarning() << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
-                        if ( !okularPage->hasTextPage() )
-                            d->document->requestTextPage( okularPage->number() );
-                        // grab text in the rect that intersects itemRect
-                        QRect relativeRect = selectionRect.intersected( itemRect );
-                        relativeRect.translate( -item->uncroppedGeometry().topLeft() );
-                        Okular::RegularAreaRect rects;
-                        rects.append( Okular::NormalizedRect( relativeRect, item->uncroppedWidth(), item->uncroppedHeight() ) );
-                        selectedText += okularPage->text( &rects );
-                    }
-                }
-            }
+                selectedText = enclosedText( selectionRect, d->items );
 
             // popup that ask to copy:text and copy/save:image
             QMenu menu( this );
@@ -2970,9 +3023,9 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
             QMenu * tagMenu = menu.addMenu ( i18n("Tag") );
             QList< QAction * > * tagSelections = new QList< QAction * >();
-            if (Okular::NodeUtils::Nodes)
+            if (Okular::QDANodeUtils::Nodes)
             {
-                QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin(), nEnd = Okular::NodeUtils::Nodes->constEnd();
+                QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin(), nEnd = Okular::QDANodeUtils::Nodes->constEnd();
                 for ( ; nIt != nEnd; ++nIt )
                 {
                     QPixmap pixmap(100,100);
@@ -3046,13 +3099,13 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 #endif
                 else
                 {
-                    Okular::Node * node = 0;
+                    Okular::QDANode * node = 0;
                     if ( choice == newNode )
-                        node = new Okular::Node();
+                        node = new Okular::QDANode();
                     else
                     {
                         QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
-                        QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin();
+                        QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin();
                         for ( ; aIt != aEnd; ++aIt )
                         {
                             if ( choice == *aIt )
@@ -3065,28 +3118,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     }
 
                     if (node)
-                    {
-                        QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
-                        for ( ; iIt < iEnd; ++iIt )
-                        {
-                            PageViewItem * item = *iIt;
-
-                            Okular::Page * okularPage = (Okular::Page *) item->page();
-                            QRect intersect = selectionRect & item->croppedGeometry();
-                            if (! intersect.isNull( ) )
-                            {
-                                intersect.translate( -item->uncroppedGeometry().topLeft() );
-                                Okular::NormalizedRect* tagRect = new Okular::NormalizedRect (intersect, item->uncroppedWidth(), item->uncroppedHeight() );
-                                Okular::Tagging* tag = new Okular::BoxTagging( tagRect );
-                                //  TODO: Create date, user, etc.
-                                tag->setNode (node);
-                                tag->setCreationDate( QDateTime::currentDateTime() );
-                                tag->setAuthor( Okular::Settings::identityAuthor() );
-
-                                d->document->addPageTagging( okularPage->number(), tag );
-                            }
-                        }
-                    }
+                        d->createBoxTagAnnotationsfromSelection( selectionRect, node );
                 }
             }
             }
@@ -3106,8 +3138,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             // if mouse is released and selection is null this is a rightClick
             if ( rightButton && !d->mouseSelecting )
             {
-                PageViewItem * pageItem = pickItemOnPoint( eventPos.x(), eventPos.y() );
-                emit rightClick( pageItem ? pageItem->page() : 0, e->globalPos() );
+                handleGenericRightButtonRelease( e );
                 break;
             }
 
@@ -3292,9 +3323,9 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
                         QMenu * tagMenu = menu.addMenu ( i18n("Tag") );
                         QList< QAction * > * tagSelections = new QList< QAction * >();
-                        if (Okular::NodeUtils::Nodes)
+                        if (Okular::QDANodeUtils::Nodes)
                         {
-                            QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin(), nEnd = Okular::NodeUtils::Nodes->constEnd();
+                            QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin(), nEnd = Okular::QDANodeUtils::Nodes->constEnd();
                             for ( ; nIt != nEnd; ++nIt )
                             {
                                 QPixmap pixmap(100,100);
@@ -3322,13 +3353,13 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 new KRun( QUrl( url ), this );
                             else
                             {
-                                Okular::Node * node = 0;
+                                Okular::QDANode * node = 0;
                                 if ( choice == newNode )
-                                    node = new Okular::Node();
+                                    node = new Okular::QDANode();
                                 else
                                 {
                                     QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
-                                    QList< Okular::Node * >::const_iterator nIt = Okular::NodeUtils::Nodes->constBegin();
+                                    QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin();
                                     for ( ; aIt != aEnd; ++aIt )
                                     {
                                         if ( choice == *aIt )
@@ -3341,24 +3372,18 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 }
 
                                 if (node)
-                                {
-                                    //  JS: This code adapted from PageViewPrivate::selectedText()
-                                    QList< int > selpages = d->pagesWithTextSelection.toList();
-                                    qSort( selpages );
-                                    int end = selpages.count();
-                                    for (int i = 0; i < end; i++ )
-                                    {
-                                        const Okular::Page * pg = d->document->page( selpages.at( i ) );
-                                        Okular::Tagging* tag = new Okular::TextTagging( pg->textSelection() );
-                                        tag->setNode (node);
-                                        tag->setCreationDate( QDateTime::currentDateTime() );
-                                        tag->setAuthor( Okular::Settings::identityAuthor() );
-                                        d->document->addPageTagging( pg->number(), tag );
-                                    }
-                                }
-
+                                    d->createTextTagAnnotationsfromSelection( node );
                             }
 
+                        }
+                    }
+                    else
+                    {
+                        // If nothing else going on, process right click as normal
+                        if ( rightButton )
+                        {
+                            handleGenericRightButtonRelease( e );
+                            break;
                         }
                     }
                 }
@@ -3367,6 +3392,11 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
     // reset mouse press / 'drag start' position
     d->mousePressPos = QPoint();
+}
+
+const QVector< PageViewItem * > PageView::items( )
+{
+    return d->items;
 }
 
 void PageView::guessTableDividers()

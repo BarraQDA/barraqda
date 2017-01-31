@@ -55,6 +55,10 @@ class PageView : public QAbstractScrollArea, public Okular::DocumentObserver, pu
 {
 Q_OBJECT
 
+/// @cond PRIVATE
+friend class TaggingPopup;
+/// @endcond
+
     public:
         PageView( QWidget *parent, Okular::Document *document );
         ~PageView();
@@ -94,6 +98,8 @@ Q_OBJECT
 
         QList< Okular::RegularAreaRect * > textSelections( const QPoint& start, const QPoint& end, int& firstpage );
         Okular::RegularAreaRect * textSelectionForItem( PageViewItem * item, const QPoint & startPoint = QPoint(), const QPoint & endPoint = QPoint() );
+
+        QString enclosedText( QRect rectArea, QVector< PageViewItem * > & items );
 
         void reparseConfig();
 
@@ -152,9 +158,12 @@ Q_OBJECT
 
         void scrollContentsBy( int dx, int dy ) Q_DECL_OVERRIDE;
 
-    private:
         // draw background and items on the opened qpainter
         void drawDocumentOnPainter( const QRect & pageViewRect, QPainter * p );
+        // return the list of pave view items
+        const QVector< PageViewItem * > items( );
+
+private:
         // update item width and height using current zoom parameters
         void updateItemSize( PageViewItem * item, int columnWidth, int rowHeight );
         // return the widget placed on a certain point or 0 if clicking on empty space
@@ -199,7 +208,9 @@ Q_OBJECT
         // don't want to expose classes in here
         class PageViewPrivate * d;
 
-    private Q_SLOTS:
+        void handleGenericRightButtonRelease( QMouseEvent * e );
+
+private Q_SLOTS:
         // used to decouple the notifyViewportChanged calle
         void slotRealNotifyViewportChanged(bool smoothMove);
         // activated either directly or via queued connection on notifySetup
