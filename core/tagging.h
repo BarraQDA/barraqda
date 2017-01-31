@@ -30,7 +30,7 @@ class TaggingPrivate;
 class TextTaggingPrivate;
 class BoxTaggingPrivate;
 
-class Node;
+class QDANode;
 
 /**
  * @short Helper class for tagging retrieval/storage.
@@ -42,7 +42,7 @@ class OKULARCORE_EXPORT TaggingUtils
          *
          * Returns a pointer to the complete tagging or 0 if element is invalid.
          */
-        static Tagging * createTagging( const QDomElement & tagElement );
+        static Tagging * createTagging( Document *doc, const QDomElement & tagElement );
 
         /**
          */
@@ -114,16 +114,16 @@ class OKULARCORE_EXPORT Tagging
         typedef void ( * DisposeDataFunction )( const Okular::Tagging * );
 
         /**
+         * Create the tagging.
+         */
+        Tagging( );
+        Tagging( NormalizedRect *rect );
+
+        /**
          * Destroys the tagging.
          */
         virtual ~Tagging();
 
-		Tagging( );
-		Tagging( NormalizedRect *rect );
-
-        void setNode ( Node *node );
-
-        Node *node() const;
 
         /**
          * Sets the @p author of the tagging.
@@ -215,6 +215,42 @@ class OKULARCORE_EXPORT Tagging
          * @see canBeMoved()
          */
         void translate( const NormalizedPoint &coord );
+
+        /**
+         * Returns the head tagging of the tagging.
+         */
+        const Tagging *head() const;
+              Tagging *head();
+
+        /**
+         * Returns the next tagging in a group.
+         */
+        Tagging *next() const;
+
+        /**
+         * Sets the next tagging field in the tagging.
+         */
+        void setNext( Tagging *next );
+
+        /**
+         * Sets the previous node of the tagging.
+         */
+        void setPrevNode ( QDANode *node );
+
+        /**
+         * Returns the node of the tagging
+         */
+        QDANode *node() const;
+
+        /**
+         * Returns the document of the tagging.
+         */
+        const Document * document() const;
+
+        /**
+         * Returns the page of the tag tagging.
+         */
+        uint pageNum() const;
 
         /**
          * The Window class contains all information about the popup window
@@ -343,6 +379,12 @@ class OKULARCORE_EXPORT Tagging
          */
         void setTaggingProperties( const QDomNode & node );
 
+        void setNode ( Node *node );
+
+        Node *node() const;
+
+        /**
+         *
 
     protected:
         /// @cond PRIVATE
@@ -363,7 +405,6 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
          * Creates a new text tagging.
          */
         TextTagging();
-
         TextTagging( const RegularAreaRect * );
 
         /**
@@ -381,6 +422,9 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
          */
         SubType subType() const;
 
+        /**
+         * Returns the transformed text area of the tagging.
+         */
         const RegularAreaRect * transformedTextArea () const;
 
         /**
@@ -426,32 +470,10 @@ class OKULARCORE_EXPORT BoxTagging : public Tagging
     private:
         Q_DECLARE_PRIVATE( BoxTagging )
         Q_DISABLE_COPY( BoxTagging )
-};
-
-/**
- * @short Helper class for node retrieval/storage.
- */
-class OKULARCORE_EXPORT NodeUtils
-{
-    public:
-        static QList< Node * > * Nodes ;
-
-        static Node * retrieveNode(int id);
-};
-
-class OKULARCORE_EXPORT Node
-{
-    friend class NodeUtils;
-
-	public:
-        Node();
-		~Node();
-
-        unsigned int color() const;
-        int id()             const;
 
     protected:
-        int m_id;
+        //  JS: A bit awkward but we need a table to lookup text tags by unique name during loading.
+        static QHash<QString, BoxTagAnnotation *> bTagAnnotationTable;
 };
 
 }

@@ -69,6 +69,7 @@ class TextPagePrivate
         TextList m_words;
         QMap< int, SearchPoint* > m_searchPoints;
         PagePrivate *m_page;
+        int m_offset;
 
     private:
         RegularAreaRect * searchPointToArea(const SearchPoint* sp);

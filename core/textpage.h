@@ -82,6 +82,21 @@ class OKULARCORE_EXPORT TextEntity
         Q_DISABLE_COPY( TextEntity )
 };
 
+/*! @class TextReference
+ * @short Abstract text offset of Okular
+ * @par The context
+ * For the purpose of identifying sections of (unformatted) text, the TextOffset structure contains
+ * the offset (relative to the entire document and length of a chunk of text.
+ */
+class OKULARCORE_EXPORT TextReference
+{
+public:
+    bool isNull() const;
+
+    uint offset;
+    uint length;
+};
+
 /**
  * The TextPage class represents the text of a page by
  * providing @see TextEntity items for every word/character of
@@ -164,6 +179,16 @@ class OKULARCORE_EXPORT TextPage
         QString text( const RegularAreaRect * rect, TextAreaInclusionBehaviour b ) const;
 
         /**
+         * Offset function - returns the character offset of the page relative to the document.
+         */
+        uint offset();
+
+        /**
+         * Text reference function.
+         */
+        Okular::TextReference reference(const RegularAreaRect *area, TextAreaInclusionBehaviour b) const;
+
+        /**
          * Text entity extraction function. Similar to text() but returns
          * the words including their bounding rectangles. Note that
          * ownership of the contents of the returned list belongs to the
@@ -184,7 +209,12 @@ class OKULARCORE_EXPORT TextPage
          */
         RegularAreaRect *textArea( TextSelection *selection ) const;
 
-    private:
+        /**
+         * Returns the area defined by the list of text references.
+         */
+        RegularAreaRect *TextReferenceArea ( TextReference ref ) const;
+
+private:
         TextPagePrivate* const d;
 
         Q_DISABLE_COPY( TextPage )
@@ -192,4 +222,4 @@ class OKULARCORE_EXPORT TextPage
 
 }
 
-#endif 
+#endif

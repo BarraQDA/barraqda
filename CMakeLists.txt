@@ -117,6 +117,7 @@ set(okularcore_SRCS
    core/pagecontroller.cpp
    core/pagesize.cpp
    core/pagetransition.cpp
+   core/qdanodes.cpp
    core/rotationjob.cpp
    core/scripter.cpp
    core/sound.cpp

@@ -17,6 +17,7 @@
 #include "misc.h"
 #include "page.h"
 #include "page_p.h"
+#include "document_p.h"
 
 #include <cstring>
 
@@ -212,9 +213,13 @@ NormalizedRect TextEntity::transformedArea(const QTransform &matrix) const
     return transformed_area;
 }
 
+bool TextReference::isNull() const
+{
+    return ( offset == 0 && length == 0 );
+}
 
 TextPagePrivate::TextPagePrivate()
-    : m_page( 0 )
+    : m_page( 0 ), m_offset( -1 )
 {
 }
 
@@ -261,17 +266,17 @@ struct WordWithCharacters
      : word(w), characters(c)
     {
     }
-    
+
     inline QString text() const
     {
         return word->text();
     }
-    
+
     inline const NormalizedRect &area() const
     {
       return word->area;
     }
-    
+
     TinyTextEntity *word;
     TextList characters;
 };
@@ -294,7 +299,7 @@ public:
         : m_region_wordWithCharacters(wordsWithCharacters), m_area(area)
     {
     }
-    
+
     inline QString string() const
     {
         QString res;
@@ -336,16 +341,16 @@ RegularAreaRect * TextPage::textArea ( TextSelection * sel) const
 /**
     It works like this:
     There are two cursors, we need to select all the text between them. The coordinates are normalised, leftTop is (0,0)
-    rightBottom is (1,1), so for cursors start (sx,sy) and end (ex,ey) we start with finding text rectangles under those 
+    rightBottom is (1,1), so for cursors start (sx,sy) and end (ex,ey) we start with finding text rectangles under those
     points, if not we search for the first that is to the right to it in the same baseline, if none found, then we search
-    for the first rectangle with a baseline under the cursor, having two points that are the best rectangles to both 
-    of the cursors: (rx,ry)x(tx,ty) for start and (ux,uy)x(vx,vy) for end, we do a 
+    for the first rectangle with a baseline under the cursor, having two points that are the best rectangles to both
+    of the cursors: (rx,ry)x(tx,ty) for start and (ux,uy)x(vx,vy) for end, we do a
     1. (rx,ry)x(1,ty)
     2. (0,ty)x(1,uy)
     3. (0,uy)x(vx,vy)
 
     To find the closest rectangle to cursor (cx,cy) we search for a rectangle that either contains the cursor
-    or that has a left border >= cx and bottom border >= cy. 
+    or that has a left border >= cx and bottom border >= cy.
 */
     RegularAreaRect * ret= new RegularAreaRect;
 
@@ -412,7 +417,7 @@ RegularAreaRect * TextPage::textArea ( TextSelection * sel) const
                 itE = it;
 #ifdef DEBUG_TEXTPAGE
                 qCWarning(OkularCoreDebug) << "ending is" << itE << "count is" << d->m_words.count();
-                qCWarning(OkularCoreDebug) << "conditions" << tmp.contains( endCx, endCy ) << " " 
+                qCWarning(OkularCoreDebug) << "conditions" << tmp.contains( endCx, endCy ) << " "
                   << ( tmp.top <= endCy && tmp.bottom >= endCy && tmp.right <= endCx ) << " " <<
                   ( tmp.top >= endCy);
 #endif
@@ -432,7 +437,7 @@ RegularAreaRect * TextPage::textArea ( TextSelection * sel) const
 
         NormalizedRect first, second, third;
         /// finding out if there is more than one baseline between them is a hard and discussable task
-        /// we will create a rectangle (rx,0)x(tx,1) and will check how many times does it intersect the 
+        /// we will create a rectangle (rx,0)x(tx,1) and will check how many times does it intersect the
         /// areas, if more than one -> we have a three or over line selection
         first = start;
         second.top = start.bottom;
@@ -711,6 +716,43 @@ RegularAreaRect * TextPage::textArea ( TextSelection * sel) const
     return ret;
 }
 
+RegularAreaRect *TextPage::TextReferenceArea ( const TextReference ref ) const
+{
+    RegularAreaRect * ret= new RegularAreaRect;
+
+    if ( ref.isNull() )
+        return ret; //  Empty area
+
+        uint ref_offset = ref.offset;
+    uint ref_length = ref.length;
+
+    TextList::ConstIterator it = d->m_words.constBegin(), end = d->m_words.constEnd();
+    int entity_offset = 0;
+    uint entity_len = 0;
+    while ( it != end )
+    {
+        entity_len = (*it)->text().length();
+        if ( entity_offset + entity_len > ref_offset )
+            break;
+
+        entity_offset += entity_len;
+        it++;
+    }
+    if ( entity_offset + entity_len > ref_offset )
+    {
+        ret->appendShape( (*it)->area, MergeRight );
+        entity_offset += entity_len;
+        it++;
+        while ( it != end && entity_offset < ref_offset + ref_length )
+        {
+            ret->appendShape( (*it)->area, MergeRight );
+            entity_offset += (*it)->text().length();
+            it++;
+        }
+    }
+
+    return ret;
+}
 
 RegularAreaRect* TextPage::findText( int searchID, const QString &query, SearchDirection direct,
                                      Qt::CaseSensitivity caseSensitivity, const RegularAreaRect *area )
@@ -779,7 +821,7 @@ RegularAreaRect* TextPage::findText( int searchID, const QString &query, SearchD
 static int stringLengthAdaptedWithHyphen(const QString &str, const TextList::ConstIterator &it, const TextList::ConstIterator &textListEnd)
 {
     int len = str.length();
-    
+
     // hyphenated '-' must be at the end of a word, so hyphenation means
     // we have a '-' just followed by a '\n' character
     // check if the string contains a '-' character
@@ -814,7 +856,7 @@ static int stringLengthAdaptedWithHyphen(const QString &str, const TextList::Con
     {
         len -= 2;
     }
-    
+
     return len;
 }
 
@@ -826,6 +868,7 @@ RegularAreaRect* TextPagePrivate::searchPointToArea(const SearchPoint* sp)
     for (TextList::ConstIterator it = sp->it_begin; ; it++)
     {
         const TinyTextEntity* curEntity = *it;
+//         qCWarning(OkularCoreDebug) << "entity text:" << (*it)->text();
         ret->append( curEntity->transformedArea( matrix ) );
 
         if (it == sp->it_end) {
@@ -881,7 +924,7 @@ RegularAreaRect* TextPagePrivate::findTextInternalForward( int searchID, const Q
 #ifdef DEBUG_TEXTPAGE
             qCDebug(OkularCoreDebug) << str.midRef(offset, min) << ":" << _query.midRef(j, min);
 #endif
-            // we have equal (or less than) area of the query left as the length of the current 
+            // we have equal (or less than) area of the query left as the length of the current
             // entity
 
             if ( !comparer( str.midRef( offset, min ), query.midRef( j, min ) ) )
@@ -905,7 +948,7 @@ RegularAreaRect* TextPagePrivate::findTextInternalForward( int searchID, const Q
                     // move the current position in the query
                     // to the position after the length of this string
                     // we matched
-                    // subtract the length of the current entity from 
+                    // subtract the length of the current entity from
                     // the left length of the query
 #ifdef DEBUG_TEXTPAGE
             qCDebug(OkularCoreDebug) << "\tmatched";
@@ -997,7 +1040,7 @@ RegularAreaRect* TextPagePrivate::findTextInternalBackward( int searchID, const 
 #ifdef DEBUG_TEXTPAGE
             qCDebug(OkularCoreDebug) << str.midRef(offset-min, min) << " : " << _query.midRef(j-min, min);
 #endif
-            // we have equal (or less than) area of the query left as the length of the current 
+            // we have equal (or less than) area of the query left as the length of the current
             // entity
 
             // Note len is not str.length() so we can't use rightRef here
@@ -1023,7 +1066,7 @@ RegularAreaRect* TextPagePrivate::findTextInternalBackward( int searchID, const 
                     // move the current position in the query
                     // to the position after the length of this string
                     // we matched
-                    // subtract the length of the current entity from 
+                    // subtract the length of the current entity from
                     // the left length of the query
 #ifdef DEBUG_TEXTPAGE
                     qCDebug(OkularCoreDebug) << "\tmatched";
@@ -1106,6 +1149,74 @@ QString TextPage::text(const RegularAreaRect *area, TextAreaInclusionBehaviour b
     return ret;
 }
 
+uint TextPage::offset()
+{
+    if ( d->m_offset == -1 )
+    {
+        Document *doc = d->m_page->m_doc->m_parent;
+        uint thisPageNum = d->m_page->m_page->number();
+        d->m_offset = 0;
+        for ( uint pageIt = 0; pageIt < thisPageNum; ++pageIt )
+        {
+            const Page *page = doc->page( pageIt );
+            if (! page->hasTextPage() )
+                doc->requestTextPage( pageIt );
+            d->m_offset += page->text().length();
+        }
+    }
+    return static_cast<uint>( d->m_offset );
+}
+
+Okular::TextReference TextPage::reference(const RegularAreaRect *area, TextAreaInclusionBehaviour b) const
+{
+    if ( area && area->isNull() )
+        return { 0, 0 };
+
+    uint ref_offset = 0, ref_length = 0;
+    TextList::ConstIterator it = d->m_words.constBegin(), itEnd = d->m_words.constEnd();
+    int entity_offset = 0;
+    if ( area )
+    {
+        for ( ; it != itEnd; ++it )
+        {
+            QString str = (*it)->text();
+            uint len = str.length();
+            if (b == AnyPixelTextAreaInclusionBehaviour)
+            {
+                if ( area->intersects( (*it)->area ) )
+                {
+                    if ( ref_length == 0 )
+                        ref_offset = entity_offset;
+
+                    ref_length += len;
+                }
+            }
+            else
+            {
+                NormalizedPoint center = (*it)->area.center();
+                if ( area->contains( center.x, center.y ) )
+                {
+                    if ( ref_length == 0 )
+                        ref_offset = entity_offset;
+
+                    ref_length += len;
+                }
+            }
+            entity_offset += len;
+        }
+    }
+    else
+    {
+        for ( ; it != itEnd; ++it )
+        {
+            QString str = (*it)->text();
+            uint len = str.length();
+            ref_length += len;
+        }
+    }
+    return { ref_offset, ref_length };
+}
+
 static bool compareTinyTextEntityX(const WordWithCharacters &first, const WordWithCharacters &second)
 {
     QRect firstArea = first.area().roundedGeometry(1000,1000);
@@ -1157,7 +1268,7 @@ static void removeSpace(TextList *words)
  * We will read the TinyTextEntity from characters and try to create words from there.
  * Note: characters might be already characters for some generators, but we will keep
  * the nomenclature characters for the generator produced data. The resulting
- * WordsWithCharacters memory has to be managed by the caller, both the 
+ * WordsWithCharacters memory has to be managed by the caller, both the
  * WordWithCharacters::word and WordWithCharacters::characters contents
  */
 static WordsWithCharacters makeWordFromCharacters(const TextList &characters, int pageWidth, int pageHeight)
@@ -1170,7 +1281,7 @@ static WordsWithCharacters makeWordFromCharacters(const TextList &characters, in
      * and keep it in newList.
 
      * We create a RegionText named regionWord that contains the word and the characters associated with it and
-     * a rectangle area of the element in newList. 
+     * a rectangle area of the element in newList.
 
      */
     WordsWithCharacters wordsWithCharacters;
@@ -1264,7 +1375,7 @@ static WordsWithCharacters makeWordFromCharacters(const TextList &characters, in
 
         if(it == itEnd) break;
     }
-    
+
     return wordsWithCharacters;
 }
 
@@ -1283,7 +1394,7 @@ QList< QPair<WordsWithCharacters, QRect> > makeAndSortLines(const WordsWithChara
      * 2. Create textline where there is y overlap between TinyTextEntity 's
      * 3. Within each line sort the TinyTextEntity 's by x0(left)
      */
-    
+
     QList< QPair<WordsWithCharacters, QRect> > lines;
 
     /*
@@ -1358,7 +1469,7 @@ QList< QPair<WordsWithCharacters, QRect> > makeAndSortLines(const WordsWithChara
         WordsWithCharacters &list = lines[i].first;
         qSort(list.begin(), list.end(), compareTinyTextEntityX);
     }
-    
+
     return lines;
 }
 
@@ -1373,7 +1484,7 @@ static void calculateStatisticalInformation(const QList<WordWithCharacters> &wor
      * 2. Make character statistical analysis to differentiate between
      *   word spacing and column spacing.
      */
-    
+
     /**
      * Step 0
      */
@@ -1784,7 +1895,7 @@ static RegionTextList XYCutForBoundingBoxes(const QList<WordWithCharacters> &wor
 
                 if(leftRect.intersects(wordRect))
                     list1.append(word);
-                else 
+                else
                     list2.append(word);
             }
 
@@ -1987,7 +2098,7 @@ RegularAreaRect * TextPage::wordAt( const NormalizedPoint &p, QString *word ) co
                     // continue searching the start of the word back
                     continue;
                 }
-                
+
                 if (itText == QLatin1String("\n") && posIt != itBegin )
                 {
                     --posIt;
@@ -2011,7 +2122,7 @@ RegularAreaRect * TextPage::wordAt( const NormalizedPoint &p, QString *word ) co
             {
                 break;
             }
-            
+
             ret->appendShape( (*posIt)->area );
             text += (*posIt)->text();
             if (itText.right(1).at(0).isSpace())
@@ -2022,7 +2133,7 @@ RegularAreaRect * TextPage::wordAt( const NormalizedPoint &p, QString *word ) co
                 }
             }
         }
-        
+
         if (word)
         {
             *word = text;

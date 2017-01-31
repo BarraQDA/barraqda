@@ -46,13 +46,16 @@ class TaggingPrivate
         virtual double distanceSqr( double x, double y, double xScale, double yScale );
 
         PagePrivate * m_page;
-        Node * m_node;
 
         QString m_author;
         QString m_contents;
         QString m_uniqueName;
         QDateTime m_modifyDate;
         QDateTime m_creationDate;
+
+        Tagging *m_head, *m_next;               //  Structures to link multi-page taggings
+        QDANode *m_node;                        //  This pointer can be updated
+        QDANode *m_linkNode;                    //  This pointer must point to a QDA Node
 
         int m_flags;
         NormalizedRect m_boundary;

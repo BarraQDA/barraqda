@@ -17,6 +17,8 @@
 #include "document_p.h"
 #include "page.h"
 #include "page_p.h"
+#include "textpage.h"
+// #include "ui/pageview.h"
 
 using namespace Okular;
 
@@ -57,17 +59,18 @@ void TaggingUtils::storeTagging( const Tagging * tag, QDomElement & tagElement,
 QDomElement TaggingUtils::findChildElement( const QDomNode & parentNode,
     const QString & name )
 {
-    // loop through the whole children and return a 'name' named element
-    QDomNode subNode = parentNode.firstChild();
-    while( subNode.isElement() )
-    {
-        QDomElement element = subNode.toElement();
-        if ( element.tagName() == name )
-            return element;
-        subNode = subNode.nextSibling();
-    }
-    // if the name can't be found, return a dummy null element
-    return QDomElement();
+    return parentNode->fistChildElement( name );
+//     // loop through the whole children and return a 'name' named element
+//     QDomNode subNode = parentNode.firstChild();
+//     while( subNode.isElement() )
+//     {
+//         QDomElement element = subNode.toElement();
+//         if ( element.tagName() == name )
+//             return element;
+//         subNode = subNode.nextSibling();
+//     }
+//     // if the name can't be found, return a dummy null element
+//     return QDomElement();
 }
 
 QRect TaggingUtils::taggingGeometry( const Tagging * tag,
@@ -190,7 +193,9 @@ QString Tagging::Window::summary() const
 
 //BEGIN Tagging implementation
 TaggingPrivate::TaggingPrivate()
-    : m_page( 0 ), m_flags( 0 ), m_disposeFunc( 0 )
+    : m_page( 0 ), m_flags( 0 ), m_disposeFunc( 0 ),
+      m_head( 0 ), m_next( 0 ), m_node( 0 ), m_linkNode( 0 ),
+      m_pageNum( 0 ), m_doc( 0 )
 {
 }
 
@@ -221,88 +226,154 @@ Tagging::~Tagging()
     delete d_ptr;
 }
 
-void Tagging::setNode ( Node *node )
+void Tagging::setNode( QDANode *node )
 {
     Q_D( Tagging );
-    d->m_node = node;
+    Tagging *head = this->head();
+    if ( head == this )
+        d->m_node = node;
+    else
+        head->setNode( node );
+}
+
+void Tagging::setPrevNode( QDANode *node )
+{
+    Q_D( Tagging );
+    Tagging *head = this->head();
+    if ( head == this )
+        d->m_linkNode = node;
+    else
+        head->setPrevNode( node );
 }
 
 Node *Tagging::node() const
 {
     Q_D( const Tagging );
-    return d->m_node;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_node;
+    else
+        return head->node();
 }
 
 void Tagging::setAuthor( const QString &author )
 {
     Q_D( Tagging );
-    d->m_author = author;
+    const Tagging *head = this->head();
+    if ( head == this )
+        d->m_author = author;
+    else
+        head->setAuthor( author );
 }
 
 QString Tagging::author() const
 {
     Q_D( const Tagging );
-    return d->m_author;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_author;
+    else
+        return head->author();
 }
 
 void Tagging::setContents( const QString &contents )
 {
     Q_D( Tagging );
-    d->m_contents = contents;
+    const Tagging *head = this->head();
+    if ( head == this )
+        d->m_contents = contents;
+    else
+        head->setContents( author );
 }
 
 QString Tagging::contents() const
 {
     Q_D( const Tagging );
-    return d->m_contents;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_contents;
+    else
+        return head->contents();
 }
 
 void Tagging::setUniqueName( const QString &name )
 {
     Q_D( Tagging );
-    d->m_uniqueName = name;
+    const Tagging *head = this->head();
+    if ( head == this )
+        d->m_uniqueName = name;
+    else
+        head->setUniqueName( name );
 }
 
 QString Tagging::uniqueName() const
 {
     Q_D( const Tagging );
-    return d->m_uniqueName;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_uniqueName;
+    else
+        return head->uniqueName();
 }
 
 void Tagging::setModificationDate( const QDateTime &date )
 {
     Q_D( Tagging );
-    d->m_modifyDate = date;
+    const Tagging *head = this->head();
+    if ( head == this )
+        d->m_modifyDate = date;
+    else
+        head->setModificationDate( date );
 }
 
 QDateTime Tagging::modificationDate() const
 {
     Q_D( const Tagging );
-    return d->m_modifyDate;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_modifyDate;
+    else
+        return head->modificationDate();
 }
 
 void Tagging::setCreationDate( const QDateTime &date )
 {
     Q_D( Tagging );
-    d->m_creationDate = date;
+    const Tagging *head = this->head();
+    if ( head == this )
+        d->m_creationDate = date;
+    else
+        head->setCreationDate( date );
 }
 
 QDateTime Tagging::creationDate() const
 {
     Q_D( const Tagging );
-    return d->m_creationDate;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_creationDate;
+    else
+        return head->creationDate();
 }
 
 void Tagging::setFlags( int flags )
 {
     Q_D( Tagging );
-    d->m_flags = flags;
+    const Tagging *head = this->head();
+    if ( head == this )
+        d->m_flags = flags;
+    else
+        head->setFlags( flags );
 }
 
 int Tagging::flags() const
 {
     Q_D( const Tagging );
-    return d->m_flags;
+    const Tagging *head = this->head();
+    if ( head == this )
+        return d->m_flags;
+    else
+        return head->flags();
 }
 
 void Tagging::setBoundingRectangle( const NormalizedRect &rectangle )
@@ -337,6 +408,30 @@ void Tagging::translate( const NormalizedPoint &coord )
     {
         d->transform( d->m_page->rotationMatrix() );
     }
+}
+
+const Tagging *head() const
+{
+    Q_D( const Tagging );
+    return d->m_head ? d->m_head : this;
+}
+
+Tagging *head()
+{
+    Q_D( const Tagging );
+    return d->m_head ? d->m_head : this;
+}
+
+Tagging *next() const
+{
+    Q_D( const Tagging );
+    return d->m_next;
+}
+
+void setNext( Tagging *next )
+{
+    Q_D( Tagging );
+    d->m_next = next;
 }
 
 Tagging::Window & Tagging::window()
@@ -377,12 +472,15 @@ void Tagging::store( QDomNode & tagNode, QDomDocument & document ) const
     e.setAttribute( QStringLiteral("node"), this->node()->id() );
 
     // Sub-Node-1 - boundary
-    QDomElement bE = document.createElement( "boundary" );
-    e.appendChild( bE );
-    bE.setAttribute( QStringLiteral("l"), QString::number( d->m_boundary.left ) );
-    bE.setAttribute( QStringLiteral("t"), QString::number( d->m_boundary.top ) );
-    bE.setAttribute( QStringLiteral("r"), QString::number( d->m_boundary.right ) );
-    bE.setAttribute( QStringLiteral("b"), QString::number( d->m_boundary.bottom ) );
+    if ( this->subType() != TTag )
+    {
+        QDomElement bE = document.createElement( "boundary" );
+        e.appendChild( bE );
+        bE.setAttribute( QStringLiteral("l"), QString::number( d->m_boundary.left ) );
+        bE.setAttribute( QStringLiteral("t"), QString::number( d->m_boundary.top ) );
+        bE.setAttribute( QStringLiteral("r"), QString::number( d->m_boundary.right ) );
+        bE.setAttribute( QStringLiteral("b"), QString::number( d->m_boundary.bottom ) );
+    }
 }
 
 QDomNode Tagging::getTaggingPropertiesDomNode() const
@@ -396,6 +494,16 @@ QDomNode Tagging::getTaggingPropertiesDomNode() const
 
 void Tagging::setTaggingProperties( const QDomNode& node )
 {
+    if ( d_ptr->m_head )
+        qCCritical(OkularCoreDebug) << "Tagging::setTaggingProperties called with non-head tagging: " << d_ptr->m_uniqueName;
+
+    //  Save and restore private fields that will be erased.
+    Tagging * next = this->next();
+
+    //  Remove annotation from current QDA node
+    if ( d_ptr->m_linkNode )
+        d_ptr->m_linkNode->removeAnnotation( this );
+
     // Save off internal properties that aren't contained in node
     Okular::PagePrivate         *p             = d_ptr->m_page;
     QVariant                     nativeID      = d_ptr->m_nativeId;
@@ -407,17 +515,20 @@ void Tagging::setTaggingProperties( const QDomNode& node )
     delete( d_ptr );
     d_ptr = new_d_ptr;
 
-    // Set the taggings properties from node
-    d_ptr->setTaggingProperties(node);
-
     // Restore internal properties
     d_ptr->m_page        = p;
     d_ptr->m_nativeId    = nativeID;
     d_ptr->m_flags       = d_ptr->m_flags | internalFlags;
     d_ptr->m_disposeFunc = disposeFunc;
 
+    // Set the private taggings properties from node
+    d_ptr->setTaggingProperties(node);
+
     // Transform tagging to current page rotation
     d_ptr->transform( d_ptr->m_page->rotationMatrix() );
+
+    this->setNext( next );
+    d->m_node->addAnnotation( this )
 }
 
 double TaggingPrivate::distanceSqr( double x, double y, double xScale, double yScale )
@@ -472,14 +583,22 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
         m_modifyDate = QDateTime::fromString( e.attribute(QStringLiteral("modifyDate")), Qt::ISODate );
     if ( e.hasAttribute( QStringLiteral("creationDate") ) )
         m_creationDate = QDateTime::fromString( e.attribute(QStringLiteral("creationDate")), Qt::ISODate );
-    // QSR node
+    // QDA node
     if ( e.hasAttribute( "node" ) )
         m_node = NodeUtils::retrieveNode( e.attribute( QStringLiteral("node") ).toInt() );
     else
         m_node = new Node ();
 
-    // parse -the-subnodes- (describing Style, Window, Revision(s) structures)
-    // Note: all subnodes if present must be 'attributes complete'
+    //  m_doc can be set either when loading the annotation, or from the attached
+    //  structure.
+    if (! m_doc )
+    {
+        if ( m_page)
+            m_doc = m_page->m_doc->m_parent;
+        else
+            return;
+    }
+
     QDomNode eSubNode = e.firstChild();
     while ( eSubNode.isElement() )
     {
@@ -502,74 +621,13 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
 
 /** TextTagging [Tagging] */
 
-class Okular::TextTaggingPrivate : public Okular::TaggingPrivate
-{
-    public:
-        TextTaggingPrivate()
-            : TaggingPrivate(),
-              m_textArea( 0 ), m_transformedTextArea( 0 )
-        {
-        }
-
-        void transform( const QTransform &matrix ) override;
-        void resetTransformation() override;
-        void translate( const NormalizedPoint &coord ) override;
-        TaggingPrivate* getNewTaggingPrivate() override;
-        void setTaggingProperties( const QDomNode& node ) override;
-
-        ~TextTaggingPrivate();
-        void setTextArea( const RegularAreaRect * textArea );
-
-        RegularAreaRect * m_textArea;
-        RegularAreaRect * m_transformedTextArea;
-};
-
-TextTaggingPrivate::~TextTaggingPrivate()
-{
-    if (m_textArea)
-        delete m_textArea;
-
-    if (m_transformedTextArea)
-        delete m_transformedTextArea;
-}
-
-void TextTaggingPrivate::setTextArea( const RegularAreaRect * textArea )
-{
-    m_textArea = new RegularAreaRect;
-    *m_textArea = *textArea;
-}
-
-void TextTaggingPrivate::setTaggingProperties( const QDomNode& node )
-{
-    Okular::TaggingPrivate::setTaggingProperties(node);
-
-    m_textArea = new Okular::RegularAreaRect();
-    QDomNode taggingNode = node.firstChild();
-    while( taggingNode.isElement() )
-    {
-        // get tagging element and advance to next annot
-        QDomElement tagElement = taggingNode.toElement();
-        taggingNode = taggingNode.nextSibling();
-
-        if ( tagElement.tagName() == "rect" )
-        {
-            NormalizedRect rect = NormalizedRect (tagElement.attribute( "l" ).toDouble(),
-                                                  tagElement.attribute( "t" ).toDouble(),
-                                                  tagElement.attribute( "r" ).toDouble(),
-                                                  tagElement.attribute( "b" ).toDouble());
-
-            m_textArea->append( rect );
-        }
-    }
-}
-
 TextTagging::TextTagging( const QDomNode & node )
-    : Tagging( *new TextTaggingPrivate(), node )
+: Tagging( *new TextTaggingPrivate(), node )
 {
 }
 
 TextTagging::TextTagging( const RegularAreaRect * textArea )
-    : Tagging( *new TextTaggingPrivate() )
+: Tagging( *new TextTaggingPrivate() )
 {
     Q_D( TextTagging );
 
@@ -593,26 +651,48 @@ Tagging::SubType TextTagging::subType() const
     return TText;
 }
 
+void TextTagging::storeSection( QDomNode & node, QDomDocument & document ) const
+{
+    Q_D( const TextTagging );
+
+    QDomElement e = document.createElement( "textref" );
+    node.appendChild( e );
+
+    e.setAttribute( QStringLiteral("o"), d->m_ref.offset + d->m_page->m_page->textOffset() );
+    e.setAttribute( QStringLiteral("l"), d->m_ref.length );
+}
+
 void TextTagging::store( QDomNode & node, QDomDocument & document ) const
 {
     Q_D( const TextTagging );
+
+    if ( d->m_head )
+        qCWarning(OkularCoreDebug) << "TextTagging::store called with non-head tagging: " << d->m_uniqueName;
+
     // recurse to parent objects storing properties
     Tagging::store( node, document );
 
-    NormalizedRect rect;
-    int end = d->m_textArea->count();
-    for (int i = 0; i < end; i++ )
+    const Tagging * tagIt = this;
+    while ( tagIt )
     {
-        rect = d->m_textArea->at( i );
-
-        QDomElement e = document.createElement( "rect" );
-        node.appendChild( e );
-
-        e.setAttribute( "l", QString::number( rect.left ) );
-        e.setAttribute( "t", QString::number( rect.top ) );
-        e.setAttribute( "r", QString::number( rect.right ) );
-        e.setAttribute( "b", QString::number( rect.bottom ) );
+        tagIt->storeSection( node, document );
+        tagIt = tagIt->next();
     }
+
+//     NormalizedRect rect;
+//     int end = d->m_textArea->count();
+//     for (int i = 0; i < end; i++ )
+//     {
+//         rect = d->m_textArea->at( i );
+//
+//         QDomElement e = document.createElement( "rect" );
+//         node.appendChild( e );
+//
+//         e.setAttribute( "l", QString::number( rect.left ) );
+//         e.setAttribute( "t", QString::number( rect.top ) );
+//         e.setAttribute( "r", QString::number( rect.right ) );
+//         e.setAttribute( "b", QString::number( rect.bottom ) );
+//     }
 }
 
 const RegularAreaRect * TextTagging::transformedTextArea () const
@@ -622,6 +702,148 @@ const RegularAreaRect * TextTagging::transformedTextArea () const
     return d->m_transformedTextArea;
 }
 
+class Okular::TextTaggingPrivate : public Okular::TaggingPrivate
+{
+    public:
+        TextTaggingPrivate()
+            : TaggingPrivate(),
+              m_textArea( 0 ), m_transformedTextArea( 0 )
+        {
+        }
+
+        ~TextTaggingPrivate()
+        {
+            delete m_textArea;
+            delete m_transformedTextArea;
+        }
+
+        void transform( const QTransform &matrix ) override;
+        void resetTransformation() override;
+        void translate( const NormalizedPoint &coord ) override;
+        TaggingPrivate* getNewTaggingPrivate() override;
+        void setTaggingProperties( const QDomNode& node ) override;
+        double distanceSqr( double x, double y, double xScale, double yScale );
+
+        ~TextTaggingPrivate();
+        void setTextArea( const RegularAreaRect * textArea );
+
+        RegularAreaRect * m_textArea;
+        RegularAreaRect * m_transformedTextArea;
+};
+
+void TextTaggingPrivate::setTextArea( const RegularAreaRect * textArea )
+{
+    m_textArea = new RegularAreaRect;
+    *m_textArea = *textArea;
+}
+
+static void buildTextReferenceArea( TextTaggingPrivate *tTagP, const Page *page )
+{
+    //  Recreate the text reference area and boundaries.
+    tTagP->m_textArea = page->TextReferenceArea( tTagP->m_ref );
+    tTagP->m_transformedTextArea = new RegularAreaRect;
+    tTagP->m_boundary = Okular::NormalizedRect();
+    int end = tTagP->m_textArea->count();
+    if ( end == 0 )
+        qCWarning(OkularCoreDebug) << __func__ << " text reference area is null: " << tTagP->m_uniqueName;
+
+    for (int i = 0; i < end; i++ )
+    {
+        NormalizedRect rect = tTagP->m_textArea->at(i);
+        tTagP->m_transformedTextArea->append (rect);
+        tTagP->m_boundary |= rect;
+    }
+    tTagP->m_transformedBoundary = tTagP->m_boundary;
+}
+
+void TextTaggingPrivate::setTaggingProperties( const QDomNode& node )
+{
+    Q_Q ( TextTagging );
+
+    Tagging *head = 0;
+
+    Okular::TaggingPrivate::setTaggingProperties(node);
+
+    m_textArea = new Okular::RegularAreaRect();
+    QDomNode subNode = node.firstChild();
+    while( subNode.isElement() )
+    {
+        // get tagging element and advance to next annot
+        QDomElement e = subNode.toElement();
+        subNode = subNode.nextSibling();
+
+        if ( e.tagName() == "rect" )
+        {
+            NormalizedRect rect = NormalizedRect (e.attribute( "l" ).toDouble(),
+                                                  e.attribute( "t" ).toDouble(),
+                                                  e.attribute( "r" ).toDouble(),
+                                                  e.attribute( "b" ).toDouble());
+
+            m_textArea->append( rect );
+        }
+        else if ( e.tagName() == "textref" )
+        {
+            uint remainingLength = e.attribute( "l" ).toInt();
+            uint pageOffset = e.attribute( "o" ).toInt();
+
+            //  Find page where annotation starts
+            uint pageNum = 0;
+            const Page *page = m_doc->page( pageNum );
+            const Page *nextPage = m_doc->page( pageNum + 1 );
+            while ( nextPage && nextPage->textOffset() <= pageOffset )
+            {
+                pageNum++;
+                page = nextPage;
+                nextPage = m_doc->page( pageNum + 1 );
+            }
+
+            pageOffset -= page->textOffset();
+            uint pageLength = nextPage ? std::min( remainingLength, nextPage->textOffset() - page->textOffset() - pageOffset ) : remainingLength;
+            remainingLength -= pageLength;
+
+            if (! head )     //  ie we are building the head annotation object
+            {
+                m_pageNum = pageNum;
+                m_ref = { pageOffset, pageLength };
+                buildTextReferenceArea( this, page );
+                head = this;
+            }
+            else
+            {
+                TextTagging *tag = new TextTagging( head, page, { pageOffset, pageLength } );
+                static_cast<TextTaggingPrivate *>(tag->d_ptr)->m_pageNum = pageNum;
+            }
+
+            while ( nextPage && remainingLength )
+            {
+                pageNum++;
+                page = nextPage;
+                nextPage = m_doc->page( pageNum + 1 );
+
+                uint pageLength = nextPage ? std::min( remainingLength, nextPage->textOffset() - page->textOffset() ) : remainingLength;
+                remainingLength -= pageLength;
+
+                TextTagging *tag = new TextTagging( head, page, { 0, pageLength } );
+                static_cast<TextTaggingPrivate *>(tag->d_ptr)->m_pageNum = pageNum;
+
+                buildTextReferenceArea( static_cast<TextTaggingPrivate *>(tag->d_ptr), page );
+            }
+        }
+}
+
+double TextTaggingPrivate::distanceSqr( double x, double y, double xScale, double yScale )
+{
+    NormalizedRect rect = m_transformedTextArea->first();
+    double leastdistance = rect.distanceSqr( x, y, xScale, yScale );
+    int end = m_transformedTextArea->count();
+    for (int i = 1; leastdistance > 0 && i < end; i++ )
+    {
+        rect = m_transformedTextArea->at( i );
+        leastdistance = std::min( leastdistance, rect.distanceSqr( x, y, xScale, yScale ) );
+    }
+
+    return leastdistance;
+}
 
 void TextTaggingPrivate::resetTransformation()
 {
@@ -637,16 +859,7 @@ void TextTaggingPrivate::resetTransformation()
 void TextTaggingPrivate::transform( const QTransform &matrix )
 {
     TaggingPrivate::transform (matrix);
-
-    delete m_transformedTextArea;
-    m_transformedTextArea = new RegularAreaRect;
-    int end = m_textArea->count();
-    for (int i = 0; i < end; i++ )
-    {
-        NormalizedRect rect = m_textArea->at(i);
-        rect.transform (matrix);
-        m_transformedTextArea->append (rect);
-    }
+    m_transformedTextArea->transform( matrix );
 }
 
 void TextTaggingPrivate::translate( const NormalizedPoint &coord )
@@ -704,11 +917,82 @@ Tagging::SubType BoxTagging::subType() const
     return TBox;
 }
 
+void BoxTagging::storeSection( QDomNode & node, QDomDocument & document ) const
+{
+    Q_D( const BoxTagging );
+
+    QDomElement e = document.createElement( "imageref" );
+    node.appendChild( e );
+
+    e.setAttribute( QStringLiteral("l"), QString::number(d->m_boundary.left ) );
+    e.setAttribute( QStringLiteral("r"), QString::number(d->m_boundary.right ) );
+    e.setAttribute( QStringLiteral("t"), QString::number(d->m_boundary.top + d->m_page->m_page->verticalOffset() ) );
+    e.setAttribute( QStringLiteral("b"), QString::number(d->m_boundary.bottom + d->m_page->m_page->verticalOffset() ) );
+}
+
+void BoxTagging::store( QDomNode & node, QDomDocument & document ) const
+{
+    Q_D( const BoxTagging );
+
+    if ( d->m_head )
+        qCWarning(OkularCoreDebug) << "BoxTagging::store called with non-head tagging: " << d->m_uniqueName;
+
+    // recurse to parent objects storing properties
+    Tagging::store( node, document );
+
+    //  Dig up the base node to add the QDA Node reference
+    QDomElement baseElement = TaggingUtils::findChildElement( node, QStringLiteral("base") );
+    baseElement.setAttribute( QStringLiteral("node"), d->m_node->uniqueName() );
+
+    const Tagging * tagIt = this;
+    while ( tagIt )
+    {
+        tagIt->storeSection( node, document );
+        tagIt = tagIt->next();
+    }
+}
+
 void BoxTagging::store( QDomNode & node, QDomDocument & document ) const
 {
     Q_D( const BoxTagging );
     // recurse to parent objects storing properties
     Tagging::store( node, document );
+}
+
+QPixmap BoxTagging::pixmap() const
+{
+    //     Q_D( const BoxTagAnnotation );
+    //
+    //     const QVector< PageViewItem * > items = pageView->items();
+    //     QVector< PageViewItem * >::const_iterator iIt = items.constBegin(), iEnd = items.constEnd();
+    //     for ( ; iIt != iEnd; ++iIt )
+    //     {
+    //         PageViewItem * item = *iIt;
+    //         const Okular::Page *okularPage = item->page();
+    //         if ( okularPage->number() != pageItem->page()->number()
+    //         ||  !item->isVisible() )
+    //             continue;
+    //
+    //         QRect tagRect   = this->transformedBoundingRectangle().geometry( item->uncroppedWidth(), item->uncroppedHeight() ).translated( item->uncroppedGeometry().topLeft() );
+    //         QRect itemRect  = item->croppedGeometry();
+    //         QRect intersect = tagRect.intersect (itemRect);
+    //         if ( !intersect.isNull() )
+    //         {
+    //             // renders page into a pixmap
+    //             QPixmap copyPix( tagRect.width(), tagRect.height() );
+    //             QPainter copyPainter( &copyPix );
+    //             copyPainter.translate( -tagRect.left(), -tagRect.top() );
+    //             pageView->drawDocumentOnPainter( tagRect, &copyPainter );
+    //             copyPainter.end();
+    //             QClipboard *cb = QApplication::clipboard();
+    //             cb->setPixmap( copyPix, QClipboard::Clipboard );
+    //             if ( cb->supportsSelection() )
+    //                 cb->setPixmap( copyPix, QClipboard::Selection );
+    //
+    //             break;
+    //         }
+    //     }
+    return QPixmap();
 }
 
 void BoxTaggingPrivate::translate( const NormalizedPoint &coord )
