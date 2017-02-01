@@ -80,12 +80,12 @@ QDANode * QDANodeUtils::retrieve( QString m_uniqueName )
     return 0;
 }
 
-void QDANodeUtils::storeQDANodes( Document * doc, QDomElement & domElement, QDomDocument & domDocument )
+void QDANodeUtils::storeQDANodes( QDomElement & domElement, QDomDocument & domDocument )
 {
     QList< QDANode * >::const_iterator nIt = QDANodeUtils::QDANodes.constBegin(), nEnd = QDANodeUtils::QDANodes.constEnd();
     for ( ; nIt != nEnd; ++nIt )
     {
-        (*nIt)->store( doc, domElement, domDocument );
+        (*nIt)->store( domElement, domDocument );
     }
 }
 
@@ -146,39 +146,6 @@ void QDANodeUtils::load( DocumentPrivate *doc_p, const QDomNode& node )
                 attrElement = attrElement.nextSiblingElement( QStringLiteral("attribute") );
             }
         }
-        QDomElement tagElement = e.firstChildElement( QStringLiteral("tagging") );
-        while (! tagElement.isNull() )
-        {
-            Tagging * tagging = TaggingUtils::createTagging( doc_p->m_parent, tagElement );
-            // append tagging to the list or show warning
-            if ( tagging )
-            {
-                if ( tagging->node() && tagging->node() != qdaNode )
-                {
-                    qCWarning(OkularCoreDebug) << "QDANodeUtils::load tagging node inconsistent in tagging: " << tagging->uniqueName();
-                    delete tagging;
-                }
-                else if ( tagging->subType() == Tagging::TText && static_cast<TextTagging *>(tagging)->reference().isNull() )
-                {
-                    qCWarning(OkularCoreDebug) << "QDANodeUtils::load tagging has null reference in tagging: " << tagging->uniqueName();
-                    delete tagging;
-                }
-                else
-                {
-                    Tagging *tagIt = tagging;
-                    while ( tagIt )
-                    {
-                        doc_p->performAddPageTagging(tagIt->pageNum(), tagIt);
-                        tagIt = tagIt->next();
-                    }
-                    qCDebug(OkularCoreDebug) << "restored tagot:" << tagging->uniqueName();
-                }
-            }
-            else
-                qCWarning(OkularCoreDebug).nospace() << "Can't restore a tag tagging from XML.";
-
-            tagElement = tagElement.nextSiblingElement( QStringLiteral("tagging") );
-        }
 
         e = e.nextSiblingElement( QStringLiteral("node") );
     }
@@ -206,17 +173,15 @@ QDANode::~QDANode()
 {
 }
 
-void QDANode::store( Document * doc, QDomElement & domElement, QDomDocument & domDocument ) const
+void QDANode::store( QDomElement & domElement, QDomDocument & domDocument ) const
 {
     QList< Tagging * >::const_iterator tagIt = m_taggings.constBegin(), tagEnd = m_taggings.constEnd();
-    bool nodeStored = false;
     QDomElement e;
+    // Only store nodes that are used
     for ( ; tagIt != tagEnd; ++tagIt )
     {
-        if ( (*tagIt)->document() == doc && ! nodeStored )
+        if ( (*tagIt)->node() == this  )
         {
-            nodeStored = true;
-
             e = domDocument.createElement( QStringLiteral("node") );
             domElement.appendChild( e );
 
@@ -240,11 +205,7 @@ void QDANode::store( Document * doc, QDomElement & domElement, QDomDocument & do
                 attrElement.setAttribute( QStringLiteral("value"), attrIt->second );
             }
 
-            QDomElement tagElement = domDocument.createElement( QStringLiteral("tagging") );
-            tagElement.setAttribute( QStringLiteral("type"), (*tagIt)->subType() );
-            e.appendChild( tagElement );
-            (*tagIt)->store( tagElement, domDocument );
-            qCDebug(OkularCoreDebug) << "save tagging:" << (*tagIt)->uniqueName();
+            break;
         }
     }
 }

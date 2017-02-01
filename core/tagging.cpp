@@ -239,6 +239,9 @@ Tagging::~Tagging()
     if ( d_ptr->m_disposeFunc )
         d_ptr->m_disposeFunc( this );
 
+    if ( d_ptr->m_linkNode )
+        d_ptr->m_linkNode->removeTagging( this );
+
     delete d_ptr;
 }
 

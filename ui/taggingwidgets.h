@@ -14,6 +14,9 @@
 
 #include "core/tagging.h"
 
+class QComboBox;
+class QScrollArea;
+class QLineEdit;
 class TaggingWidget;
 
 /**
@@ -36,57 +39,32 @@ public:
 
     virtual Okular::Tagging::SubType taggingType() const;
 
-    QWidget * appearanceWidget();
-    QWidget * extraWidget();
+    QWidget * nodeWidget();
 
-    virtual void applyChanges();
+    void applyChanges();
 
-signals:
+Q_SIGNALS:
     void dataChanged();
+
+private Q_SLOTS:
+    void nodeChanged();
 
 protected:
     QWidget * createAppearanceWidget();
 
-    virtual QWidget * createStyleWidget();
-    virtual QWidget * createExtraWidget();
+    virtual QWidget * createNodeWidget();
 
     Okular::Tagging * m_tag;
-    QWidget * m_appearanceWidget;
-    QWidget * m_extraWidget;
-};
-
-class TextTaggingWidget
-  : public TaggingWidget
-{
-    Q_OBJECT
-
-public:
-    TextTaggingWidget( Okular::Tagging * tag );
-
-    virtual void applyChanges();
-
-protected:
-    virtual QWidget * createStyleWidget();
+    QWidget * m_nodeWidget;
 
 private:
-    Okular::TextTagging * m_textTag;
-};
+    QComboBox       * m_nodeBox;
+    Okular::QDANode * m_QDANode;
+    int               m_attrCount;
+    QScrollArea     * m_attrArea;
+    QLineEdit      ** m_attrName, **m_attrValue;
 
-class BoxTaggingWidget
-  : public TaggingWidget
-{
-    Q_OBJECT
-
-public:
-    BoxTaggingWidget( Okular::Tagging * tag );
-
-    virtual void applyChanges();
-
-protected:
-    virtual QWidget * createStyleWidget();
-
-private:
-    Okular::BoxTagging * m_boxTag;
+    void loadAttributes( QWidget *widget );
 };
 
 #endif

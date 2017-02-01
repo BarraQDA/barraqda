@@ -41,7 +41,7 @@ class OKULARCORE_EXPORT QDANodeUtils
         /**
          * Store all nodes with taggings in a given document, along with those taggings.
          */
-        static void storeQDANodes( Document * doc, QDomElement & domElement, QDomDocument & domDocument );
+        static void storeQDANodes( QDomElement & domElement, QDomDocument & domDocument );
         static void load( DocumentPrivate *doc_p, const QDomNode& node);
 };
 
@@ -54,7 +54,7 @@ class OKULARCORE_EXPORT QDANode
         QDANode( QString uniqueName );
         ~QDANode();
 
-        void store( Document * doc, QDomElement & domElement, QDomDocument & domDocument ) const;
+        void store( QDomElement & domElement, QDomDocument & domDocument ) const;
 
         QString uniqueName() const;
 

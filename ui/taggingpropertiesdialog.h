@@ -12,8 +12,6 @@
 
 #include <kpagedialog.h>
 
-class QLabel;
-class QLineEdit;
 class TaggingWidget;
 
 namespace Okular {
@@ -34,9 +32,7 @@ private:
     bool modified;
     Okular::Tagging* m_tag;    //source tagging
     //dialog widgets:
-    QLineEdit *AuthorEdit;
     TaggingWidget *m_tagWidget;
-    QLabel *m_modifyDateLabel;
 
     void setCaptionTextbyTagType();
 

@@ -43,42 +43,11 @@ TagsPropertiesDialog::TagsPropertiesDialog( QWidget *parent, Okular::Document *d
     QLabel* tmplabel;
   //1. Appearance
     //BEGIN tab1
-    QWidget *appearanceWidget = m_tagWidget->appearanceWidget();
-    addPage( appearanceWidget, i18n( "&Appearance" ) );
+    QWidget *nodeWidget = m_tagWidget->nodeWidget();
+    addPage( nodeWidget, i18n( "Node" ) );
     //END tab1
 
-    //BEGIN tab 2
-    QFrame* page = new QFrame( this );
-    addPage( page, i18n( "&General" ) );
-//    m_tabitem[1]->setIcon( QIcon::fromTheme( "fonts" ) );
-    QGridLayout* gridlayout = new QGridLayout( page );
-    tmplabel = new QLabel( i18n( "&Author:" ), page );
-    AuthorEdit = new KLineEdit( tag->author(), page );
-    tmplabel->setBuddy( AuthorEdit );
-    gridlayout->addWidget( tmplabel, 0, 0, Qt::AlignRight );
-    gridlayout->addWidget( AuthorEdit, 0, 1 );
-
-    tmplabel = new QLabel( page );
-    tmplabel->setText( i18n( "Created: %1", QLocale().toString( tag->creationDate(), QLocale::LongFormat ) ) );
-    tmplabel->setTextInteractionFlags( Qt::TextSelectableByMouse );
-    gridlayout->addWidget( tmplabel, 1, 0, 1, 2 );
-
-    m_modifyDateLabel = new QLabel( page );
-    m_modifyDateLabel->setText( i18n( "Modified: %1", QLocale().toString( tag->modificationDate(), QLocale::LongFormat ) ) );
-    m_modifyDateLabel->setTextInteractionFlags( Qt::TextSelectableByMouse );
-    gridlayout->addWidget( m_modifyDateLabel, 2, 0, 1, 2 );
-
-    gridlayout->addItem( new QSpacerItem( 5, 5, QSizePolicy::Fixed, QSizePolicy::MinimumExpanding ), 3, 0 );
-    //END tab 2
-
-    QWidget * extraWidget = m_tagWidget->extraWidget();
-    if ( extraWidget )
-    {
-        addPage( extraWidget, extraWidget->windowTitle() );
-    }
-
     //BEGIN connections
-    connect(AuthorEdit, &QLineEdit::textChanged, this, &TagsPropertiesDialog::setModified);
     connect(m_tagWidget, &TaggingWidget::dataChanged, this, &TagsPropertiesDialog::setModified);
     //END
 
@@ -127,14 +96,11 @@ void TagsPropertiesDialog::slotapply()
         return;
 
     m_document->prepareToModifyTaggingProperties( m_tag );
-    m_tag->setAuthor( AuthorEdit->text() );
     m_tag->setModificationDate( QDateTime::currentDateTime() );
 
     m_tagWidget->applyChanges();
 
     m_document->modifyPageTaggingProperties( m_page, m_tag );
-
-    m_modifyDateLabel->setText( i18n( "Modified: %1", QLocale().toString( m_tag->modificationDate(), QLocale::LongFormat ) ) );
 
     modified = false;
     button( QDialogButtonBox::Apply )->setEnabled( false );

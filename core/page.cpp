@@ -823,9 +823,9 @@ bool Page::removeTagging( Tagging * tagging )
 void Page::deleteTaggings()
 {
     // delete all stored taggings
-    QLinkedList< Tagging * >::const_iterator aIt = m_taggings.begin(), aEnd = m_taggings.end();
-    for ( ; aIt != aEnd; ++aIt )
-        delete *aIt;
+    QLinkedList< Tagging * >::const_iterator tIt = m_taggings.begin(), tEnd = m_taggings.end();
+    for ( ; tIt != tEnd; ++tIt )
+        delete *tIt;
     m_taggings.clear();
 }
 

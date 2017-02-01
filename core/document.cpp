@@ -562,6 +562,11 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
     {
         QString catName = topLevelNode.toElement().tagName();
 
+        if ( catName == QLatin1String("QDA") )
+            // Restore local QDA information
+        {
+            QDANodeUtils::load( this, topLevelNode );
+        }
         // Restore page attributes (bookmark, annotations, ...) from the DOM
         if ( catName == QLatin1String("pageList") )
         {
@@ -1189,6 +1194,11 @@ void DocumentPrivate::saveDocumentInfo() const
     QDomElement root = doc.createElement( QStringLiteral("documentInfo") );
     root.setAttribute( QStringLiteral("url"), m_url.toDisplayString(QUrl::PreferLocalFile) );
     doc.appendChild( root );
+
+    // 1.A Save QDA nodes
+    QDomElement QDAElement = doc.createElement( QStringLiteral("QDA") );
+    root.appendChild( QDAElement );
+    QDANodeUtils::storeQDANodes( QDAElement, doc );
 
     // 2.1. Save page attributes (bookmark state, annotations, ... ) to DOM
     QDomElement pageList = doc.createElement( QStringLiteral("pageList") );
