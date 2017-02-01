@@ -128,6 +128,7 @@ class PagePrivate
         int m_number;
         Rotation m_orientation;
         double m_width, m_height;
+        double m_offset;    //  Vertical distance of top of page from top of document
         DocumentPrivate *m_doc;
         NormalizedRect m_boundingBox;
         Rotation m_rotation;

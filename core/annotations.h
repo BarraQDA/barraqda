@@ -653,7 +653,7 @@ class OKULARCORE_EXPORT Annotation
 
         /**
          * Retrieve the QDomNode representing this annotation's properties
-         
+
          * @since 0.17 (KDE 4.11)
          */
         QDomNode getAnnotationPropertiesDomNode() const;

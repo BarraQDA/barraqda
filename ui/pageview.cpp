@@ -131,7 +131,7 @@ public:
     OkularTTS* tts();
 #endif
     QString selectedText() const;
-    void createTextTagginssfromSelection( Okular::QDANode *node ) const;
+    void createTextTaggingsfromSelection( Okular::QDANode *node ) const;
     void createBoxTaggingsfromSelection( QRect selectionRect, Okular::QDANode *node ) const;
 
     // the document, pageviewItems and the 'visible cache'
@@ -882,7 +882,7 @@ QString PageView::enclosedText( QRect rectArea, QVector< PageViewItem * > & item
             if ( !okularPage->hasTextPage() )
                 d->document->requestTextPage( okularPage->number() );
             // grab text in the rect that intersects itemRect
-            QRect relativeRect = rectArea.intersect( itemRect );
+            QRect relativeRect = rectArea | itemRect;
             relativeRect.translate( -item->uncroppedGeometry().topLeft() );
             Okular::RegularAreaRect rects;
             rects.append( Okular::NormalizedRect( relativeRect, item->uncroppedWidth(), item->uncroppedHeight() ) );
@@ -2566,32 +2566,43 @@ void PageView::handleGenericRightButtonRelease( QMouseEvent * e )
                 double nY = pageItem->absToPageY(eventPos.y());
 
                 const QLinkedList< const Okular::ObjectRect *> annRects = pageItem->page()->objectRects( Okular::ObjectRect::OAnnotation, nX, nY, itemRect.width(), itemRect.height() );
-
                 if ( !annRects.isEmpty() )
                 {
                     AnnotationPopup popup( d->document, AnnotationPopup::MultiAnnotationMode, this );
-
                     foreach ( const Okular::ObjectRect * annRect, annRects )
                     {
                         Okular::Annotation * ann = ( (Okular::AnnotationObjectRect *)annRect )->annotation();
-                        if ( ann && (ann->subType() == Okular::Annotation::ATTag
-                            || ann->subType() == Okular::Annotation::ABTag) )
-                            popup.addAnnotation( ann->head(), ann->head()->pageNum() );
-                        else if ( ann && (ann->subType() != Okular::Annotation::AWidget) )
+                        if ( ann && (ann->subType() != Okular::Annotation::AWidget) )
                             popup.addAnnotation( ann, pageItem->pageNumber() );
 
                     }
-
                     connect( &popup, &AnnotationPopup::openAnnotationWindow,
                              this, &PageView::openAnnotationWindow );
-
-                    popup.exec( this, e->globalPos() );
+                    popup.exec( e->globalPos() );
                 }
                 else
                 {
-                    // right click (if not within 5 px of the press point, the mode
-                    // had been already changed to 'Selection' instead of 'Normal')
-                    emit rightClick( pageItem->page(), e->globalPos() );
+                    const QLinkedList< const Okular::ObjectRect *> tagRects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
+                    if ( !tagRects.isEmpty() )
+                    {
+                        TaggingPopup popup( d->document, TaggingPopup::MultiTaggingMode, this );
+                        foreach ( const Okular::ObjectRect * tagRect, tagRects )
+                        {
+                            Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)tagRect )->tagging();
+                            if ( tag )
+                                popup.addTagging( tag, pageItem->pageNumber() );
+
+                        }
+                        connect( &popup, &TaggingPopup::openTaggingWindow,
+                                 this, &PageView::openTaggingWindow );
+                        popup.exec( e->globalPos() );
+                    }
+                    else
+                    {
+                        // right click (if not within 5 px of the press point, the mode
+                        // had been already changed to 'Selection' instead of 'Normal')
+                        emit rightClick( pageItem->page(), e->globalPos() );
+                    }
                 }
             }
         }
@@ -3023,16 +3034,13 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
             QMenu * tagMenu = menu.addMenu ( i18n("Tag") );
             QList< QAction * > * tagSelections = new QList< QAction * >();
-            if (Okular::QDANodeUtils::Nodes)
+            QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::QDANodes.constBegin(), nEnd = Okular::QDANodeUtils::QDANodes.constEnd();
+            for ( ; nIt != nEnd; ++nIt )
             {
-                QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin(), nEnd = Okular::QDANodeUtils::Nodes->constEnd();
-                for ( ; nIt != nEnd; ++nIt )
-                {
-                    QPixmap pixmap(100,100);
-                    pixmap.fill((*nIt)->color());
-                    QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n("Tag") );
-                    tagSelections->append( tagSelection );
-                }
+                QPixmap pixmap(100,100);
+                pixmap.fill((*nIt)->color());
+                QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n("Tag") );
+                tagSelections->append( tagSelection );
             }
             QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), i18n("New") );
 
@@ -3105,7 +3113,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     else
                     {
                         QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
-                        QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin();
+                        QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::QDANodes.constBegin();
                         for ( ; aIt != aEnd; ++aIt )
                         {
                             if ( choice == *aIt )
@@ -3118,7 +3126,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     }
 
                     if (node)
-                        d->createBoxTagAnnotationsfromSelection( selectionRect, node );
+                        d->createBoxTaggingsfromSelection( selectionRect, node );
                 }
             }
             }
@@ -3323,16 +3331,13 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 
                         QMenu * tagMenu = menu.addMenu ( i18n("Tag") );
                         QList< QAction * > * tagSelections = new QList< QAction * >();
-                        if (Okular::QDANodeUtils::Nodes)
+                        QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::QDANodes.constBegin(), nEnd = Okular::QDANodeUtils::QDANodes.constEnd();
+                        for ( ; nIt != nEnd; ++nIt )
                         {
-                            QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin(), nEnd = Okular::QDANodeUtils::Nodes->constEnd();
-                            for ( ; nIt != nEnd; ++nIt )
-                            {
-                                QPixmap pixmap(100,100);
-                                pixmap.fill((*nIt)->color());
-                                QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n("Tag") );
-                                tagSelections->append( tagSelection );
-                            }
+                            QPixmap pixmap(100,100);
+                            pixmap.fill((*nIt)->color());
+                            QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n("Tag") );
+                            tagSelections->append( tagSelection );
                         }
                         QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), i18n("New") );
 
@@ -3359,7 +3364,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 else
                                 {
                                     QList< QAction * >::const_iterator aIt = tagSelections->constBegin(), aEnd = tagSelections->constEnd();
-                                    QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::Nodes->constBegin();
+                                    QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::QDANodes.constBegin();
                                     for ( ; aIt != aEnd; ++aIt )
                                     {
                                         if ( choice == *aIt )
@@ -3372,7 +3377,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 }
 
                                 if (node)
-                                    d->createTextTagAnnotationsfromSelection( node );
+                                    d->createTextTaggingsfromSelection( node );
                             }
 
                         }

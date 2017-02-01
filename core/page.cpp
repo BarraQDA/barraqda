@@ -69,7 +69,7 @@ static void deleteObjectRects( QLinkedList< ObjectRect * >& rects, const QSet<Ob
 
 PagePrivate::PagePrivate( Page *page, uint n, double w, double h, Rotation o )
     : m_page( page ), m_number( n ), m_orientation( o ),
-      m_width( w ), m_height( h ), m_doc( 0 ), m_boundingBox( 0, 0, 1, 1 ),
+      m_width( w ), m_height( h ), m_offset( -1 ), m_doc( 0 ), m_boundingBox( 0, 0, 1, 1 ),
       m_rotation( Rotation0 ),
       m_text( 0 ), m_transition( 0 ), m_textSelections( 0 ),
       m_openingAction( 0 ), m_closingAction( 0 ), m_duration( -1 ),
@@ -233,6 +233,42 @@ bool Page::hasTextPage() const
     return d->m_text != 0;
 }
 
+Document *Page::document() const
+{
+    return d->m_doc->m_parent;
+}
+
+uint Page::textOffset() const
+{
+    if (! d->m_text )
+        d->m_doc->m_parent->requestTextPage( d->m_page->number() );
+
+    return d->m_text->offset();
+}
+
+double Page::verticalOffset() const
+{
+    //  This is all a bit silly, would be better simply to calcuate vertical offset when
+    //  page if first populated.
+    //     if ( d->m_offset == -1 )
+    //     {
+    //         Document *doc = d->m_doc->m_parent;
+    //         uint thisPageNum = this->number();
+    //         double offset = 0;
+    //         for ( uint pageIt = 0; pageIt < thisPageNum; ++pageIt )
+    //         {
+    //             const Page *page = doc->page( pageIt );
+    //             page->d->m_offset = offset;
+    //             offset += page->height();
+    //         }
+    //         d->m_offset = offset;
+    //     }
+    //     return d->m_offset;
+
+    // Pages are normalised to height 1.0
+    return d->m_number;
+}
+
 RegularAreaRect * Page::wordAt( const NormalizedPoint &p, QString *word ) const
 {
     if ( d->m_text )
@@ -297,6 +333,56 @@ RegularAreaRect * Page::findText( int id, const QString & text, SearchDirection 
 
     rect = d->m_text->findText( id, text, direction, caseSensitivity, lastRect );
     return rect;
+}
+
+Okular::TextReference Page::reference( const RegularAreaRect * area ) const
+{
+    return reference( area, TextPage::AnyPixelTextAreaInclusionBehaviour );
+}
+
+Okular::TextReference Page::reference( const RegularAreaRect * area, TextPage::TextAreaInclusionBehaviour b ) const
+{
+    Okular::TextReference ret;
+
+    if ( !d->m_text )
+        return { 0, 0 };
+
+    if ( area )
+    {
+        RegularAreaRect rotatedArea = *area;
+        rotatedArea.transform( d->rotationMatrix().inverted() );
+
+        ret = d->m_text->reference( &rotatedArea, b );
+
+        //  JS test text reference area functions
+        //         RegularAreaRect *textarea = d->m_text->TextReferenceArea( ret );
+        //         bool equal = ( textarea->count() == rotatedArea.count() );
+        //         if ( equal )
+        //         {
+        //             for (int i = 0; i < rotatedArea.count(); i++)
+        //             {
+        //                 if (! (textarea->at(i) == rotatedArea.at(i)))
+        //                 {
+        //                     equal = 0;
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //         if ( ! equal )
+        //             qCWarning(OkularCoreDebug) << "XXXXXX Text reference error";
+    }
+    else
+        ret = d->m_text->reference( 0, b );
+
+    return ret;
+}
+
+RegularAreaRect* Page::TextReferenceArea( const Okular::TextReference ref ) const
+{
+    if (! d->m_text )
+        d->m_doc->m_parent->requestTextPage( d->m_page->number() );
+
+    return d->m_text->TextReferenceArea( ref );
 }
 
 QString Page::text( const RegularAreaRect * area ) const
@@ -691,6 +777,14 @@ void Page::addTagging( Tagging * tagging)
     tagging->d_ptr->m_page = d;
     m_taggings.append( tagging );
 
+    //  If annotation is head then add it to node's list of annotations
+    if ( tagging == tagging->head() )
+    {
+        QDANode *node = tagging->node();
+        if ( node )
+            node->addTagging( tagging );
+    }
+
     TaggingObjectRect *rect = new TaggingObjectRect( tagging );
 
     // Rotate the tagging on the page.
@@ -907,7 +1001,7 @@ void PagePrivate::restoreLocalContents( const QDomNode & pageNode )
                 taggingNode = taggingNode.nextSibling();
 
                 // get tagging from the dom element
-                Tagging * tag = TaggingUtils::createTagging( tagElement );
+                Tagging * tag = TaggingUtils::createTagging( m_doc->m_parent, tagElement );
 
                 // append tagging to the list or show warning
                 if ( tag )

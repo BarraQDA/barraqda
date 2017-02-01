@@ -140,7 +140,7 @@ class OKULARCORE_EXPORT Page
         void setBoundingBox( const NormalizedRect& bbox );
 
         /**
-         * Returns whether the page of size @p width x @p height has a @p pixmap 
+         * Returns whether the page of size @p width x @p height has a @p pixmap
          * in the region given by @p rect for the given @p observer
          */
         bool hasPixmap( DocumentObserver *observer, int width = -1, int height = -1, const NormalizedRect &rect = NormalizedRect() ) const;
@@ -149,6 +149,21 @@ class OKULARCORE_EXPORT Page
          * Returns whether the page provides a text page (@ref TextPage).
          */
         bool hasTextPage() const;
+
+        /**
+         * Returns the document to which the page belongs.
+         */
+        Document *document() const;
+
+        /**
+         * Returns the text offset of the page relative to the document.
+         */
+        uint textOffset() const;
+
+        /**
+         * Returns the vertical offset of the page relative to the document.
+         */
+        double verticalOffset() const;
 
         /**
          * Returns whether the page has an object rect which includes the point (@p x, @p y)
@@ -187,6 +202,24 @@ class OKULARCORE_EXPORT Page
         RegularAreaRect* findText( int id, const QString & text, SearchDirection direction,
                                    Qt::CaseSensitivity caseSensitivity, const RegularAreaRect * lastRect=0) const;
 
+         /**
+         * Returns the page reference (or part of it).
+         * @see TextPage::reference()
+         */
+        Okular::TextReference reference( const RegularAreaRect * rect = 0 ) const;
+
+        /**
+         * Returns the area taken by a text reference.
+         * @see TextPage::TextReferenceArea()
+         */
+        RegularAreaRect* TextReferenceArea( const Okular::TextReference ref ) const;
+
+        /**
+         * Returns the page reference (or part of it).
+         * @see TextPage::reference()
+         */
+        Okular::TextReference reference( const RegularAreaRect * rect, TextPage::TextAreaInclusionBehaviour b ) const;
+
         /**
          * Returns the page text (or part of it).
          * @see TextPage::text()
@@ -208,7 +241,7 @@ class OKULARCORE_EXPORT Page
          * @since 0.14 (KDE 4.8)
          */
         TextEntity::List words( const RegularAreaRect * rect, TextPage::TextAreaInclusionBehaviour b ) const;
-        
+
         /**
          * Returns the area and text of the word at the given point
          * Note that ownership of the returned area belongs to the caller.
@@ -349,7 +382,7 @@ class OKULARCORE_EXPORT Page
          * Deletes all taggings of the document.
          */
         void deleteTaggings();
-        
+
         /**
          * Sets the page @p transition effect.
          */

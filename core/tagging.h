@@ -20,7 +20,9 @@
 
 #include "okularcore_export.h"
 #include "area.h"
-#include "kicon.h"
+#include "ui/pageview.h"
+#include "textpage.h"
+#include "qdanodes.h"
 
 namespace Okular {
 
@@ -116,8 +118,17 @@ class OKULARCORE_EXPORT Tagging
         /**
          * Create the tagging.
          */
-        Tagging( );
-        Tagging( NormalizedRect *rect );
+//         Tagging( TaggingPrivate &dd );
+
+        /**
+         * Appends a tagging to an existing tagging.
+         */
+//         Tagging( Tagging *head, TaggingPrivate &dd );
+
+        /**
+         * Creates a tagging from xml @p tagElement
+         */
+        Tagging( Document *doc, TaggingPrivate &dd, const QDomElement & tagElement );
 
         /**
          * Destroys the tagging.
@@ -248,7 +259,7 @@ class OKULARCORE_EXPORT Tagging
         const Document * document() const;
 
         /**
-         * Returns the page of the tag tagging.
+         * Returns the page of the tagging.
          */
         uint pageNum() const;
 
@@ -379,17 +390,12 @@ class OKULARCORE_EXPORT Tagging
          */
         void setTaggingProperties( const QDomNode & node );
 
-        void setNode ( Node *node );
-
-        Node *node() const;
-
-        /**
-         *
+        void setNode ( QDANode *node );
 
     protected:
         /// @cond PRIVATE
         Tagging( TaggingPrivate &dd );
-        Tagging( TaggingPrivate &dd, const QDomNode &description );
+        Tagging( Tagging *head, TaggingPrivate &dd );
         Q_DECLARE_PRIVATE( Tagging )
         TaggingPrivate *d_ptr;
         /// @endcond
@@ -402,15 +408,15 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
 {
     public:
         /**
-         * Creates a new text tagging.
+         * Creates a new text tagging from the xml @p tagElement
          */
-        TextTagging();
-        TextTagging( const RegularAreaRect * );
+        TextTagging( Document *doc, const QDomElement & tagElement );
 
         /**
-         * Creates a new text tagging from the xml @p description
+         * Creates a new text tagging from a text reference.
          */
-        TextTagging( const QDomNode &description );
+        TextTagging( Tagging * head, const Page * page, TextReference ref );
+        TextTagging(                 const Page * page, TextReference ref );
 
         /**
          * Destroys the text tagging.
@@ -423,9 +429,14 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
         SubType subType() const;
 
         /**
-         * Returns the transformed text area of the tagging.
+         * Returns the transformed text area of the textTag tagging.
          */
         const RegularAreaRect * transformedTextArea () const;
+
+        /**
+         * Returns the text reference of the text tagging.
+         */
+        const TextReference reference () const;
 
         /**
          * Stores the tagging as xml in @p document under the given parent @p node.
@@ -441,16 +452,15 @@ class OKULARCORE_EXPORT BoxTagging : public Tagging
 {
     public:
         /**
-         * Creates a new box tagging.
+         * Creates a new box tagging from the xml @p tagElement
          */
-        BoxTagging( );
-
-        BoxTagging( const NormalizedRect *rect );
+        BoxTagging( Document *doc, const QDomElement & tagElement );
 
         /**
-         * Creates a new box tagging from the xml @p description
+         * Creates a new box tagging from a rectangle.
          */
-        BoxTagging( const QDomNode &description );
+        BoxTagging( Tagging * head, const Page * page, const NormalizedRect *rect );
+        BoxTagging(                 const Page * page, const NormalizedRect *rect );
 
         /**
          * Destroys the text tagging.
@@ -473,7 +483,7 @@ class OKULARCORE_EXPORT BoxTagging : public Tagging
 
     protected:
         //  JS: A bit awkward but we need a table to lookup text tags by unique name during loading.
-        static QHash<QString, BoxTagAnnotation *> bTagAnnotationTable;
+        static QHash<QString, BoxTagging *> bTaggingTable;
 };
 
 }

@@ -17,6 +17,7 @@
 #include "debug_p.h"
 #include "document_p.h"
 #include "page.h"
+#include "tagging.h"
 
 using namespace Okular;
 
@@ -157,7 +158,7 @@ void QDANodeUtils::load( DocumentPrivate *doc_p, const QDomNode& node )
                     qCWarning(OkularCoreDebug) << "QDANodeUtils::load tagging node inconsistent in tagging: " << tagging->uniqueName();
                     delete tagging;
                 }
-                else if ( tagging->subType() == Tagging::ATTag && tagging->reference().isNull() )
+                else if ( tagging->subType() == Tagging::TText && static_cast<TextTagging *>(tagging)->reference().isNull() )
                 {
                     qCWarning(OkularCoreDebug) << "QDANodeUtils::load tagging has null reference in tagging: " << tagging->uniqueName();
                     delete tagging;

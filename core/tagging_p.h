@@ -21,7 +21,7 @@ class PagePrivate;
 class TaggingPrivate
 {
     public:
-        TaggingPrivate();
+        TaggingPrivate( Tagging *q );
 
         virtual ~TaggingPrivate();
 
@@ -56,6 +56,8 @@ class TaggingPrivate
         Tagging *m_head, *m_next;               //  Structures to link multi-page taggings
         QDANode *m_node;                        //  This pointer can be updated
         QDANode *m_linkNode;                    //  This pointer must point to a QDA Node
+        uint m_pageNum;                         //  Unlike m_page, m_pageNum is always assigned.
+        Document *m_doc;
 
         int m_flags;
         NormalizedRect m_boundary;
@@ -65,6 +67,10 @@ class TaggingPrivate
 
         Tagging::DisposeDataFunction m_disposeFunc;
         QVariant m_nativeId;
+
+    protected:
+        Q_DECLARE_PUBLIC( Tagging )
+        Tagging * q_ptr;
 };
 
 }
