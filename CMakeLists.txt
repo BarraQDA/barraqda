@@ -282,7 +282,6 @@ set(okularpart_SRCS
    ui/sidebar.cpp
    ui/side_reviews.cpp
    ui/snapshottaker.cpp
-   ui/taggingpopup.cpp
    ui/taggingpropertiesdialog.cpp
    ui/taggingwidgets.cpp
    ui/taggingwindow.cpp

@@ -67,9 +67,9 @@
 #include "core/tagging.h"
 #include "annotwindow.h"
 #include "taggingwindow.h"
+#include "annotationpropertiesdialog.h"
+#include "taggingpropertiesdialog.h"
 #include "guiutils.h"
-#include "annotationpopup.h"
-#include "taggingpopup.h"
 #include "pageviewannotator.h"
 #include "priorities.h"
 #include "toolaction.h"
@@ -2494,6 +2494,24 @@ void PageView::mousePressEvent( QMouseEvent * e )
     }
 }
 
+Okular::EmbeddedFile* embeddedFileFromAnnotation( Okular::Annotation *annotation )
+{
+    if ( annotation->subType() == Okular::Annotation::AFileAttachment )
+    {
+        const Okular::FileAttachmentAnnotation *fileAttachAnnot = static_cast<Okular::FileAttachmentAnnotation*>( annotation );
+        return fileAttachAnnot->embeddedFile();
+    }
+    else if ( annotation->subType() == Okular::Annotation::ARichMedia )
+    {
+        const Okular::RichMediaAnnotation *richMediaAnnot = static_cast<Okular::RichMediaAnnotation*>( annotation );
+        return richMediaAnnot->embeddedFile();
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 void PageView::handleGenericRightButtonRelease( QMouseEvent * e )
 {
     //  These variables are already calculated in the calling functino/
@@ -2558,7 +2576,21 @@ void PageView::handleGenericRightButtonRelease( QMouseEvent * e )
             }
             else
             {
-                //  Handle right click over annotation
+                //  Handle right click over annotation or tagging
+
+                //  This code taken from AnnotationPopup
+                const char *objectTypeId = "objectType";
+
+                const QString annId = QStringLiteral( "annotation" );
+                const QString tagId = QStringLiteral( "tagging" );
+
+                const char *actionTypeId = "actionType";
+
+                const QString openId = QStringLiteral( "open" );
+                const QString deleteId = QStringLiteral( "delete" );
+                const QString propertiesId = QStringLiteral( "properties" );
+                const QString saveId = QStringLiteral( "save" );
+                const QString copyId = QStringLiteral( "copy" );
 
                 // find out normalized mouse coords inside current item
                 const QRect & itemRect = pageItem->uncroppedGeometry();
@@ -2566,43 +2598,168 @@ void PageView::handleGenericRightButtonRelease( QMouseEvent * e )
                 double nY = pageItem->absToPageY(eventPos.y());
 
                 const QLinkedList< const Okular::ObjectRect *> annRects = pageItem->page()->objectRects( Okular::ObjectRect::OAnnotation, nX, nY, itemRect.width(), itemRect.height() );
-                if ( !annRects.isEmpty() )
+                const QLinkedList< const Okular::ObjectRect *> tagRects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
+                if ( (! annRects.isEmpty()) || (! tagRects.isEmpty()) )
                 {
-                    AnnotationPopup popup( d->document, AnnotationPopup::MultiAnnotationMode, this );
+                    QMenu menu( this );
+                    QAction *action;
                     foreach ( const Okular::ObjectRect * annRect, annRects )
                     {
                         Okular::Annotation * ann = ( (Okular::AnnotationObjectRect *)annRect )->annotation();
                         if ( ann && (ann->subType() != Okular::Annotation::AWidget) )
-                            popup.addAnnotation( ann, pageItem->pageNumber() );
+                        {
+                            QMenu * annMenu = menu.addMenu( GuiUtils::captionForAnnotation( ann ));
 
+                            action = annMenu->addAction( QIcon::fromTheme( QStringLiteral("comment") ), i18n( "&Open Pop-up Note" ) );
+                            action->setData( qVariantFromValue( static_cast<void *>(ann) ) );
+                            action->setProperty( objectTypeId, annId );
+                            action->setProperty( actionTypeId, openId );
+
+                            action = annMenu->addAction( QIcon::fromTheme( QStringLiteral("list-remove") ), i18n( "&Delete" ) );
+                            action->setEnabled( d->document->isAllowed( Okular::AllowNotes ) &&
+                                                d->document->canRemovePageAnnotation( ann ) );
+                            action->setData( qVariantFromValue( static_cast<void *>(ann) ) );
+                            action->setProperty( objectTypeId, annId );
+                            action->setProperty( actionTypeId, deleteId );
+
+                            action = annMenu->addAction( QIcon::fromTheme( QStringLiteral("configure") ), i18n( "&Properties" ) );
+                            action->setData( qVariantFromValue( static_cast<void *>(ann) ) );
+                            action->setProperty( objectTypeId, annId );
+                            action->setProperty( actionTypeId, propertiesId );
+
+                            const Okular::EmbeddedFile *embeddedFile = embeddedFileFromAnnotation( ann );
+                            if ( embeddedFile )
+                            {
+                                const QString saveText = i18nc( "%1 is the name of the file to save", "&Save '%1'...", embeddedFile->name() );
+
+                                annMenu->addSeparator();
+                                action = annMenu->addAction( QIcon::fromTheme( QStringLiteral("document-save") ), saveText );
+                                action->setData( qVariantFromValue( static_cast<void *>(ann) ) );
+                                action->setProperty( objectTypeId, annId );
+                                action->setProperty( actionTypeId, saveId );
+                            }
+                        }
                     }
-                    connect( &popup, &AnnotationPopup::openAnnotationWindow,
-                             this, &PageView::openAnnotationWindow );
-                    popup.exec( e->globalPos() );
+                    foreach ( const Okular::ObjectRect * tagRect, tagRects )
+                    {
+                        Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)tagRect )->tagging();
+                        QPixmap pixmap(100,100);
+                        pixmap.fill(tag->node()->color());
+                        QMenu * tagMenu = menu.addMenu( QIcon(pixmap), tag->node()->name() );
+
+                        action = tagMenu->addAction( QIcon::fromTheme( QStringLiteral("comment") ), i18n( "&Open Pop-up Note" ) );
+                        action->setData( qVariantFromValue( static_cast<void *>(tag) ) );
+                        action->setProperty( objectTypeId, tagId );
+                        action->setProperty( actionTypeId, openId );
+
+                        action = tagMenu->addAction( QIcon::fromTheme( QStringLiteral("list-remove") ), i18n( "&Delete" ) );
+                        action->setData( qVariantFromValue( static_cast<void *>(tag) ) );
+                        action->setProperty( objectTypeId, tagId );
+                        action->setProperty( actionTypeId, deleteId );
+
+                        action = tagMenu->addAction( QIcon::fromTheme( QStringLiteral("configure") ), i18n( "&Properties" ) );
+                        action->setData( qVariantFromValue( static_cast<void *>(tag) ) );
+                        action->setProperty( objectTypeId, tagId );
+                        action->setProperty( actionTypeId, propertiesId );
+
+                        action = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("edit-copy")), i18n("Copy") );
+                        action->setData( qVariantFromValue( static_cast<void *>(tag) ) );
+                        action->setProperty( objectTypeId, tagId );
+                        action->setProperty( actionTypeId, copyId );
+                    }
+
+                    QAction *choice = menu.exec( e->globalPos() );
+
+                    if ( choice )
+                    {
+                        const QString objectType = choice->property( objectTypeId ).toString();
+                        const QString actionType = choice->property( actionTypeId ).toString();
+                        if ( objectType == annId )
+                        {
+                            Okular::Annotation * ann = static_cast<Okular::Annotation *>(choice->data().value<void *>());
+
+                            if ( actionType == openId ) {
+                                emit openAnnotationWindow( ann, pageItem->page()->number() );
+                            } else if( actionType == deleteId ) {
+                                d->document->removePageAnnotation( pageItem->page()->number(), ann );
+                            } else if( actionType == propertiesId ) {
+                                AnnotsPropertiesDialog propdialog( this, d->document, pageItem->page()->number(), ann );
+                                propdialog.exec();
+                            } else if( actionType == saveId ) {
+                                Okular::EmbeddedFile *embeddedFile = embeddedFileFromAnnotation( ann );
+                                GuiUtils::saveEmbeddedFile( embeddedFile, this );
+                            }
+                        } else if ( objectType == tagId )
+                        foreach ( const Okular::ObjectRect * tagRect, tagRects )
+                        {
+                            Okular::Tagging * tag = static_cast<Okular::Tagging *>(choice->data().value<void *>());
+
+                            if ( actionType == openId ) {
+                                emit openTaggingWindow( tag, pageItem->page()->number() );
+                            } else if( actionType == deleteId ) {
+                                d->document->removePageTagging( pageItem->page()->number(), tag );
+                            } else if( actionType == propertiesId ) {
+                                TagsPropertiesDialog propdialog( this, d->document, pageItem->page()->number(), tag );
+                                propdialog.exec();
+                            } else if( actionType == copyId ) {
+                                QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
+                                for ( ; iIt != iEnd; ++iIt )
+                                {
+                                    PageViewItem * item = *iIt;
+                                    const Okular::Page *okularPage = item->page();
+                                    if ( okularPage->number() != pageItem->page()->number()
+                                    ||  !item->isVisible() )
+                                        continue;
+
+                                    QRect tagRect   = tag->transformedBoundingRectangle().geometry( item->uncroppedWidth(), item->uncroppedHeight() ).translated( item->uncroppedGeometry().topLeft() );
+                                    QRect itemRect  = item->croppedGeometry();
+                                    QRect intersect = tagRect & itemRect;
+                                    if ( !intersect.isNull() )
+                                    {
+                                        switch ( tag->subType() )
+                                        {
+                                            case Okular::Tagging::TText:
+                                            {
+                                                intersect.translate( -item->uncroppedGeometry().topLeft() );
+                                                Okular::RegularAreaRect rects;
+                                                rects.append( Okular::NormalizedRect( intersect, item->uncroppedWidth(), item->uncroppedHeight() ) );
+                                                QString tagText = okularPage->text( &rects );
+                                                QClipboard *cb = QApplication::clipboard();
+                                                cb->setText( tagText, QClipboard::Clipboard );
+                                                if ( cb->supportsSelection() )
+                                                    cb->setText( tagText, QClipboard::Selection );
+                                                d->messageWindow->display( i18n( "Text (%1 characters) copied to clipboard.", tagText.length() ) );
+
+                                                break;
+                                            }
+                                            case Okular::Tagging::TBox:
+                                            {
+                                                // renders page into a pixmap
+                                                QPixmap copyPix( tagRect.width(), tagRect.height() );
+                                                QPainter copyPainter( &copyPix );
+                                                copyPainter.translate( -tagRect.left(), -tagRect.top() );
+                                                drawDocumentOnPainter( tagRect, &copyPainter );
+                                                copyPainter.end();
+                                                QClipboard *cb = QApplication::clipboard();
+                                                cb->setPixmap( copyPix, QClipboard::Clipboard );
+                                                if ( cb->supportsSelection() )
+                                                    cb->setPixmap( copyPix, QClipboard::Selection );
+                                                d->messageWindow->display( i18n( "Image [%1x%2] copied to clipboard.", copyPix.width(), copyPix.height() ) );
+
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 else
                 {
-                    const QLinkedList< const Okular::ObjectRect *> tagRects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
-                    if ( !tagRects.isEmpty() )
-                    {
-                        TaggingPopup popup( d->document, TaggingPopup::MultiTaggingMode, this );
-                        foreach ( const Okular::ObjectRect * tagRect, tagRects )
-                        {
-                            Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)tagRect )->tagging();
-                            if ( tag )
-                                popup.addTagging( tag, pageItem->pageNumber() );
-
-                        }
-                        connect( &popup, &TaggingPopup::openTaggingWindow,
-                                 this, &PageView::openTaggingWindow );
-                        popup.exec( e->globalPos() );
-                    }
-                    else
-                    {
-                        // right click (if not within 5 px of the press point, the mode
-                        // had been already changed to 'Selection' instead of 'Normal')
-                        emit rightClick( pageItem->page(), e->globalPos() );
-                    }
+                    // right click (if not within 5 px of the press point, the mode
+                    // had been already changed to 'Selection' instead of 'Normal')
+                    emit rightClick( pageItem->page(), e->globalPos() );
                 }
             }
         }
@@ -2868,111 +3025,8 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             // if mouse is released and selection is null this is a rightClick
             if ( rightButton && !d->mouseSelecting )
             {
-                PageViewItem * pageItem = pickItemOnPoint( eventPos.x(), eventPos.y() );
+                handleGenericRightButtonRelease( e );
 
-                // find out normalized mouse coords inside current item
-                const QRect & itemRect = pageItem->uncroppedGeometry();
-                double nX = pageItem->absToPageX(eventPos.x());
-                double nY = pageItem->absToPageY(eventPos.y());
-
-                const QLinkedList< const Okular::ObjectRect *> orects = pageItem->page()->objectRects( Okular::ObjectRect::OTagging, nX, nY, itemRect.width(), itemRect.height() );
-                if ( !orects.isEmpty() )
-                {
-                    QMenu menu( this );
-                    QList< QAction * > * deleteTagSelections = new QList< QAction * >();
-                    QList< QAction * > * copyTagSelections = new QList< QAction * >();
-                    foreach ( const Okular::ObjectRect * orect, orects )
-                    {
-                        Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                        Okular::QDANode * node  = tag->node();
-                        QPixmap pixmap(100,100);
-                        pixmap.fill(node->color());
-                        QMenu * tagmenu = menu.addMenu( QIcon(pixmap), i18n("Tag") );
-                        QAction * tagSelection = tagmenu->addAction ( QIcon::fromTheme(QStringLiteral("edit-delete")), i18n("Delete") );
-                        deleteTagSelections->append( tagSelection );
-                        tagSelection = tagmenu->addAction ( QIcon::fromTheme(QStringLiteral("edit-copy")), i18n("Copy") );
-                        copyTagSelections->append( tagSelection );
-                    }
-                    QAction *choice = menu.exec( e->globalPos() );
-                    // check if the user really selected an action
-                    if ( choice )
-                    {
-                        QList< QAction * >::const_iterator aIt = deleteTagSelections->constBegin(), aEnd = deleteTagSelections->constEnd();
-                        foreach ( const Okular::ObjectRect * orect, orects )
-                        {
-                            if ( choice == *aIt )
-                            {
-                                Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                                d->document->removePageTagging ( pageItem->page()->number(), tag );
-                                break;
-                            }
-                            aIt++;
-                        }
-                        aIt = copyTagSelections->constBegin(); aEnd = copyTagSelections->constEnd();
-                        foreach ( const Okular::ObjectRect * orect, orects )
-                        {
-                            if ( choice == *aIt )
-                            {
-                                Okular::Tagging * tag = ( (Okular::TaggingObjectRect *)orect )->tagging();
-                                QVector< PageViewItem * >::const_iterator iIt = d->items.constBegin(), iEnd = d->items.constEnd();
-                                for ( ; iIt != iEnd; ++iIt )
-                                {
-                                    PageViewItem * item = *iIt;
-                                    const Okular::Page *okularPage = item->page();
-                                    if ( okularPage->number() != pageItem->page()->number()
-                                    ||  !item->isVisible() )
-                                        continue;
-
-                                    QRect tagRect   = tag->transformedBoundingRectangle().geometry( item->uncroppedWidth(), item->uncroppedHeight() ).translated( item->uncroppedGeometry().topLeft() );
-                                    QRect itemRect  = item->croppedGeometry();
-                                    QRect intersect = tagRect & itemRect;
-                                    if ( !intersect.isNull() )
-                                    {
-                                        switch ( tag->subType() )
-                                        {
-                                            case Okular::Tagging::TText:
-                                            {
-                                                intersect.translate( -item->uncroppedGeometry().topLeft() );
-                                                Okular::RegularAreaRect rects;
-                                                rects.append( Okular::NormalizedRect( intersect, item->uncroppedWidth(), item->uncroppedHeight() ) );
-                                                QString tagText = okularPage->text( &rects );
-                                                QClipboard *cb = QApplication::clipboard();
-                                                cb->setText( tagText, QClipboard::Clipboard );
-                                                if ( cb->supportsSelection() )
-                                                    cb->setText( tagText, QClipboard::Selection );
-                                                d->messageWindow->display( i18n( "Text (%1 characters) copied to clipboard.", tagText.length() ) );
-
-                                                break;
-                                            }
-                                            case Okular::Tagging::TBox:
-                                            {
-                                                // renders page into a pixmap
-                                                QPixmap copyPix( tagRect.width(), tagRect.height() );
-                                                QPainter copyPainter( &copyPix );
-                                                copyPainter.translate( -tagRect.left(), -tagRect.top() );
-                                                drawDocumentOnPainter( tagRect, &copyPainter );
-                                                copyPainter.end();
-                                                QClipboard *cb = QApplication::clipboard();
-                                                cb->setPixmap( copyPix, QClipboard::Clipboard );
-                                                if ( cb->supportsSelection() )
-                                                    cb->setPixmap( copyPix, QClipboard::Selection );
-                                                d->messageWindow->display( i18n( "Image [%1x%2] copied to clipboard.", copyPix.width(), copyPix.height() ) );
-
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                break;
-                            }
-                            aIt++;
-                        }
-                    }
-
-                }
-                else
-                    emit rightClick( pageItem ? pageItem->page() : 0, e->globalPos() );
                 break;
             }
 
@@ -3039,7 +3093,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
             {
                 QPixmap pixmap(100,100);
                 pixmap.fill((*nIt)->color());
-                QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n("Tag") );
+                QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), (*nIt)->name() );
                 tagSelections->append( tagSelection );
             }
             QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), i18n("New") );
@@ -3336,7 +3390,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         {
                             QPixmap pixmap(100,100);
                             pixmap.fill((*nIt)->color());
-                            QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), i18n("Tag") );
+                            QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), (*nIt)->name() );
                             tagSelections->append( tagSelection );
                         }
                         QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), i18n("New") );

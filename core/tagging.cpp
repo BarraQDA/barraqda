@@ -691,13 +691,17 @@ static void buildTextReferenceArea( TextTaggingPrivate *tTagP, const Page *page 
 {
     //  Recreate the text reference area and boundaries.
     tTagP->m_textArea = page->TextReferenceArea( tTagP->m_ref );
-    tTagP->m_transformedTextArea = new RegularAreaRect;
-    tTagP->m_boundary = Okular::NormalizedRect();
     int end = tTagP->m_textArea->count();
     if ( end == 0 )
         qCWarning(OkularCoreDebug) << __func__ << " text reference area is null: " << tTagP->m_uniqueName;
 
-    for (int i = 0; i < end; i++ )
+    NormalizedRect rect = tTagP->m_textArea->at(0);
+
+    tTagP->m_transformedTextArea = new RegularAreaRect();
+    tTagP->m_transformedTextArea->append ( rect );
+    tTagP->m_boundary = Okular::NormalizedRect( rect );
+
+    for (int i = 1; i < end; i++ )
     {
         NormalizedRect rect = tTagP->m_textArea->at(i);
         tTagP->m_transformedTextArea->append (rect);
