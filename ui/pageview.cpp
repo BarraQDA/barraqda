@@ -878,7 +878,7 @@ QString PageView::enclosedText( QRect rectArea, QVector< PageViewItem * > & item
         {
             // request the textpage if there isn't one
             okularPage= item->page();
-            qWarning() << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
+            qCWarning(OkularUiDebug) << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
             if ( !okularPage->hasTextPage() )
                 d->document->requestTextPage( okularPage->number() );
             // grab text in the rect that intersects itemRect
@@ -1157,7 +1157,6 @@ void PageView::notifySetup( const QVector< Okular::Page * > & pageSet, int setup
                 }
             }
         }
-
     }
 
     // invalidate layout so relayout/repaint will happen on next viewport change
@@ -1355,7 +1354,7 @@ void PageView::slotRealNotifyViewportChanged( bool smoothMove )
         }
     if ( !item )
     {
-        qWarning() << "viewport for page" << vp.pageNumber << "has no matching item!";
+        qCWarning(OkularUiDebug) << "viewport for page" << vp.pageNumber << "has no matching item!";
         d->blockViewport = false;
         return;
     }
@@ -1435,11 +1434,11 @@ void PageView::notifyPageChanged( int pageNumber, int changedFlags )
 
     if ( changedFlags & DocumentObserver::Annotations )
     {
+        const QLinkedList< Okular::Annotation * > annots = d->document->page( pageNumber )->annotations();
+        const QLinkedList< Okular::Annotation * >::ConstIterator annItEnd = annots.end();
         QHash< Okular::Annotation*, AnnotWindow * >::Iterator it = d->m_annowindows.begin();
         for ( ; it != d->m_annowindows.end(); )
         {
-            const QLinkedList< Okular::Annotation * > annots = d->document->page( pageNumber )->annotations();
-            const QLinkedList< Okular::Annotation * >::ConstIterator annItEnd = annots.end();
             QLinkedList< Okular::Annotation * >::ConstIterator annIt = qFind( annots, it.key() );
             if ( annIt != annItEnd )
             {
@@ -2514,7 +2513,7 @@ Okular::EmbeddedFile* embeddedFileFromAnnotation( Okular::Annotation *annotation
 
 void PageView::handleGenericRightButtonRelease( QMouseEvent * e )
 {
-    //  These variables are already calculated in the calling functino/
+    //  These variables were already calculated in the calling function
     const QPoint eventPos = contentAreaPoint( e->pos() );
     PageViewItem * pageItem = pickItemOnPoint( eventPos.x(), eventPos.y() );
     const QPoint pressPos = contentAreaPoint( mapFromGlobal( d->mousePressPos ) );
@@ -3232,7 +3231,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                     {
                         // request the textpage if there isn't one
                         okularPage= item->page();
-                        qWarning() << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
+                        qCWarning(OkularUiDebug) << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
                         if ( !okularPage->hasTextPage() )
                             d->document->requestTextPage( okularPage->number() );
                         // grab text in the rect that intersects itemRect
