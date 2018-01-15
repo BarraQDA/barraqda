@@ -1,6 +1,9 @@
 /***************************************************************************
  *   Copyright (C) 2005   by Piotr Szymanski <niedakh@gmail.com>           *
  *   Copyright (C) 2008   by Albert Astals Cid <aacid@kde.org>             *
+ *   Copyright (C) 2017   Klarälvdalens Datakonsult AB, a KDAB Group       *
+ *                        company, info@kdab.com. Work sponsored by the    *
+ *                        LiMux project of the city of Munich              *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -12,6 +15,7 @@
 #include "generator_p.h"
 #include "observer.h"
 
+#include <QApplication>
 #include <qeventloop.h>
 #include <QtPrintSupport/QPrinter>
 
@@ -31,12 +35,13 @@
 using namespace Okular;
 
 GeneratorPrivate::GeneratorPrivate()
-    : m_document( 0 ),
-      mPixmapGenerationThread( 0 ), mTextPageGenerationThread( 0 ),
-      m_mutex( 0 ), m_threadsMutex( 0 ), mPixmapReady( true ), mTextPageReady( true ),
-      m_closing( false ), m_closingLoop( 0 ),
+    : m_document( nullptr ),
+      mPixmapGenerationThread( nullptr ), mTextPageGenerationThread( nullptr ),
+      m_mutex( nullptr ), m_threadsMutex( nullptr ), mPixmapReady( true ), mTextPageReady( true ),
+      m_closing( false ), m_closingLoop( nullptr ),
       m_dpi(72.0, 72.0)
 {
+    qRegisterMetaType<Okular::Page*>();
 }
 
 GeneratorPrivate::~GeneratorPrivate()
@@ -198,6 +203,11 @@ Document::OpenResult Generator::loadDocumentFromDataWithPassword( const QByteArr
     return loadDocumentFromData( fileData, pagesVector ) ? Document::OpenSuccess : Document::OpenError;
 }
 
+Generator::SwapBackingFileResult Generator::swapBackingFile( QString const &/*newFileName */, QVector<Okular::Page*> & /*newPagesVector*/ )
+{
+    return SwapBackingFileError;
+}
+
 bool Generator::closeDocument()
 {
     Q_D( Generator );
@@ -214,7 +224,7 @@ bool Generator::closeDocument()
 
         loop.exec();
 
-        d->m_closingLoop = 0;
+        d->m_closingLoop = nullptr;
     }
     else
     {
@@ -251,7 +261,8 @@ void Generator::generatePixmap( PixmapRequest *request )
          */
         if ( hasFeature( TextExtraction ) && !request->page()->hasTextPage() && canGenerateTextPage() && !d->m_closing ) {
             d->mTextPageReady = false;
-            d->textPageGenerationThread()->startGeneration( request->page() );
+            // Queue the text generation request so that pixmap generation gets a chance to start before the text generation
+            QMetaObject::invokeMethod(d->textPageGenerationThread(), "startGeneration", Qt::QueuedConnection, Q_ARG(Okular::Page*, request->page()));
         }
 
         return;
@@ -289,7 +300,7 @@ QImage Generator::image( PixmapRequest *request )
 
 TextPage* Generator::textPage( Page* )
 {
-    return 0;
+    return nullptr;
 }
 
 DocumentInfo Generator::generateDocumentInfo(const QSet<DocumentInfo::Key> &keys) const
@@ -301,7 +312,7 @@ DocumentInfo Generator::generateDocumentInfo(const QSet<DocumentInfo::Key> &keys
 
 const DocumentSynopsis * Generator::generateDocumentSynopsis()
 {
-    return 0;
+    return nullptr;
 }
 
 FontInfo::List Generator::fontsForPage( int )
@@ -311,7 +322,7 @@ FontInfo::List Generator::fontsForPage( int )
 
 const QList<EmbeddedFile*> * Generator::embeddedFiles() const
 {
-    return 0;
+    return nullptr;
 }
 
 Generator::PageSizeMetric Generator::pagesSizeMetric() const
@@ -345,6 +356,10 @@ bool Generator::print( QPrinter& )
 Generator::PrintError Generator::printError() const
 {
     return UnknownPrintError;
+}
+
+void Generator::opaqueAction( const BackendOpaqueAction * /*action*/ )
+{
 }
 
 QVariant Generator::metaData( const QString &key, const QVariant &option ) const
@@ -396,6 +411,14 @@ void Generator::signalTextGenerationDone( Page *page, TextPage *textPage )
         delete textPage;
 }
 
+void Generator::signalPartialPixmapRequest( PixmapRequest *request, const QImage &image )
+{
+    request->page()->setPixmap( request->observer(), new QPixmap( QPixmap::fromImage( image ) ), request->normalizedRect() );
+
+    const int pageNumber = request->page()->number();
+    request->observer()->notifyPageChanged( pageNumber, Okular::DocumentObserver::Pixmap );
+}
+
 const Document * Generator::document() const
 {
     Q_D( const Generator );
@@ -403,7 +426,7 @@ const Document * Generator::document() const
     {
         return d->m_document->m_parent;
     }
-    return 0;
+    return nullptr;
 }
 
 void Generator::setFeature( GeneratorFeature feature, bool on )
@@ -416,6 +439,24 @@ void Generator::setFeature( GeneratorFeature feature, bool on )
 }
 
 QVariant Generator::documentMetaData( const QString &key, const QVariant &option ) const
+{
+    Q_D( const Generator );
+    if ( !d->m_document )
+        return QVariant();
+
+    if (key == QLatin1String("PaperColor"))
+        return documentMetaData(PaperColorMetaData, option);
+    if (key == QLatin1String("GraphicsAntialias"))
+        return documentMetaData(GraphicsAntialiasMetaData, option);
+    if (key == QLatin1String("TextAntialias"))
+        return documentMetaData(TextAntialiasMetaData, option);
+    if (key == QLatin1String("TextHinting"))
+        return documentMetaData(TextHintingMetaData, option);
+
+    return QVariant();
+}
+
+QVariant Generator::documentMetaData( const DocumentMetaDataKey key, const QVariant &option ) const
 {
     Q_D( const Generator );
     if ( !d->m_document )
@@ -460,7 +501,7 @@ QSizeF Generator::dpi() const
 
 QAbstractItemModel * Generator::layersModel() const
 {
-    return 0;
+    return nullptr;
 }
 
 PixmapRequest::PixmapRequest( DocumentObserver *observer, int pageNumber, int width, int height, int priority, PixmapRequestFeatures features )
@@ -468,13 +509,14 @@ PixmapRequest::PixmapRequest( DocumentObserver *observer, int pageNumber, int wi
 {
     d->mObserver = observer;
     d->mPageNumber = pageNumber;
-    d->mWidth = width;
-    d->mHeight = height;
+    d->mWidth = ceil(width * qApp->devicePixelRatio());
+    d->mHeight = ceil(height * qApp->devicePixelRatio());
     d->mPriority = priority;
     d->mFeatures = features;
     d->mForce = false;
     d->mTile = false;
     d->mNormalizedRect = NormalizedRect();
+    d->mPartialUpdatesWanted = false;
 }
 
 PixmapRequest::~PixmapRequest()
@@ -543,6 +585,16 @@ void PixmapRequest::setNormalizedRect( const NormalizedRect &rect )
 const NormalizedRect& PixmapRequest::normalizedRect() const
 {
     return d->mNormalizedRect;
+}
+
+void PixmapRequest::setPartialUpdatesWanted(bool partialUpdatesWanted)
+{
+    d->mPartialUpdatesWanted = partialUpdatesWanted;
+}
+
+bool PixmapRequest::partialUpdatesWanted() const
+{
+    return d->mPartialUpdatesWanted;
 }
 
 Okular::TilesManager* PixmapRequestPrivate::tilesManager() const

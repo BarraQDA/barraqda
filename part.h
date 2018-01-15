@@ -6,6 +6,9 @@
  *   Copyright (C) 2003 by Laurent Montel <montel@kde.org>                 *
  *   Copyright (C) 2004 by Dominique Devriese <devriese@kde.org>           *
  *   Copyright (C) 2004-2007 by Albert Astals Cid <aacid@kde.org>          *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -36,6 +39,8 @@
 
 #include "okularpart_export.h"
 
+#include <config-okular.h>
+
 class QAction;
 class QWidget;
 class QPrinter;
@@ -50,6 +55,7 @@ class KSelectAction;
 class KAboutData;
 class QTemporaryFile;
 class QAction;
+class QJsonObject;
 namespace KParts { class GUIActivateEvent; }
 
 class FindBar;
@@ -68,6 +74,10 @@ class Reviews;
 class BookmarkList;
 class DrawingToolActions;
 class Layers;
+
+#if PURPOSE_FOUND
+namespace Purpose { class Menu; }
+#endif
 
 namespace Okular
 {
@@ -120,26 +130,26 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         ~Part();
 
         // inherited from DocumentObserver
-        void notifySetup( const QVector< Okular::Page * > &pages, int setupFlags ) Q_DECL_OVERRIDE;
-        void notifyViewportChanged( bool smoothMove ) Q_DECL_OVERRIDE;
-        void notifyPageChanged( int page, int flags ) Q_DECL_OVERRIDE;
+        void notifySetup( const QVector< Okular::Page * > &pages, int setupFlags ) override;
+        void notifyViewportChanged( bool smoothMove ) override;
+        void notifyPageChanged( int page, int flags ) override;
 
-        bool openDocument(const QUrl &url, uint page) Q_DECL_OVERRIDE;
-        void startPresentation() Q_DECL_OVERRIDE;
-        QStringList supportedMimeTypes() const Q_DECL_OVERRIDE;
+        bool openDocument(const QUrl &url, uint page) override;
+        void startPresentation() override;
+        QStringList supportedMimeTypes() const override;
 
         QUrl realUrl() const;
 
-        void showSourceLocation(const QString& fileName, int line, int column, bool showGraphically = true) Q_DECL_OVERRIDE;
-        void clearLastShownSourceLocation() Q_DECL_OVERRIDE;
-        bool isWatchFileModeEnabled() const Q_DECL_OVERRIDE;
-        void setWatchFileModeEnabled(bool enable) Q_DECL_OVERRIDE;
-        bool areSourceLocationsShownGraphically() const Q_DECL_OVERRIDE;
-        void setShowSourceLocationsGraphically(bool show) Q_DECL_OVERRIDE;
-        bool openNewFilesInTabs() const Q_DECL_OVERRIDE;
+        void showSourceLocation(const QString& fileName, int line, int column, bool showGraphically = true) override;
+        void clearLastShownSourceLocation() override;
+        bool isWatchFileModeEnabled() const override;
+        void setWatchFileModeEnabled(bool enable) override;
+        bool areSourceLocationsShownGraphically() const override;
+        void setShowSourceLocationsGraphically(bool show) override;
+        bool openNewFilesInTabs() const override;
 
     public Q_SLOTS:                // dbus
-        Q_SCRIPTABLE Q_NOREPLY void goToPage(uint page) Q_DECL_OVERRIDE;
+        Q_SCRIPTABLE Q_NOREPLY void goToPage(uint page) override;
         Q_SCRIPTABLE Q_NOREPLY void openDocument( const QString &doc );
         Q_SCRIPTABLE uint pages();
         Q_SCRIPTABLE uint currentPage();
@@ -167,17 +177,16 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
 
     protected:
         // reimplemented from KParts::ReadWritePart
-        bool openFile() Q_DECL_OVERRIDE;
-        bool openUrl(const QUrl &url) Q_DECL_OVERRIDE;
-        void guiActivateEvent(KParts::GUIActivateEvent *event) Q_DECL_OVERRIDE;
+        bool openFile() override;
+        bool openUrl(const QUrl &url) override;
+        void guiActivateEvent(KParts::GUIActivateEvent *event) override;
         void displayInfoMessage( const QString &message, KMessageWidget::MessageType messageType = KMessageWidget::Information, int duration = -1 );
     public:
-        bool saveFile() Q_DECL_OVERRIDE;
-        bool queryClose() Q_DECL_OVERRIDE;
-        bool closeUrl() Q_DECL_OVERRIDE;
-        bool closeUrl(bool promptToSave) Q_DECL_OVERRIDE;
-        void setReadWrite(bool readwrite) Q_DECL_OVERRIDE;
-        bool saveAs(const QUrl & saveUrl) Q_DECL_OVERRIDE;
+        bool queryClose() override;
+        bool closeUrl() override;
+        bool closeUrl(bool promptToSave) override;
+        void setReadWrite(bool readwrite) override;
+        bool saveAs(const QUrl & saveUrl) override;
 
     protected Q_SLOTS:
         // connected to actions
@@ -189,16 +198,17 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         void slotHistoryNext();
         void slotAddBookmark();
         void slotRenameBookmarkFromMenu();
+        void slotRemoveBookmarkFromMenu();
         void slotRenameCurrentViewportBookmark();
         void slotPreviousBookmark();
         void slotNextBookmark();
         void slotFindNext();
         void slotFindPrev();
-        void slotSaveFileAs();
-        void slotSaveCopyAs();
+        bool slotSaveFileAs(bool showOkularArchiveAsDefaultFormat = false);
         void slotGetNewStuff();
         void slotNewConfig();
         void slotShowMenu(const Okular::Page *page, const QPoint &point);
+        void slotShowTOCMenu(const Okular::DocumentViewport &vp, const QPoint &point, const QString &title);
         void slotShowProperties();
         void slotShowEmbeddedFiles();
         void slotShowLeftPanel();
@@ -225,10 +235,11 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         void enableLayers( bool enable );
 
     public Q_SLOTS:
+        bool saveFile() override;
         // connected to Shell action (and browserExtension), not local one
         void slotPrint();
         void slotFileDirty( const QString& );
-        void slotDoFileDirty();
+        bool slotAttemptReload( bool oneShot = false, const QUrl &newUrl = QUrl() );
         void psTransformEnded(int, QProcess::ExitStatus);
         KConfigDialog * slotGeneratorPreferences();
 
@@ -240,8 +251,10 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
 
     private:
         bool aboutToShowContextMenu(QMenu *menu, QAction *action, QMenu *contextMenu);
+        void showMenu(const Okular::Page *page, const QPoint &point, const QString &bookmarkTitle = QString(), const Okular::DocumentViewport &vp = DocumentViewport());
         bool eventFilter(QObject * watched, QEvent * event) override;
         Document::OpenResult doOpenFile(const QMimeType &mime, const QString &fileNameToOpen, bool *isCompressedFile);
+        bool openUrl( const QUrl &url, bool swapInsteadOfOpening );
 
         void setupViewerActions();
         void setViewerShortcuts();
@@ -254,7 +267,25 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         void updateAboutBackendAction();
         void unsetDummyMode();
         void slotRenameBookmark( const DocumentViewport &viewport );
+        void slotRemoveBookmark( const DocumentViewport &viewport );
         void resetStartArguments();
+        void checkNativeSaveDataLoss(bool *out_wontSaveForms, bool *out_wontSaveAnnotations) const;
+
+        enum SaveAsFlag
+        {
+            NoSaveAsFlags = 0,         ///< No options
+            SaveAsOkularArchive = 1    ///< Save as Okular Archive (.okular) instead of document's native format
+        };
+        Q_DECLARE_FLAGS( SaveAsFlags, SaveAsFlag )
+
+        bool saveAs( const QUrl & saveUrl, SaveAsFlags flags );
+
+        void setFileToWatch( const QString &filePath );
+        void unsetFileToWatch();
+
+#if PURPOSE_FOUND
+        void slotShareActionFinished(const QJsonObject &output, int error, const QString &message);
+#endif
 
         static int numberOfParts;
 
@@ -262,13 +293,17 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
 
         // the document
         Okular::Document * m_document;
+        QDateTime m_fileLastModified;
         QString m_temporaryLocalFile;
         bool isDocumentArchive;
+        bool m_documentOpenWithPassword;
+        bool m_swapInsteadOfOpening; // if set, the next open operation will replace the backing file (used when reloading just saved files)
 
         // main widgets
         Sidebar *m_sidebar;
         SearchWidget *m_searchWidget;
         FindBar * m_findBar;
+        KMessageWidget * m_migrationMessage;
         KMessageWidget * m_topMessage;
         KMessageWidget * m_formsMessage;
         KMessageWidget * m_infoMessage;
@@ -288,9 +323,11 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
 
         // document watcher (and reloader) variables
         KDirWatch *m_watcher;
+        QString m_watchedFilePath, m_watchedFileSymlinkTarget;
         QTimer *m_dirtyHandler;
         QUrl m_oldUrl;
         Okular::DocumentViewport m_viewportDirty;
+        bool m_isReloading;
         bool m_wasPresentationOpen;
         QWidget *m_dirtyToolboxItem;
         bool m_wasSidebarVisible;
@@ -318,6 +355,7 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         QAction *m_find;
         QAction *m_findNext;
         QAction *m_findPrev;
+        QAction *m_save;
         QAction *m_saveAs;
         QAction *m_saveCopyAs;
         QAction *m_printPreview;
@@ -326,6 +364,9 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         QAction *m_exportAs;
         QAction *m_exportAsText;
         QAction *m_exportAsDocArchive;
+#if PURPOSE_FOUND
+        QAction *m_share;
+#endif
         QAction *m_showPresentation;
         KToggleAction* m_showMenuBarAction;
         KToggleAction* m_showLeftPanel;
@@ -334,6 +375,9 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         QAction *m_aboutBackend;
         QAction *m_reload;
         QMenu *m_exportAsMenu;
+#if PURPOSE_FOUND
+        Purpose::Menu *m_shareMenu;
+#endif
         QAction *m_closeFindBar;
         DrawingToolActions *m_presentationDrawingActions;
 
@@ -356,6 +400,8 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
 
         // Timer for m_infoMessage
         QTimer *m_infoTimer;
+
+        QString m_registerDbusName;
 
     private Q_SLOTS:
         void slotAnnotationPreferences();

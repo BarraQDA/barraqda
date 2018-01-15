@@ -1,5 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2004-2005 by Enrico Ros <eros.kde@email.it>             *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -47,7 +50,7 @@ class PageViewItem
         int pageNumber() const;
         double zoomFactor() const;
         bool isVisible() const;
-        QHash<int, FormWidgetIface*>& formWidgets();
+        QSet<FormWidgetIface*>& formWidgets();
         QHash< Okular::Movie *, VideoWidget * >& videoWidgets();
 
         /* The page is cropped as follows: */
@@ -87,7 +90,7 @@ class PageViewItem
         QRect m_croppedGeometry;
         QRect m_uncroppedGeometry;
         Okular::NormalizedRect m_crop;
-        QHash<int, FormWidgetIface*> m_formWidgets;
+        QSet<FormWidgetIface*> m_formWidgets;
         QHash< Okular::Movie *, VideoWidget * > m_videoWidgets;
 };
 
@@ -110,9 +113,9 @@ class PageViewMessage : public QWidget
         void display( const QString & message, const QString & details = QString(), Icon icon = Info, int durationMs = 4000 );
 
     protected:
-        bool eventFilter(QObject * obj, QEvent * event ) Q_DECL_OVERRIDE;
-        void paintEvent( QPaintEvent * e ) Q_DECL_OVERRIDE;
-        void mousePressEvent( QMouseEvent * e ) Q_DECL_OVERRIDE;
+        bool eventFilter(QObject * obj, QEvent * event ) override;
+        void paintEvent( QPaintEvent * e ) override;
+        void mousePressEvent( QMouseEvent * e ) override;
 
     private:
         QRect computeTextRect( const QString & message, int extra_width ) const;
@@ -153,7 +156,7 @@ class ToolBarButton : public QToolButton
         void buttonDoubleClicked( int buttonID );
 
     protected:
-        void mouseDoubleClickEvent( QMouseEvent * event ) Q_DECL_OVERRIDE;
+        void mouseDoubleClickEvent( QMouseEvent * event ) override;
 
     private:
         int m_id;
@@ -201,11 +204,11 @@ class PageViewToolBar : public QWidget
 
     protected:
         // handle widget events { anchor_resize, paint, animation, drag }
-        bool eventFilter( QObject * o, QEvent * e ) Q_DECL_OVERRIDE;
-        void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
-        void mousePressEvent( QMouseEvent * e ) Q_DECL_OVERRIDE;
-        void mouseMoveEvent( QMouseEvent * e ) Q_DECL_OVERRIDE;
-        void mouseReleaseEvent( QMouseEvent * e ) Q_DECL_OVERRIDE;
+        bool eventFilter( QObject * o, QEvent * e ) override;
+        void paintEvent( QPaintEvent * ) override;
+        void mousePressEvent( QMouseEvent * e ) override;
+        void mouseMoveEvent( QMouseEvent * e ) override;
+        void mouseReleaseEvent( QMouseEvent * e ) override;
 
     private:
         // private variables

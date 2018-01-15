@@ -18,6 +18,7 @@
 #include <qlayout.h>
 #include <qtimer.h>
 #include <kcolorscheme.h>
+#include <kiconloader.h>
 #include <kpixmapsequence.h>
 #include <kpixmapsequencewidget.h>
 #include <kmessagebox.h>
@@ -28,7 +29,7 @@ SearchLineEdit::SearchLineEdit( QWidget * parent, Okular::Document * document )
       m_caseSensitivity( Qt::CaseInsensitive ),
       m_searchType( Okular::Document::AllDocument ), m_id( -1 ),
       m_moveViewport( false ), m_changed( false ), m_fromStart( true ),
-      m_searchRunning( false )
+      m_findAsYouType( true ), m_searchRunning( false )
 {
     setObjectName( QStringLiteral( "SearchLineEdit" ) );
     setClearButtonShown( true );
@@ -39,7 +40,6 @@ SearchLineEdit::SearchLineEdit( QWidget * parent, Okular::Document * document )
     connect(m_inputDelayTimer, &QTimer::timeout, this, &SearchLineEdit::startSearch);
 
     connect(this, &SearchLineEdit::textChanged, this, &SearchLineEdit::slotTextChanged);
-    connect(this, &SearchLineEdit::returnPressed, this, &SearchLineEdit::slotReturnPressed);
     connect(document, &Okular::Document::searchFinished, this, &SearchLineEdit::searchFinished);
 }
 
@@ -65,7 +65,15 @@ void SearchLineEdit::setSearchType( Okular::Document::SearchType type )
     if ( type == m_searchType )
         return;
 
+    disconnect(this, &SearchLineEdit::returnPressed, this, &SearchLineEdit::slotReturnPressed);
+
     m_searchType = type;
+
+    // Only connect Enter for next/prev searches, the rest of searches are document global so
+    // next/prev serach does not make sense for them
+    if (m_searchType == Okular::Document::NextMatch || m_searchType == Okular::Document::PreviousMatch) {
+        connect(this, &SearchLineEdit::returnPressed, this, &SearchLineEdit::slotReturnPressed);
+    }
 
     if ( !m_changed )
         m_changed = ( m_searchType != Okular::Document::NextMatch && m_searchType != Okular::Document::PreviousMatch );
@@ -91,6 +99,11 @@ void SearchLineEdit::setSearchMoveViewport( bool move )
 void SearchLineEdit::setSearchFromStart( bool fromStart )
 {
     m_fromStart = fromStart;
+}
+
+void SearchLineEdit::setFindAsYouType( bool findAsYouType )
+{
+    m_findAsYouType = findAsYouType;
 }
 
 void SearchLineEdit::resetSearch()
@@ -168,7 +181,11 @@ void SearchLineEdit::slotTextChanged( const QString & text )
     Q_UNUSED(text);
 
     prepareLineEditForSearch();
-    restartSearch();
+
+    if ( m_findAsYouType )
+        restartSearch();
+    else
+        m_changed = true;
 }
 
 void SearchLineEdit::prepareLineEditForSearch()
@@ -255,15 +272,6 @@ void SearchLineEdit::searchFinished( int id, Okular::Document::SearchStatus endS
         setPalette( pal );
     }
 
-    if ( endStatus == Okular::Document::EndOfDocumentReached ) {
-        const bool forward = m_searchType == Okular::Document::NextMatch;
-        const QString question = forward ? i18n("End of document reached.\nContinue from the beginning?") : i18n("Beginning of document reached.\nContinue from the bottom?");
-        if ( KMessageBox::questionYesNo(window(), question, QString(), KStandardGuiItem::cont(), KStandardGuiItem::cancel()) == KMessageBox::Yes ) {
-            m_document->continueSearch( m_id, m_searchType );
-            return;
-        }
-    }
-
     m_searchRunning = false;
     emit searchStopped();
 }
@@ -311,7 +319,7 @@ void SearchLineWidget::slotTimedout()
 {
     if ( m_anim->sequence().isEmpty() )
     {
-        const KPixmapSequence seq( QStringLiteral("process-working"), 22 );
+        const KPixmapSequence seq = KIconLoader::global()->loadPixmapSequence(QStringLiteral("process-working"), 22);
         if ( seq.frameCount() > 0 )
         {
             m_anim->setInterval( 1000 / seq.frameCount() );

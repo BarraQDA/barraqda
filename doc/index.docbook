@@ -34,8 +34,8 @@ Context menu actions like Rename Bookmarks etc.)
 			<!-- TRANS:ROLES_OF_TRANSLATORS -->
 		</authorgroup>
 		<legalnotice>&FDLNotice;</legalnotice>
-		<date>2016-11-04</date>
-		<releaseinfo>1.0 (Applications 16.12)</releaseinfo>
+		<date>2017-11-06</date>
+		<releaseinfo>1.3 (Applications 17.12)</releaseinfo>
 		<!-- Abstract about this handbook -->
 		<abstract>
 			<para>&okular; is a &kde; universal document viewer based on &kpdf; code.</para>
@@ -53,6 +53,7 @@ Context menu actions like Rename Bookmarks etc.)
 			<keyword>xps</keyword>
 			<keyword>comicbook</keyword>
 			<keyword>fictionbook</keyword>
+			<keyword>markdown</keyword>
 			<keyword>mobipocket</keyword>
 			<keyword>plucker</keyword>
 			<keyword>annotation</keyword>
@@ -66,7 +67,7 @@ Context menu actions like Rename Bookmarks etc.)
 		</para>
 		<para>
 			&okular; supports a lot of different formats like &PDF;, &PostScript;, Tiff, CHM, DjVU, Images (png, jpg, &etc;)
-			XPS, Open Document (ODT), Fiction Books, Comic Book, Plucker, EPub and Fax.
+			XPS, Open Document (ODT), Fiction Books, Comic Book, Plucker, EPub, Fax and Markdown.
 			For all supported formats and their features see <ulink url="http://okular.kde.org/formats.php">
 			&okular; Document Format Handlers</ulink>.
 		</para>
@@ -437,9 +438,6 @@ Context menu actions like Rename Bookmarks etc.)
 			<title>Annotations</title>
 			<para>
 				&okular; allows you to review and annotate your documents.
-				Annotations created in &okular; are automatically saved in the internal local data folder
-				for each user.
-				&okular; does not implicitly change any document it opens.
 			</para>
 			<screenshot>
 			<screeninfo>&okular;'s Annotations</screeninfo>
@@ -459,22 +457,11 @@ Context menu actions like Rename Bookmarks etc.)
 			<para>Using the context menu either in the <guilabel>Reviews</guilabel> view of the navigation panel or in the main window you can open a <guilabel>Pop up Note</guilabel> for any kind of annotation and add or edit comments.</para>
 			<para>Annotations are not only limited to &PDF; files, they can be used for any format &okular; supports.</para>
 			<para>
-				Since &kde; 4.2, &okular; has the "document archiving" feature. This is an &okular;-specific format for carrying the document plus various metadata related to it (currently only annotations). You can save a "document archive" from the open document by choosing <menuchoice><guimenu>File</guimenu><guisubmenu>Export As</guisubmenu><guimenuitem>Document Archive</guimenuitem></menuchoice>. To open an &okular; document archive, just open it with &okular; as it would be &eg; a &PDF; document.
+                &okular; has the "document archiving" feature. This is an &okular;-specific format for carrying the document plus various metadata related to it (currently only annotations). You can save a "document archive" from the open document by choosing <menuchoice><guimenu>File</guimenu><guisubmenu>Save As</guisubmenu></menuchoice> and selecting <guilabel>Okular document archive</guilabel> in the <guilabel>Filter</guilabel> selector. To open an &okular; document archive, just open it with &okular; as it would be &eg; a &PDF; document.
 			</para>
 			<para>
-			  Since &okular; 0.15 you can <emphasis>also</emphasis> save annotations directly into &PDF; files. This feature is only available if &okular; has been built with version 0.20 or later of <ulink url="http://poppler.freedesktop.org/">Poppler rendering library</ulink>. You can use <menuchoice><guimenu>File</guimenu> <guimenuitem>Save As...</guimenuitem></menuchoice> to save the copy of &PDF; file with annotations.
+			  You can <emphasis>also</emphasis> save annotations directly into &PDF; files. You can use <menuchoice><guimenu>File</guimenu> <guimenuitem>Save</guimenuitem></menuchoice> to save it over the current file or <menuchoice><guimenu>File</guimenu> <guimenuitem>Save As...</guimenuitem></menuchoice> to save it to a new file.
 			</para>
-				<note>
-					<para>
-						It is not possible to save annotations into &PDF; file if original file was encrypted and &okular; uses Poppler libraries of version which is lower than 0.22.
-					</para>
-				</note>
-				<note>
-				  <para>
-				    If you open a &PDF; with existing annotations, your annotation changes are not automatically saved in the internal local data folder, and you need to save the modified document (using <menuchoice><guimenu>File</guimenu><guimenuitem>Save As...</guimenuitem></menuchoice>) before closing it. Should you forget to do this &okular; will show confirmation window that allows you to save the document.
-				  </para>
-				</note>
-
 				<note>
 					<para>
 						Due to DRM limitations (typically with &PDF; documents), adding, editing some properties
@@ -487,7 +474,7 @@ Context menu actions like Rename Bookmarks etc.)
 				  </para>
 				</note>
 			<para>
-			  Since &okular; 0.17 you can configure the default properties and appearance of each annotating tool. Please refer to the <link linkend="configannotations">corresponding section in this documentation</link>.
+			  You can configure the default properties and appearance of each annotating tool. Please refer to the <link linkend="configannotations">corresponding section in this documentation</link>.
 			</para>
 			<sect2 id="annotations-add">
 				<title>Adding annotations</title>
@@ -774,7 +761,7 @@ Context menu actions like Rename Bookmarks etc.)
 				<title>Removing annotations</title>
 				<para>
 					To remove an annotation, just click on it with the &RMB;, and select
-					<guimenuitem>Delete</guimenuitem>.
+					<guimenuitem>Delete</guimenuitem> or select an annotation using the &LMB; and press the &Del; key.
 				</para>
 				<para>
 					When removing the annotation, its window will be closed if open.
@@ -809,6 +796,14 @@ Context menu actions like Rename Bookmarks etc.)
 					To move an annotation, hold down the &Ctrl; key, move the mouse pointer on it and
 					then start dragging with the &LMB;.
 				</para>
+				<para>If you click with the &LMB; on an annotation, it gets selected. Resize handles appear on the
+					selection rectangle. When the cursor is moved over one of the 8 resize handles on
+					the corners or edges, the cursor shape changes to indicate the resize mode. Click anywhere
+					else on the annotation to move it.
+					Pressing &Esc; or clicking an area outside the annotation cancels a selection.
+				</para>
+				<para>Resizing is only applicable for annotation types Inline Note, Stamp and Ellipse.</para>
+
 				<note>
 					<para>
 						Depending on the document permissions (typically with &PDF; documents), some options
@@ -849,13 +844,16 @@ Context menu actions like Rename Bookmarks etc.)
 				  The list pane permits to view the bookmark list in a tree-like fashion: each document in the list can be <quote>expanded</quote> or <quote>collapsed</quote> by clicking on the <guiicon>&lt;</guiicon> or <guiicon>v</guiicon> icon next to it.
 				</para>
 				<para>
-				  Click on <inlinemediaobject><imageobject><imagedata fileref="rating.png" format="PNG"/></imageobject></inlinemediaobject> icon below the list to show only the bookmarks from the current document.
+				  Click on <inlinemediaobject><imageobject><imagedata fileref="bookmarks.png" format="PNG"/></imageobject></inlinemediaobject> icon below the list to show only the bookmarks from the current document.
 				</para>
 				<para>
 				  Right-click menu of document item can be used to open document, rename its item or remove it from the list. Remember that the removal of a document item leads to the removal of all bookmarks in the corresponding document.
 				</para>
 				<para>
 				  Right-click menus of individual bookmark items allow you to go to the bookmark, rename or remove it.
+				</para>
+				<para>
+				  The Right-click menu of items in the table of contents can be used to create bookmarks or go to the next or previous bookmark.
 				</para>
 		      </sect2>
 		</sect1>
@@ -942,7 +940,7 @@ Context menu actions like Rename Bookmarks etc.)
 					</term>
 					<listitem>
 						<para>
-							<action>Open</action> a supported file or &okular; archive. If there is already an opened file it will be closed. For more information, see the section about <link linkend="opening">Opening Files</link>.
+							<action>Open</action> a supported file or &okular; document archive. If there is already an opened file it will be closed. For more information, see the section about <link linkend="opening">Opening Files</link>.
 						</para>
 					</listitem>
 				</varlistentry>
@@ -998,31 +996,31 @@ Context menu actions like Rename Bookmarks etc.)
 							<keycombo action="simul">&Ctrl;<keycap>S</keycap></keycombo>
 							</shortcut>
 							<guimenu>File</guimenu>
-							<guimenuitem>Save As...</guimenuitem>
+							<guimenuitem>Save</guimenuitem>
 						</menuchoice>
 					</term>
 					<listitem>
-					  <para><action>Saves</action> the document under a new name including all the changes (annotations, form contents, &etc;), provided the document backend supports saving changes. With the &PDF; backend it is possible to save the document with the changed values of the form fields.<!--Only useful for pdf? what happens with other formats/backends?--> It can be possible (provided that the data were not secured using DRM) to save annotations with &PDF; files.</para>
-                                        <note>
-                                        <para>
-                                            Note that, due to the way this is implemented, even if there are no changes to the file, the new file need not to be an exact bit-for-bit copy of the original file (&eg; can have a different SHA-1 hash, &etc;).
-                                        </para>
-                                        </note>
+					  <para><action>Saves</action> the document including all the changes (annotations, form contents, &etc;), provided the document backend supports saving those changes. If the backend does not support saving the changes, the user will be given the option to either discard or to save them together with the document in an &okular; document archive.</para>
 					</listitem>
 				</varlistentry>
 
-				<varlistentry>
+                <varlistentry>
 					<term>
 						<menuchoice>
 							<shortcut>
 							<keycombo action="simul">&Ctrl;&Shift;<keycap>S</keycap></keycombo>
 							</shortcut>
 							<guimenu>File</guimenu>
-							<guimenuitem>Save Copy As...</guimenuitem>
+							<guimenuitem>Save As...</guimenuitem>
 						</menuchoice>
 					</term>
 					<listitem>
-						<para><action>Saves</action> a copy of the original document under a new name (completely bypassing the document backend). The saved document will be a bit-for-bit copy of the original.</para>
+					  <para><action>Saves</action> the document under a new name including all the changes (annotations, form contents, &etc;), provided the document backend supports saving changes. If the backend does not support saving the changes, the user will be given the option to either discard or to save them together with the document in an &okular; document archive.</para>
+                                        <note>
+                                        <para>
+                                            Note that, due to the way this is implemented, even if there are no changes to the file, the new file need not to be an exact bit-for-bit copy of the original file (&eg; can have a different SHA-1 hash, &etc;).
+                                        </para>
+                                        </note>
 					</listitem>
 				</varlistentry>
 
@@ -1107,6 +1105,19 @@ Context menu actions like Rename Bookmarks etc.)
 						<para>This item contains the export formats the current document can be exported to.
 						The first entry for all kind of documents is always <guimenuitem>Plain Text...</guimenuitem></para>
 						<para>The second entry is <guimenuitem>Document Archive</guimenuitem>, which allows you to save the document with your annotations into an &okular;-specific archive format. Thus it is easily possible to share the original document and your annotations with other &okular; users or work with them collaboratively.</para>
+					</listitem>
+				</varlistentry>
+
+				<varlistentry>
+					<term>
+						<menuchoice>
+							<guimenu>File</guimenu>
+							<guisubmenu>Share</guisubmenu>
+						</menuchoice>
+					</term>
+					<listitem>
+						<para>This item contains the services which can be used to share the current document with other people or send it to your devices.
+						The entries in this sub-menu are controlled by the system. They depend on the current document format and the installed KPurpose plugins.</para>
 					</listitem>
 				</varlistentry>
 
@@ -1712,36 +1723,12 @@ Context menu actions like Rename Bookmarks etc.)
 			</variablelist>
 		</sect1>
 
-		<sect1 id="settings-menu">
-			<title>The Settings Menu</title>
+		<sect1 id="settings-help-menu">
+			<title>The Settings and Help Menu</title>
+			<para>Apart from the common &kde; <guimenu>Settings</guimenu> and <guimenu>Help</guimenu> menus described
+			in the <ulink url="help:/fundamentals/ui.html#menus">Menu</ulink> chapter of the &kde; Fundamentals documentation
+			&okular; has these application specific menu entries:</para>
 			<variablelist>
-				<varlistentry>
-					<term>
-						<menuchoice>
-							<shortcut><keycombo action="simul">&Ctrl;<keycap>M</keycap></keycombo></shortcut>
-							<guimenu>Settings</guimenu>
-							<guimenuitem>Show Menubar</guimenuitem>
-						</menuchoice>
-					</term>
-					<listitem>
-						<para><action>Toggle the Menubar display</action> on and off. Once
-						hidden it can be made visible using the shortcut
-                                                <keycombo action="simul">&Ctrl;<keycap>M</keycap></keycombo> again.
-     						If the menubar is hidden, the context menu opened with a right mouse button
-						click anywhere in the view area has an extra entry <guimenuitem>Show Menubar</guimenuitem>.</para>
-					</listitem>
-				</varlistentry>
-				<varlistentry>
-					<term>
-						<menuchoice>
-							<guimenu>Settings</guimenu>
-							<guimenuitem>Show Toolbar</guimenuitem>
-						</menuchoice>
-					</term>
-					<listitem>
-						<para><action>Toggle the Toolbar display</action> on and off.</para>
-					</listitem>
-				</varlistentry>
 				<varlistentry>
 					<term>
 						<menuchoice>
@@ -1785,30 +1772,6 @@ Context menu actions like Rename Bookmarks etc.)
 					<term>
 						<menuchoice>
 							<guimenu>Settings</guimenu>
-							<guimenuitem>Configure Shortcuts...</guimenuitem>
-						</menuchoice>
-					</term>
-					<listitem>
-						<para>Opens a window that lets you <action>configure the keyboard
-							shortcuts</action> for many menu commands.</para>
-					</listitem>
-				</varlistentry>
-				<varlistentry>
-					<term>
-						<menuchoice>
-							<guimenu>Settings</guimenu>
-							<guimenuitem>Configure Toolbars...</guimenuitem>
-						</menuchoice>
-					</term>
-					<listitem>
-						<para>Opens a window that lets you choose which icons are visible
-							in the toolbar.</para>
-					</listitem>
-				</varlistentry>
-				<varlistentry>
-					<term>
-						<menuchoice>
-							<guimenu>Settings</guimenu>
 							<guimenuitem>Configure Backends...</guimenuitem>
 						</menuchoice>
 					</term>
@@ -1817,24 +1780,7 @@ Context menu actions like Rename Bookmarks etc.)
 							window.</para>
 					</listitem>
 				</varlistentry>
-				<varlistentry>
-					<term>
-						<menuchoice>
-							<guimenu>Settings</guimenu>
-							<guimenuitem>Configure &okular;...</guimenuitem>
-						</menuchoice>
-					</term>
-					<listitem>
-						<para>Opens the <link linkend="configure">Configure</link>
-							window.</para>
-					</listitem>
-				</varlistentry>
-
 			</variablelist>
-		</sect1>
-		<sect1 id="menuhelp">
-			<title>The Help Menu</title>
-			&help.menu.documentation;
 		</sect1>
 
 	</chapter>
@@ -2067,6 +2013,22 @@ Context menu actions like Rename Bookmarks etc.)
 					  </para>
 					</listitem>
 				</varlistentry>
+                                <varlistentry>
+					<term><guilabel>Use custom background color</guilabel></term>
+					<listitem>
+                                            <para>Enables <ulink url="help:/fundamentals/colors.html">choosing the document background color</ulink> (the color around the displayed page). By default, the &Qt; toolkit color is used when this option is unchecked.
+						</para>
+					</listitem>
+				</varlistentry>
+                                <varlistentry>
+					<term><guilabel>Open new files in tabs</guilabel></term>
+					<listitem>
+						<para>Whether to open new documents in tabs. The tabs are disabled by default.</para>
+						<para>
+						  The default shortcuts to switch between tabs are <keycombo>&Ctrl;<keycap>.</keycap></keycombo> (<guilabel>Next tab</guilabel>) and <keycombo>&Ctrl;<keycap>,</keycap></keycombo> (<guilabel>Previous tab</guilabel>).
+						</para>
+					</listitem>
+				</varlistentry>
 				<varlistentry>
 					<term><guilabel>Obey DRM limitations</guilabel></term>
 					<listitem>
@@ -2075,15 +2037,6 @@ Context menu actions like Rename Bookmarks etc.)
 							to make it impossible to perform certain actions with &PDF; documents,
 							such as copying content to the clipboard. Note that in some configurations
 							of &okular;, this option is not available.</para>
-					</listitem>
-				</varlistentry>
-				<varlistentry>
-					<term><guilabel>Open new files in tabs</guilabel></term>
-					<listitem>
-						<para>Whether to open new documents in tabs. The tabs are disabled by default.</para>
-						<para>
-						  The default shortcuts to switch between tabs are <keycombo>&Ctrl;<keycap>.</keycap></keycombo> (<guilabel>Next tab</guilabel>) and <keycombo>&Ctrl;<keycap>,</keycap></keycombo> (<guilabel>Previous tab</guilabel>).
-						</para>
 					</listitem>
 				</varlistentry>
 				<varlistentry>

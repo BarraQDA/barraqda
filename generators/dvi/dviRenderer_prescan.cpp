@@ -595,12 +595,12 @@ void dviRenderer::prescan_parseSpecials(char *cp, quint8 *)
 void dviRenderer::prescan_setChar(unsigned int ch)
 {
   TeXFontDefinition *fontp = currinf.fontp;
-  if (fontp == NULL)
+  if (fontp == nullptr)
     return;
 
   if (currinf.set_char_p == &dviRenderer::set_char) {
     glyph *g = ((TeXFont *)(currinf.fontp->font))->getGlyph(ch, true, globalColor);
-    if (g == NULL)
+    if (g == nullptr)
       return;
     currinf.data.dvi_h += (int)(currinf.fontp->scaled_size_in_DVI_units * dviFile->getCmPerDVIunit() *
                                 (1200.0 / 2.54)/16.0 * g->dvi_advance_in_units_of_design_size_by_2e20 + 0.5);
@@ -609,7 +609,7 @@ void dviRenderer::prescan_setChar(unsigned int ch)
 
   if (currinf.set_char_p == &dviRenderer::set_vf_char) {
     macro *m = &currinf.fontp->macrotable[ch];
-    if (m->pos == NULL)
+    if (m->pos == nullptr)
       return;
     currinf.data.dvi_h += (int)(currinf.fontp->scaled_size_in_DVI_units * dviFile->getCmPerDVIunit() *
                                 (1200.0 / 2.54)/16.0 * m->dvi_advance_in_units_of_design_size_by_2e20 + 0.5);
@@ -633,7 +633,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
 
   stack.clear();
 
-  currinf.fontp        = NULL;
+  currinf.fontp        = nullptr;
   currinf.set_char_p   = &dviRenderer::set_no_char;
 
   for (;;) {
@@ -646,7 +646,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
 
     if (FNTNUM0 <= ch && ch <= (unsigned char) (FNTNUM0 + 63)) {
       currinf.fontp = currinf.fonttable->value(ch - FNTNUM0);
-      if (currinf.fontp == NULL) {
+      if (currinf.fontp == nullptr) {
         errorMsg = i18n("The DVI code referred to font #%1, which was not previously defined.", ch - FNTNUM0);
         return;
       }
@@ -713,6 +713,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
     case W4:
       WWtmp = readINT(ch - W0);
       currinf.data.w = ((long) (WWtmp *  65536.0*fontPixelPerDVIunit));
+      // fallthrough
     case W0:
       currinf.data.dvi_h += currinf.data.w;
       break;
@@ -723,6 +724,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
     case X4:
       XXtmp = readINT(ch - X0);
       currinf.data.x = ((long) (XXtmp *  65536.0*fontPixelPerDVIunit));
+      // fallthrough
     case X0:
       currinf.data.dvi_h += currinf.data.x;
       break;
@@ -744,6 +746,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
     case Y4:
       YYtmp = readINT(ch - Y0);
       currinf.data.y    = ((long) (YYtmp *  65536.0*fontPixelPerDVIunit));
+      // fallthrough
     case Y0:
       currinf.data.dvi_v += currinf.data.y/65536;
       currinf.data.pxl_v = int(currinf.data.dvi_v/shrinkfactor);
@@ -755,6 +758,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
     case Z4:
       ZZtmp = readINT(ch - Z0);
       currinf.data.z    = ((long) (ZZtmp *  65536.0*fontPixelPerDVIunit));
+      // fallthrough
     case Z0:
       currinf.data.dvi_v += currinf.data.z/65536;
       currinf.data.pxl_v  = int(currinf.data.dvi_v/shrinkfactor);
@@ -765,7 +769,7 @@ void dviRenderer::prescan(parseSpecials specialParser)
     case FNT3:
     case FNT4:
       currinf.fontp = currinf.fonttable->value(readUINT(ch - FNT1 + 1));
-      if (currinf.fontp == NULL)
+      if (currinf.fontp == nullptr)
         return;
       currinf.set_char_p = currinf.fontp->set_char_p;
       break;

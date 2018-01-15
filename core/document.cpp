@@ -1,6 +1,9 @@
 /***************************************************************************
  *   Copyright (C) 2004-2005 by Enrico Ros <eros.kde@email.it>             *
  *   Copyright (C) 2004-2008 by Albert Astals Cid <aacid@kde.org>          *
+ *   Copyright (C) 2017 Klarälvdalens Datakonsult AB, a KDAB Group         *
+ *                      company, info@kdab.com. Work sponsored by the      *
+ *                      LiMux project of the city of Munich                *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -113,6 +116,7 @@ struct ArchiveData
     {
     }
 
+    QString originalFileName;
     QTemporaryFile document;
     QTemporaryFile metadataFile;
 };
@@ -361,7 +365,7 @@ AllocatedPixmap * DocumentPrivate::searchLowestPriorityPixmap( bool unloadableOn
     {
         const AllocatedPixmap * p = *pIt;
         // Filter by observer
-        if ( observer == 0 || p->observer == observer )
+        if ( observer == nullptr || p->observer == observer )
         {
             const int distance = qAbs( p->page - currentViewportPage );
             if ( maxDistance < distance && ( !unloadableOnly || p->observer->canUnloadPixmap( p->page ) ) )
@@ -375,7 +379,7 @@ AllocatedPixmap * DocumentPrivate::searchLowestPriorityPixmap( bool unloadableOn
 
     /* No pixmap to remove */
     if ( farthestPixmap == pEnd )
-        return 0;
+        return nullptr;
 
     AllocatedPixmap * selectedPixmap = *farthestPixmap;
     if ( thenRemoveIt )
@@ -525,22 +529,22 @@ qulonglong DocumentPrivate::getFreeMemory( qulonglong *freeSwap )
 #endif
 }
 
-void DocumentPrivate::loadDocumentInfo()
+bool DocumentPrivate::loadDocumentInfo( LoadDocumentInfoFlags loadWhat )
 // note: load data and stores it internally (document or pages). observers
 // are still uninitialized at this point so don't access them
 {
     //qCDebug(OkularCoreDebug).nospace() << "Using '" << d->m_xmlFileName << "' as document info file.";
     if ( m_xmlFileName.isEmpty() )
-        return;
+        return false;
 
     QFile infoFile( m_xmlFileName );
-    loadDocumentInfo( infoFile );
+    return loadDocumentInfo( infoFile, loadWhat );
 }
 
-void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
+bool DocumentPrivate::loadDocumentInfo( QFile &infoFile, LoadDocumentInfoFlags loadWhat )
 {
     if ( !infoFile.exists() || !infoFile.open( QIODevice::ReadOnly ) )
-        return;
+        return false;
 
     // Load DOM from XML file
     QDomDocument doc( QStringLiteral("documentInfo") );
@@ -548,13 +552,17 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
     {
         qCDebug(OkularCoreDebug) << "Can't load XML pair! Check for broken xml.";
         infoFile.close();
-        return;
+        return false;
     }
     infoFile.close();
 
     QDomElement root = doc.documentElement();
+
     if ( root.tagName() != QLatin1String("documentInfo") )
-        return;
+        return false;
+
+    QUrl documentUrl( root.attribute( "url" ) );
+    bool loadedAnything = false; // set if something gets actually loaded
 
     // Parse the DOM tree
     QDomNode topLevelNode = root.firstChild();
@@ -568,7 +576,7 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
             QDANodeUtils::load( this, topLevelNode );
         }
         // Restore page attributes (bookmark, annotations, ...) from the DOM
-        if ( catName == QLatin1String("pageList") )
+        if ( catName == QLatin1String("pageList") && ( loadWhat & LoadPageInfo ) )
         {
             QDomNode pageNode = topLevelNode.firstChild();
             while ( pageNode.isElement() )
@@ -582,14 +590,17 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
 
                     // pass the domElement to the right page, to read config data from
                     if ( ok && pageNumber >= 0 && pageNumber < (int)m_pagesVector.count() )
-                        m_pagesVector[ pageNumber ]->d->restoreLocalContents( pageElement );
+                    {
+                        if ( m_pagesVector[ pageNumber ]->d->restoreLocalContents( pageElement ) )
+                            loadedAnything = true;
+                    }
                 }
                 pageNode = pageNode.nextSibling();
             }
         }
 
         // Restore 'general info' from the DOM
-        else if ( catName == QLatin1String("generalInfo") )
+        else if ( catName == QLatin1String("generalInfo") && ( loadWhat & LoadGeneralInfo ) )
         {
             QDomNode infoNode = topLevelNode.firstChild();
             while ( infoNode.isElement() )
@@ -611,6 +622,7 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
                             QString vpString = historyElement.attribute( QStringLiteral("viewport") );
                             m_viewportIterator = m_viewportHistory.insert( m_viewportHistory.end(),
                                     DocumentViewport( vpString ) );
+                            loadedAnything = true;
                         }
                         historyNode = historyNode.nextSibling();
                     }
@@ -626,6 +638,7 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
                     if ( ok && newrotation != 0 )
                     {
                         setRotationInternal( newrotation, false );
+                        loadedAnything = true;
                     }
                 }
                 else if ( infoElement.tagName() == QLatin1String("views") )
@@ -642,6 +655,7 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
                                 if ( view->name() == viewName )
                                 {
                                     loadViewsInfo( view, viewElement );
+                                    loadedAnything = true;
                                     break;
                                 }
                             }
@@ -655,6 +669,8 @@ void DocumentPrivate::loadDocumentInfo( QFile &infoFile )
 
         topLevelNode = topLevelNode.nextSibling();
     } // </documentInfo>
+
+    return loadedAnything;
 }
 
 void DocumentPrivate::loadViewsInfo( View *view, const QDomElement &e )
@@ -739,12 +755,12 @@ bool DocumentPrivate::openRelativeFile( const QString & fileName )
 Generator * DocumentPrivate::loadGeneratorLibrary( const KPluginMetaData &service )
 {
     KPluginLoader loader( service.fileName() );
-    qDebug() << service.fileName();
+    qCDebug(OkularCoreDebug) << service.fileName();
     KPluginFactory *factory = loader.factory();
     if ( !factory )
     {
         qCWarning(OkularCoreDebug).nospace() << "Invalid plugin factory for " << service.fileName() << ":" << loader.errorString();
-        return 0;
+        return nullptr;
     }
 
     Generator * plugin = factory->create<Okular::Generator>();
@@ -829,7 +845,7 @@ Document::OpenResult DocumentPrivate::openDocumentInternal( const KPluginMetaDat
 {
     QString propName = offer.pluginId();
     QHash< QString, GeneratorInfo >::const_iterator genIt = m_loadedGenerators.constFind( propName );
-    m_walletGenerator = 0;
+    m_walletGenerator = nullptr;
     if ( genIt != m_loadedGenerators.constEnd() )
     {
         m_generator = genIt.value().generator;
@@ -874,7 +890,7 @@ Document::OpenResult DocumentPrivate::openDocumentInternal( const KPluginMetaDat
             if ( !m_tempFile->open() )
             {
                 delete m_tempFile;
-                m_tempFile = 0;
+                m_tempFile = nullptr;
             }
             else
             {
@@ -889,20 +905,20 @@ Document::OpenResult DocumentPrivate::openDocumentInternal( const KPluginMetaDat
     QApplication::restoreOverrideCursor();
     if ( openResult != Document::OpenSuccess || m_pagesVector.size() <= 0 )
     {
-        m_generator->d_func()->m_document = 0;
-        QObject::disconnect( m_generator, 0, m_parent, 0 );
+        m_generator->d_func()->m_document = nullptr;
+        QObject::disconnect( m_generator, nullptr, m_parent, nullptr );
         // TODO this is a bit of a hack, since basically means that
         // you can only call walletDataForFile after calling openDocument
         // but since in reality it's what happens I've decided not to refactor/break API
         // One solution is just kill walletDataForFile and make OpenResult be an object
         // where the wallet data is also returned when OpenNeedsPassword
         m_walletGenerator = m_generator;
-        m_generator = 0;
+        m_generator = nullptr;
 
         qDeleteAll( m_pagesVector );
         m_pagesVector.clear();
         delete m_tempFile;
-        m_tempFile = 0;
+        m_tempFile = nullptr;
 
         // TODO: emit a message telling the document is empty
         if ( openResult == Document::OpenSuccess )
@@ -956,29 +972,10 @@ DocumentViewport DocumentPrivate::nextDocumentViewport() const
     return ret;
 }
 
-void DocumentPrivate::warnLimitedAnnotSupport()
-{
-    if ( !m_showWarningLimitedAnnotSupport )
-        return;
-    m_showWarningLimitedAnnotSupport = false; // Show the warning once
-
-    if ( m_annotationsNeedSaveAs )
-    {
-        // Shown if the user is editing annotations in a file whose metadata is
-        // not stored locally (.okular archives belong to this category)
-        KMessageBox::information( m_widget, i18n("Your annotation changes will not be saved automatically. Use File -> Save As...\nor your changes will be lost once the document is closed"), QString(), QStringLiteral("annotNeedSaveAs") );
-    }
-    else if ( !canAddAnnotationsNatively() )
-    {
-        // If the generator doesn't support native annotations
-        KMessageBox::information( m_widget, i18n("Your annotations are saved internally by Okular.\nYou can export the annotated document using File -> Export As -> Document Archive"), QString(), QStringLiteral("annotExportAsArchive") );
-    }
-}
-
 void DocumentPrivate::performAddPageAnnotation( int page, Annotation * annotation )
 {
     Okular::SaveInterface * iface = qobject_cast< Okular::SaveInterface * >( m_generator );
-    AnnotationProxy *proxy = iface ? iface->annotationProxy() : 0;
+    AnnotationProxy *proxy = iface ? iface->annotationProxy() : nullptr;
 
     // find out the page to attach annotation
     Page * kp = m_pagesVector[ page ];
@@ -1004,14 +1001,12 @@ void DocumentPrivate::performAddPageAnnotation( int page, Annotation * annotatio
         // Redraw everything, including ExternallyDrawn annotations
         refreshPixmaps( page );
     }
-
-    warnLimitedAnnotSupport();
 }
 
 void DocumentPrivate::performRemovePageAnnotation( int page, Annotation * annotation )
 {
     Okular::SaveInterface * iface = qobject_cast< Okular::SaveInterface * >( m_generator );
-    AnnotationProxy *proxy = iface ? iface->annotationProxy() : 0;
+    AnnotationProxy *proxy = iface ? iface->annotationProxy() : nullptr;
     bool isExternallyDrawn;
 
     // find out the page
@@ -1042,14 +1037,12 @@ void DocumentPrivate::performRemovePageAnnotation( int page, Annotation * annota
             refreshPixmaps( page );
         }
     }
-
-    warnLimitedAnnotSupport();
 }
 
 void DocumentPrivate::performModifyPageAnnotation( int page, Annotation * annotation, bool appearanceChanged )
 {
     Okular::SaveInterface * iface = qobject_cast< Okular::SaveInterface * >( m_generator );
-    AnnotationProxy *proxy = iface ? iface->annotationProxy() : 0;
+    AnnotationProxy *proxy = iface ? iface->annotationProxy() : nullptr;
 
     // find out the page
     Page * kp = m_pagesVector[ page ];
@@ -1068,26 +1061,22 @@ void DocumentPrivate::performModifyPageAnnotation( int page, Annotation * annota
     {
         /* When an annotation is being moved, the generator will not render it.
          * Therefore there's no need to refresh pixmaps after the first time */
-        if ( annotation->flags() & Annotation::BeingMoved )
+        if ( annotation->flags() & (Annotation::BeingMoved | Annotation::BeingResized) )
         {
-            if ( m_annotationBeingMoved )
+            if ( m_annotationBeingModified )
                 return;
             else // First time: take note
-                m_annotationBeingMoved = true;
+                m_annotationBeingModified = true;
         }
         else
         {
-            m_annotationBeingMoved = false;
+            m_annotationBeingModified = false;
         }
 
         // Redraw everything, including ExternallyDrawn annotations
         qCDebug(OkularCoreDebug) << "Refreshing Pixmaps";
         refreshPixmaps( page );
     }
-
-    // If the user is moving the annotation, don't steal the focus
-    if ( (annotation->flags() & Annotation::BeingMoved) == 0 )
-        warnLimitedAnnotSupport();
 }
 
 void DocumentPrivate::performSetAnnotationContents( const QString & newContents, Annotation *annot, int pageNumber )
@@ -1173,6 +1162,35 @@ void DocumentPrivate::performSetTaggingContents( const QString & newContents, Ta
     performModifyPageTagging( pageNumber, tag, true );
 }
 
+void DocumentPrivate::recalculateForms()
+{
+    const QVariant fco = m_parent->metaData(QLatin1String("FormCalculateOrder"));
+    const QVector<int> formCalculateOrder = fco.value<QVector<int>>();
+    foreach(int formId, formCalculateOrder) {
+        for ( uint pageIdx = 0; pageIdx  < m_parent->pages(); pageIdx++ )
+        {
+            const Page *p = m_parent->page( pageIdx );
+            if (p)
+            {
+                foreach( FormField *form, p->formFields() )
+                {
+                    if ( form->id() == formId ) {
+                        Action *action = form->additionalAction( FormField::CalculateField );
+                        if (action)
+                        {
+                            m_parent->processAction( action );
+                        }
+                        else
+                        {
+                            qWarning() << "Form that is part of calculate order doesn't have a calculate action";
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void DocumentPrivate::saveDocumentInfo() const
 {
     if ( m_xmlFileName.isEmpty() )
@@ -1184,7 +1202,6 @@ void DocumentPrivate::saveDocumentInfo() const
     {
         qCWarning(OkularCoreDebug) << "Failed to open docdata file" << m_xmlFileName;
         return;
-
     }
     // 1. Create DOM
     QDomDocument doc( QStringLiteral("documentInfo") );
@@ -1201,21 +1218,23 @@ void DocumentPrivate::saveDocumentInfo() const
     QDANodeUtils::storeQDANodes( QDAElement, doc );
 
     // 2.1. Save page attributes (bookmark state, annotations, ... ) to DOM
-    QDomElement pageList = doc.createElement( QStringLiteral("pageList") );
-    root.appendChild( pageList );
-    PageItems saveWhat = AllPageItems;
-    if ( m_annotationsNeedSaveAs )
+    //  -> do this if there are not-yet-migrated annots or forms in docdata/
+    if ( m_docdataMigrationNeeded )
     {
-        /* In this case, if the user makes a modification, he's requested to
-            * save to a new document. Therefore, if there are existing local
-            * annotations, we save them back unmodified in the original
-            * document's metadata, so that it appears that it was not changed */
-        saveWhat |= OriginalAnnotationPageItems;
+        QDomElement pageList = doc.createElement( "pageList" );
+        root.appendChild( pageList );
+        // OriginalAnnotationPageItems and OriginalFormFieldPageItems tell to
+        // store the same unmodified annotation list and form contents that we
+        // read when we opened the file and ignore any change made by the user.
+        // Since we don't store annotations and forms in docdata/ any more, this is
+        // necessary to preserve annotations/forms that previous Okular version
+        // had stored there.
+        const PageItems saveWhat = AllPageItems | OriginalAnnotationPageItems | OriginalFormFieldPageItems;
+        // <page list><page number='x'>.... </page> save pages that hold data
+        QVector< Page * >::const_iterator pIt = m_pagesVector.constBegin(), pEnd = m_pagesVector.constEnd();
+        for ( ; pIt != pEnd; ++pIt )
+            (*pIt)->d->saveLocalContents( pageList, doc, saveWhat );
     }
-    // <page list><page number='x'>.... </page> save pages that hold data
-    QVector< Page * >::const_iterator pIt = m_pagesVector.constBegin(), pEnd = m_pagesVector.constEnd();
-    for ( ; pIt != pEnd; ++pIt )
-        (*pIt)->d->saveLocalContents( pageList, doc, saveWhat );
 
     // 2.2. Save document info (current viewport, history, ... ) to DOM
     QDomElement generalInfo = doc.createElement( QStringLiteral("generalInfo") );
@@ -1296,7 +1315,7 @@ void DocumentPrivate::sendGeneratorPixmapRequest()
     }
 
     // find a request
-    PixmapRequest * request = 0;
+    PixmapRequest * request = nullptr;
     m_pixmapRequestsMutex.lock();
     while ( !m_pixmapRequestsStack.isEmpty() && !request )
     {
@@ -1456,6 +1475,8 @@ void DocumentPrivate::sendGeneratorPixmapRequest()
             request->setNormalizedRect( TilesManager::fromRotatedRect(
                         request->normalizedRect(), m_rotation ) );
 
+        request->setPartialUpdatesWanted( request->asynchronous() && !request->page()->hasPixmap( request->observer() ) );
+
         // we always have to unlock _before_ the generatePixmap() because
         // a sync generation would end with requestDone() -> deadlock, and
         // we can not really know if the generator can do async requests
@@ -1481,14 +1502,14 @@ void DocumentPrivate::rotationFinished( int page, Okular::Page *okularPage )
         o->notifyPageChanged( page, DocumentObserver::Pixmap | DocumentObserver::Annotations | DocumentObserver::Taggings );
 }
 
-void DocumentPrivate::fontReadingProgress( int page )
+void DocumentPrivate::slotFontReadingProgress( int page )
 {
     emit m_parent->fontReadingProgress( page );
 
     if ( page >= (int)m_parent->pages() - 1 )
     {
         emit m_parent->fontReadingEnded();
-        m_fontThread = 0;
+        m_fontThread = nullptr;
         m_fontsCached = true;
     }
 }
@@ -1555,7 +1576,7 @@ void DocumentPrivate::refreshPixmaps( int pageNumber )
     for ( ; it != itEnd; ++it )
     {
         QSize size = (*it).m_pixmap->size();
-        PixmapRequest * p = new PixmapRequest( it.key(), pageNumber, size.width(), size.height(), 1, PixmapRequest::Asynchronous );
+        PixmapRequest * p = new PixmapRequest( it.key(), pageNumber, size.width() / qApp->devicePixelRatio(), size.height() / qApp->devicePixelRatio(), 1, PixmapRequest::Asynchronous );
         p->d->mForce = true;
         requestedPixmaps.push_back( p );
     }
@@ -1567,7 +1588,7 @@ void DocumentPrivate::refreshPixmaps( int pageNumber )
         {
             tilesManager->markDirty();
 
-            PixmapRequest * p = new PixmapRequest( observer, pageNumber, tilesManager->width(), tilesManager->height(), 1, PixmapRequest::Asynchronous );
+            PixmapRequest * p = new PixmapRequest( observer, pageNumber, tilesManager->width() / qApp->devicePixelRatio(), tilesManager->height() / qApp->devicePixelRatio(), 1, PixmapRequest::Asynchronous );
 
             NormalizedRect tilesRect;
 
@@ -1608,7 +1629,7 @@ void DocumentPrivate::_o_configChanged()
     while (m_allocatedTextPagesFifo.count() > m_maxAllocatedTextPages)
     {
         int pageToKick = m_allocatedTextPagesFifo.takeFirst();
-        m_pagesVector.at(pageToKick)->setTextPage( 0 ); // deletes the textpage
+        m_pagesVector.at(pageToKick)->setTextPage( nullptr ); // deletes the textpage
     }
 }
 
@@ -1639,13 +1660,15 @@ void DocumentPrivate::doContinueDirectionMatchSearch(void *doContinueDirectionMa
         if (search->pagesDone < pageCount)
         {
             doContinue = true;
-            if ( searchStruct->currentPage >= pageCount || searchStruct->currentPage < 0 )
+            if ( searchStruct->currentPage >= pageCount )
             {
-                doContinue = false;
-                search->isCurrentlySearching = false;
-                search->continueOnPage = forward ? 0 : pageCount - 1;
-                search->continueOnMatch = RegularAreaRect();
-                emit m_parent->searchFinished ( searchStruct->searchID, Document::EndOfDocumentReached );
+                searchStruct->currentPage = 0;
+                emit m_parent->notice(i18n("Continuing search from beginning"), 3000);
+            }
+            else if ( searchStruct->currentPage < 0 )
+            {
+                searchStruct->currentPage = pageCount - 1;
+                emit m_parent->notice(i18n("Continuing search from bottom"), 3000);
             }
         }
     }
@@ -1719,7 +1742,7 @@ void DocumentPrivate::doProcessSearchMatch( RegularAreaRect *match, RunningSearc
             searchViewport.rePos.enabled = true;
             searchViewport.rePos.normalizedX = (match->first().left + match->first().right) / 2.0;
             searchViewport.rePos.normalizedY = (match->first().top + match->first().bottom) / 2.0;
-            m_parent->setViewport( searchViewport, 0, true );
+            m_parent->setViewport( searchViewport, nullptr, true );
         }
         delete match;
     }
@@ -1767,7 +1790,7 @@ void DocumentPrivate::doContinueAllDocumentSearch(void *pagesToNotifySet, void *
             m_parent->requestTextPage( pageNumber );
 
         // loop on a page adding highlights for all found items
-        RegularAreaRect * lastMatch = 0;
+        RegularAreaRect * lastMatch = nullptr;
         while ( 1 )
         {
             if ( lastMatch )
@@ -1873,7 +1896,7 @@ void DocumentPrivate::doContinueGooglesDocumentSearch(void *pagesToNotifySet, vo
             if ( newHue < 0 )
                 newHue += 360;
             QColor wordColor = QColor::fromHsv( newHue, baseSat, baseVal );
-            RegularAreaRect * lastMatch = 0;
+            RegularAreaRect * lastMatch = nullptr;
             // add all highlights for current word
             bool wordMatched = false;
             while ( 1 )
@@ -1943,66 +1966,68 @@ void DocumentPrivate::doContinueGooglesDocumentSearch(void *pagesToNotifySet, vo
     }
 }
 
-QVariant DocumentPrivate::documentMetaData( const QString &key, const QVariant &option ) const
+QVariant DocumentPrivate::documentMetaData( const Generator::DocumentMetaDataKey key, const QVariant &option ) const
 {
-    if ( key == QLatin1String( "PaperColor" ) )
+    switch ( key )
     {
-        bool giveDefault = option.toBool();
-        // load paper color from Settings, or use the default color (white)
-        // if we were told to do so
-        QColor color;
-        if ( ( SettingsCore::renderMode() == SettingsCore::EnumRenderMode::Paper )
-             && SettingsCore::changeColors() )
+        case Generator::PaperColorMetaData:
         {
-            color = SettingsCore::paperColor();
+            bool giveDefault = option.toBool();
+            QColor color;
+            if ( ( SettingsCore::renderMode() == SettingsCore::EnumRenderMode::Paper )
+                && SettingsCore::changeColors() )
+            {
+                color = SettingsCore::paperColor();
+            }
+            else if ( giveDefault )
+            {
+                color = Qt::white;
+            }
+            return color;
         }
-        else if ( giveDefault )
-        {
-            color = Qt::white;
-        }
-        return color;
-    }
-    else if ( key == QLatin1String( "TextAntialias" ) )
-    {
-        switch ( SettingsCore::textAntialias() )
-        {
-            case SettingsCore::EnumTextAntialias::Enabled:
-                return true;
-                break;
+        break;
+
+        case Generator::TextAntialiasMetaData:
+            switch ( SettingsCore::textAntialias() )
+            {
+                case SettingsCore::EnumTextAntialias::Enabled:
+                    return true;
+                    break;
 #if 0
-            case Settings::EnumTextAntialias::UseKDESettings:
-                // TODO: read the KDE configuration
-                return true;
-                break;
+                case Settings::EnumTextAntialias::UseKDESettings:
+                    // TODO: read the KDE configuration
+                    return true;
+                    break;
 #endif
-            case SettingsCore::EnumTextAntialias::Disabled:
-                return false;
-                break;
-        }
-    }
-    else if ( key == QLatin1String( "GraphicsAntialias" ) )
-    {
-        switch ( SettingsCore::graphicsAntialias() )
-        {
-            case SettingsCore::EnumGraphicsAntialias::Enabled:
-                return true;
-                break;
-            case SettingsCore::EnumGraphicsAntialias::Disabled:
-                return false;
-                break;
-        }
-    }
-    else if ( key == QLatin1String( "TextHinting" ) )
-    {
-        switch ( SettingsCore::textHinting() )
-        {
-            case SettingsCore::EnumTextHinting::Enabled:
-                return true;
-                break;
-            case SettingsCore::EnumTextHinting::Disabled:
-                return false;
-                break;
-        }
+                case SettingsCore::EnumTextAntialias::Disabled:
+                    return false;
+                    break;
+            }
+        break;
+
+        case Generator::GraphicsAntialiasMetaData:
+            switch ( SettingsCore::graphicsAntialias() )
+            {
+                case SettingsCore::EnumGraphicsAntialias::Enabled:
+                    return true;
+                    break;
+                case SettingsCore::EnumGraphicsAntialias::Disabled:
+                    return false;
+                    break;
+            }
+        break;
+
+        case Generator::TextHintingMetaData:
+            switch ( SettingsCore::textHinting() )
+            {
+                case SettingsCore::EnumTextHinting::Enabled:
+                    return true;
+                    break;
+                case SettingsCore::EnumTextHinting::Disabled:
+                    return false;
+                    break;
+            }
+        break;
     }
     return QVariant();
 }
@@ -2153,7 +2178,7 @@ void DocumentPrivate::loadSyncFile( const QString & filePath )
 }
 
 Document::Document( QWidget *widget )
-    : QObject( 0 ), d( new DocumentPrivate( this ) )
+    : QObject( nullptr ), d( new DocumentPrivate( this ) )
 {
     d->m_widget = widget;
     d->m_bookmarkManager = new BookmarkManager( d );
@@ -2163,6 +2188,7 @@ Document::Document( QWidget *widget )
     connect( SettingsCore::self(), SIGNAL(configChanged()), this, SLOT(_o_configChanged()) );
     connect(d->m_undoStack, &QUndoStack::canUndoChanged, this, &Document::canUndoChanged);
     connect(d->m_undoStack, &QUndoStack::canRedoChanged, this, &Document::canRedoChanged);
+    connect(d->m_undoStack, &QUndoStack::cleanChanged, this, &Document::undoHistoryCleanChanged);
 
     qRegisterMetaType<Okular::FontInfo>();
 }
@@ -2176,7 +2202,7 @@ Document::~Document()
     for ( ; viewIt != viewEnd; ++viewIt )
     {
         View *v = *viewIt;
-        v->d_func()->document = 0;
+        v->d_func()->document = nullptr;
     }
 
     // delete the bookmark manager
@@ -2311,7 +2337,6 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     QMimeDatabase db;
     QMimeType mime = _mime;
     QByteArray filedata;
-    qint64 document_size = -1;
     bool isstdin = url.fileName() == QLatin1String( "-" );
     bool triedMimeFromFileContent = false;
     if ( !isstdin )
@@ -2319,21 +2344,11 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
         if ( !mime.isValid() )
             return OpenError;
 
-        // docFile is always local so we can use QFileInfo on it
-        QFileInfo fileReadTest( docFile );
-        if ( fileReadTest.isFile() && !fileReadTest.isReadable() )
-        {
-            d->m_docFileName.clear();
-            return OpenError;
-        }
-        // determine the related "xml document-info" filename
         d->m_url = url;
         d->m_docFileName = docFile;
-        if ( url.isLocalFile() && !d->m_archiveData )
-        {
-            document_size = fileReadTest.size();
-            d->m_xmlFileName = DocumentPrivate::docDataFileName(url, document_size);
-        }
+
+        if ( !d->updateMetadataXmlNameAndDocSize() )
+            return OpenError;
     }
     else
     {
@@ -2343,7 +2358,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
         mime = db.mimeTypeForData( filedata );
         if ( !mime.isValid() || mime.isDefault() )
             return OpenError;
-        document_size = filedata.size();
+        d->m_docSize = filedata.size();
         triedMimeFromFileContent = true;
     }
 
@@ -2438,7 +2453,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
 
     // no need to check for the existence of a synctex file, no parser will be
     // created if none exists
-    d->m_synctex_scanner = synctex_scanner_new_with_output_file( QFile::encodeName( docFile ).constData(), 0, 1);
+    d->m_synctex_scanner = synctex_scanner_new_with_output_file( QFile::encodeName( docFile ).constData(), nullptr, 1);
     if ( !d->m_synctex_scanner && QFile::exists(docFile + QLatin1String( "sync" ) ) )
     {
         d->loadSyncFile(docFile);
@@ -2449,35 +2464,30 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     connect( d->m_pageController, SIGNAL(rotationFinished(int,Okular::Page*)),
              this, SLOT(rotationFinished(int,Okular::Page*)) );
 
-    bool containsExternalAnnotations = false;
     foreach ( Page * p, d->m_pagesVector )
-    {
         p->d->m_doc = d;
-        if ( !p->annotations().empty() )
-            containsExternalAnnotations = true;
-    }
 
-    // Be quiet while restoring local annotations
-    d->m_showWarningLimitedAnnotSupport = false;
-    d->m_annotationsNeedSaveAs = false;
+    d->m_metadataLoadingCompleted = false;
+    d->m_docdataMigrationNeeded = false;
 
     // 2. load Additional Data (bookmarks, local annotations and metadata) about the document
     if ( d->m_archiveData )
     {
-        d->loadDocumentInfo( d->m_archiveData->metadataFile );
-        d->m_annotationsNeedSaveAs = true;
+        d->loadDocumentInfo( d->m_archiveData->metadataFile, LoadPageInfo );
+        d->loadDocumentInfo( LoadGeneralInfo );
     }
     else
     {
-        d->loadDocumentInfo();
-        d->m_annotationsNeedSaveAs = ( d->canAddAnnotationsNatively() && containsExternalAnnotations );
+        if ( d->loadDocumentInfo( LoadPageInfo ) )
+            d->m_docdataMigrationNeeded = true;
+        d->loadDocumentInfo( LoadGeneralInfo );
     }
 
-    d->m_showWarningLimitedAnnotSupport = true;
+    d->m_metadataLoadingCompleted = true;
     d->m_bookmarkManager->setUrl( d->m_url );
 
     // 3. setup observers inernal lists and data
-    foreachObserver( notifySetup( d->m_pagesVector, DocumentObserver::DocumentChanged ) );
+    foreachObserver( notifySetup( d->m_pagesVector, DocumentObserver::DocumentChanged | DocumentObserver::UrlChanged ) );
 
     // 4. set initial page (restoring the page saved in xml if loaded)
     DocumentViewport loadedViewport = (*d->m_viewportIterator);
@@ -2516,7 +2526,6 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     }
 
     AudioPlayer::instance()->d->m_currentDocument = isstdin ? QUrl() : d->m_url;
-    d->m_docSize = document_size;
 
     const QStringList docScripts = d->m_generator->metaData( QStringLiteral("DocumentScripts"), QStringLiteral ( "JavaScript" ) ).toStringList();
     if ( !docScripts.isEmpty() )
@@ -2531,6 +2540,31 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     return OpenSuccess;
 }
 
+bool DocumentPrivate::updateMetadataXmlNameAndDocSize()
+{
+    // m_docFileName is always local so we can use QFileInfo on it
+    QFileInfo fileReadTest( m_docFileName );
+    if ( !fileReadTest.isFile() && !fileReadTest.isReadable() )
+        return false;
+
+    m_docSize = fileReadTest.size();
+
+    // determine the related "xml document-info" filename
+    if ( m_url.isLocalFile() )
+    {
+        const QString filePath = docDataFileName( m_url, m_docSize );
+        qCDebug(OkularCoreDebug) << "Metadata file is now:" << filePath;
+        m_xmlFileName = filePath;
+    }
+    else
+    {
+        qCDebug(OkularCoreDebug) << "Metadata file: disabled";
+        m_xmlFileName = QString();
+    }
+
+    return true;
+}
+
 
 KXMLGUIClient* Document::guiClient()
 {
@@ -2540,7 +2574,7 @@ KXMLGUIClient* Document::guiClient()
         if ( iface )
             return iface->guiClient();
     }
-    return 0;
+    return nullptr;
 }
 
 void Document::closeDocument()
@@ -2550,10 +2584,10 @@ void Document::closeDocument()
         return;
 
     delete d->m_pageController;
-    d->m_pageController = 0;
+    d->m_pageController = nullptr;
 
     delete d->m_scripter;
-    d->m_scripter = 0;
+    d->m_scripter = nullptr;
 
      // remove requests left in queue
     d->m_pixmapRequestsMutex.lock();
@@ -2575,17 +2609,17 @@ void Document::closeDocument()
         {
             d->m_closingLoop = &loop;
             loop.exec();
-            d->m_closingLoop = 0;
+            d->m_closingLoop = nullptr;
         }
     }
     while ( startEventLoop );
 
     if ( d->m_fontThread )
     {
-        disconnect( d->m_fontThread, 0, this, 0 );
+        disconnect( d->m_fontThread, nullptr, this, nullptr );
         d->m_fontThread->stopExtraction();
         d->m_fontThread->wait();
-        d->m_fontThread = 0;
+        d->m_fontThread = nullptr;
     }
 
     // stop any audio playback
@@ -2601,7 +2635,7 @@ void Document::closeDocument()
     if ( d->m_synctex_scanner )
     {
         synctex_scanner_free( d->m_synctex_scanner );
-        d->m_synctex_scanner = 0;
+        d->m_synctex_scanner = nullptr;
     }
 
     // stop timers
@@ -2613,23 +2647,23 @@ void Document::closeDocument()
     if ( d->m_generator )
     {
         // disconnect the generator from this document ...
-        d->m_generator->d_func()->m_document = 0;
+        d->m_generator->d_func()->m_document = nullptr;
         // .. and this document from the generator signals
-        disconnect( d->m_generator, 0, this, 0 );
+        disconnect( d->m_generator, nullptr, this, nullptr );
 
         QHash< QString, GeneratorInfo >::const_iterator genIt = d->m_loadedGenerators.constFind( d->m_generatorName );
         Q_ASSERT( genIt != d->m_loadedGenerators.constEnd() );
     }
-    d->m_generator = 0;
+    d->m_generator = nullptr;
     d->m_generatorName = QString();
     d->m_url = QUrl();
-    d->m_walletGenerator = 0;
+    d->m_walletGenerator = nullptr;
     d->m_docFileName = QString();
     d->m_xmlFileName = QString();
     delete d->m_tempFile;
-    d->m_tempFile = 0;
+    d->m_tempFile = nullptr;
     delete d->m_archiveData;
-    d->m_archiveData = 0;
+    d->m_archiveData = nullptr;
     d->m_docSize = -1;
     d->m_exportCached = false;
     d->m_exportFormats.clear();
@@ -2639,7 +2673,7 @@ void Document::closeDocument()
     d->m_rotation = Rotation0;
 
     // send an empty list to observers (to free their data)
-    foreachObserver( notifySetup( QVector< Page * >(), DocumentObserver::DocumentChanged ) );
+    foreachObserver( notifySetup( QVector< Page * >(), DocumentObserver::DocumentChanged | DocumentObserver::UrlChanged ) );
 
     // delete pages and clear 'd->m_pagesVector' container
     QVector< Page * >::const_iterator pIt = d->m_pagesVector.constBegin();
@@ -2683,6 +2717,7 @@ void Document::closeDocument()
     AudioPlayer::instance()->d->m_currentDocument = QUrl();
 
     d->m_undoStack->clear();
+    d->m_docdataMigrationNeeded = false;
 }
 
 void Document::addObserver( DocumentObserver * pObserver )
@@ -2693,7 +2728,7 @@ void Document::addObserver( DocumentObserver * pObserver )
     // if the observer is added while a document is already opened, tell it
     if ( !d->m_pagesVector.isEmpty() )
     {
-        pObserver->notifySetup( d->m_pagesVector, DocumentObserver::DocumentChanged );
+        pObserver->notifySetup( d->m_pagesVector, DocumentObserver::DocumentChanged | DocumentObserver::UrlChanged );
         pObserver->notifyViewportChanged( false /*disables smoothMove*/ );
     }
 }
@@ -2835,7 +2870,7 @@ DocumentInfo Document::documentInfo( const QSet<DocumentInfo::Key> &keys ) const
 
 const DocumentSynopsis * Document::documentSynopsis() const
 {
-    return d->m_generator ? d->m_generator->generateDocumentSynopsis() : NULL;
+    return d->m_generator ? d->m_generator->generateDocumentSynopsis() : nullptr;
 }
 
 void Document::startFontReading()
@@ -2859,7 +2894,7 @@ void Document::startFontReading()
 
     d->m_fontThread = new FontExtractionThread( d->m_generator, pages() );
     connect( d->m_fontThread, SIGNAL(gotFont(Okular::FontInfo)), this, SLOT(fontReadingGotFont(Okular::FontInfo)) );
-    connect( d->m_fontThread.data(), &FontExtractionThread::progress, this, &Document::fontReadingProgress );
+    connect( d->m_fontThread.data(), SIGNAL(progress(int)), this, SLOT(slotFontReadingProgress(int)) );
 
     d->m_fontThread->startExtraction( /*d->m_generator->hasFeature( Generator::Threaded )*/true );
 }
@@ -2869,9 +2904,9 @@ void Document::stopFontReading()
     if ( !d->m_fontThread )
         return;
 
-    disconnect( d->m_fontThread, 0, this, 0 );
+    disconnect( d->m_fontThread, nullptr, this, nullptr );
     d->m_fontThread->stopExtraction();
-    d->m_fontThread = 0;
+    d->m_fontThread = nullptr;
     d->m_fontsCache.clear();
 }
 
@@ -2882,7 +2917,7 @@ bool Document::canProvideFontInformation() const
 
 const QList<EmbeddedFile*> *Document::embeddedFiles() const
 {
-    return d->m_generator ? d->m_generator->embeddedFiles() : NULL;
+    return d->m_generator ? d->m_generator->embeddedFiles() : nullptr;
 }
 
 const Page * Document::page( int n ) const
@@ -2930,7 +2965,9 @@ QUrl Document::currentDocument() const
 
 bool Document::isAllowed( Permission action ) const
 {
-    if ( action == Okular::AllowNotes && !d->m_annotationEditingEnabled )
+    if ( action == Okular::AllowNotes && ( d->m_docdataMigrationNeeded || !d->m_annotationEditingEnabled ) )
+        return false;
+    if ( action == Okular::AllowFillForms && d->m_docdataMigrationNeeded )
         return false;
 
 #if !OKULAR_FORCE_DRM
@@ -3048,12 +3085,12 @@ QVariant Document::metaData( const QString & key, const QVariant & option ) cons
         if (!ok) line = -1;
 
         // Use column == -1 for now.
-        if( synctex_display_query( d->m_synctex_scanner, QFile::encodeName(name).constData(), line, -1 ) > 0 )
+        if( synctex_display_query( d->m_synctex_scanner, QFile::encodeName(name).constData(), line, -1, 0 ) > 0 )
         {
-            synctex_node_t node;
+            synctex_node_p node;
             // For now use the first hit. Could possibly be made smarter
             // in case there are multiple hits.
-            while( ( node = synctex_next_result( d->m_synctex_scanner ) ) )
+            while( ( node = synctex_scanner_next_result( d->m_synctex_scanner ) ) )
             {
                 Okular::DocumentViewport viewport;
 
@@ -3240,12 +3277,11 @@ void Document::requestTextPage( uint page )
 
 void DocumentPrivate::notifyAnnotationChanges( int page )
 {
-    int flags = DocumentObserver::Annotations;
+    foreachObserverD( notifyPageChanged( page, DocumentObserver::Annotations ) );
+}
 
-    if ( m_annotationsNeedSaveAs )
-        flags |= DocumentObserver::NeedSaveAs;
-
-    foreachObserverD( notifyPageChanged( page, flags ) );
+void DocumentPrivate::notifyFormChanges( int /*page*/ )
+{
 }
 
 void Document::addPageAnnotation( int page, Annotation * annotation )
@@ -3316,6 +3352,13 @@ void Document::translatePageAnnotation(int page, Annotation* annotation, const N
 {
     int complete = (annotation->flags() & Okular::Annotation::BeingMoved) == 0;
     QUndoCommand *uc = new Okular::TranslateAnnotationCommand( d, annotation, page, delta, complete );
+    d->m_undoStack->push(uc);
+}
+
+void Document::adjustPageAnnotation( int page, Annotation *annotation, const Okular::NormalizedPoint & delta1, const Okular::NormalizedPoint & delta2 )
+{
+    const bool complete = (annotation->flags() & Okular::Annotation::BeingResized) == 0;
+    QUndoCommand *uc = new Okular::AdjustAnnotationCommand( d, annotation, page, delta1, delta2, complete );
     d->m_undoStack->push(uc);
 }
 
@@ -3696,7 +3739,7 @@ void Document::searchText( int searchID, const QString & text, bool fromStart, Q
         int pagesDone = 0;
 
         // continue checking last TextPage first (if it is the current page)
-        RegularAreaRect * match = 0;
+        RegularAreaRect * match = nullptr;
         if ( lastPage && lastPage->number() == s->continueOnPage )
         {
             if ( newText )
@@ -3819,6 +3862,8 @@ void Document::editFormText( int pageNumber,
 {
     QUndoCommand *uc = new EditFormTextCommand( this->d, form, pageNumber, newContents, newCursorPos, form->text(), prevCursorPos, prevAnchorPos );
     d->m_undoStack->push( uc );
+
+    d->recalculateForms();
 }
 
 void Document::editFormList( int pageNumber,
@@ -3828,6 +3873,8 @@ void Document::editFormList( int pageNumber,
     const QList< int > prevChoices = form->currentChoices();
     QUndoCommand *uc = new EditFormListCommand( this->d, form, pageNumber, newChoices, prevChoices );
     d->m_undoStack->push( uc );
+
+    d->recalculateForms();
 }
 
 void Document::editFormCombo( int pageNumber,
@@ -3850,6 +3897,8 @@ void Document::editFormCombo( int pageNumber,
 
     QUndoCommand *uc = new EditFormComboCommand( this->d, form, pageNumber, newText, newCursorPos, prevText, prevCursorPos, prevAnchorPos );
     d->m_undoStack->push( uc );
+
+    d->recalculateForms();
 }
 
 void Document::editFormButtons( int pageNumber, const QList< FormFieldButton* >& formButtons, const QList< bool >& newButtonStates )
@@ -3967,7 +4016,7 @@ void Document::processAction( const Action * action )
                 if ( !nextViewport.isValid() )
                     return;
 
-                setViewport( nextViewport, 0, true );
+                setViewport( nextViewport, nullptr, true );
                 d->m_nextDocumentViewport = DocumentViewport();
                 d->m_nextDocumentDestination = QString();
             }
@@ -4019,7 +4068,7 @@ void Document::processAction( const Action * action )
             {
                 QList<QUrl> lst;
                 lst.append( url );
-                KRun::runService( *ptr, lst, 0 );
+                KRun::runService( *ptr, lst, nullptr );
             }
             else
                 KMessageBox::information( d->m_widget, i18n( "No application found for opening file of mimetype %1.", mime.name() ) );
@@ -4131,6 +4180,10 @@ void Document::processAction( const Action * action )
 
             emit processRenditionAction( static_cast< const RenditionAction * >( action ) );
             } break;
+        case Action::BackendOpaque: {
+            d->m_generator->opaqueAction( static_cast< const BackendOpaqueAction * >( action ) );
+            } break;
+
     }
 }
 
@@ -4198,15 +4251,15 @@ void Document::processSourceReference( const SourceReference * ref )
 const SourceReference * Document::dynamicSourceReference( int pageNr, double absX, double absY )
 {
     if  ( !d->m_synctex_scanner )
-        return 0;
+        return nullptr;
 
     const QSizeF dpi = d->m_generator->dpi();
 
     if (synctex_edit_query(d->m_synctex_scanner, pageNr + 1, absX * 72. / dpi.width(), absY * 72. / dpi.height()) > 0)
     {
-        synctex_node_t node;
+        synctex_node_p node;
         // TODO what should we do if there is really more than one node?
-        while (( node = synctex_next_result( d->m_synctex_scanner ) ))
+        while (( node = synctex_scanner_next_result( d->m_synctex_scanner ) ))
         {
             int line = synctex_node_line(node);
             int col = synctex_node_column(node);
@@ -4220,7 +4273,7 @@ const SourceReference * Document::dynamicSourceReference( int pageNr, double abs
             return new Okular::SourceReference( QFile::decodeName( name ), line, col );
         }
     }
-    return 0;
+    return nullptr;
 }
 
 Document::PrintingType Document::printingSupport() const
@@ -4299,10 +4352,10 @@ QWidget* Document::printConfigurationWidget() const
     if ( d->m_generator )
     {
         PrintInterface * iface = qobject_cast< Okular::PrintInterface * >( d->m_generator );
-        return iface ? iface->printConfigurationWidget() : 0;
+        return iface ? iface->printConfigurationWidget() : nullptr;
     }
     else
-        return 0;
+        return nullptr;
 }
 
 void Document::fillConfigDialog( KConfigDialog * dialog )
@@ -4386,6 +4439,9 @@ QStringList Document::supportedMimeTypes() const
             result.append(mimeType.name());
         }
 
+        // Add the Okular archive mimetype
+        result << QStringLiteral("application/vnd.kde.okular-archive");
+
         // Sorting by mimetype name doesn't make a ton of sense,
         // but ensures that the list is ordered the same way every time
         qSort(result);
@@ -4393,6 +4449,162 @@ QStringList Document::supportedMimeTypes() const
         d->m_supportedMimeTypes = result;
     }
     return result;
+}
+
+bool Document::canSwapBackingFile() const
+{
+    if ( !d->m_generator )
+        return false;
+    Q_ASSERT( !d->m_generatorName.isEmpty() );
+
+    QHash< QString, GeneratorInfo >::iterator genIt = d->m_loadedGenerators.find( d->m_generatorName );
+    Q_ASSERT( genIt != d->m_loadedGenerators.end() );
+
+    return genIt->generator->hasFeature( Generator::SwapBackingFile );
+}
+
+bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
+{
+    if ( !d->m_generator )
+        return false;
+    Q_ASSERT( !d->m_generatorName.isEmpty() );
+
+    QHash< QString, GeneratorInfo >::iterator genIt = d->m_loadedGenerators.find( d->m_generatorName );
+    Q_ASSERT( genIt != d->m_loadedGenerators.end() );
+
+    if ( !genIt->generator->hasFeature( Generator::SwapBackingFile ) )
+        return false;
+
+    // Save metadata about the file we're about to close
+    d->saveDocumentInfo();
+
+    qCDebug(OkularCoreDebug) << "Swapping backing file to" << newFileName;
+    QVector< Page * > newPagesVector;
+    Generator::SwapBackingFileResult result = genIt->generator->swapBackingFile( newFileName, newPagesVector );
+    if (result != Generator::SwapBackingFileError)
+    {
+        QLinkedList< ObjectRect* > rectsToDelete;
+        QLinkedList< Annotation* > annotationsToDelete;
+        QSet< PagePrivate* > pagePrivatesToDelete;
+
+        if (result == Generator::SwapBackingFileReloadInternalData)
+        {
+            // Here we need to replace everything that the old generator
+            // had created with what the new one has without making it look like
+            // we have actually closed and opened the file again
+
+            // Simple sanity check
+            if (newPagesVector.count() != d->m_pagesVector.count())
+                return false;
+
+            // Update the undo stack contents
+            for (int i = 0; i < d->m_undoStack->count(); ++i)
+            {
+                // Trust me on the const_cast ^_^
+                QUndoCommand *uc = const_cast<QUndoCommand *>( d->m_undoStack->command( i ) );
+                if (OkularUndoCommand *ouc = dynamic_cast<OkularUndoCommand*>( uc ))
+                {
+                    const bool success = ouc->refreshInternalPageReferences( newPagesVector );
+                    if ( !success )
+                    {
+                        qWarning() << "Document::swapBackingFile: refreshInternalPageReferences failed" << ouc;
+                        return false;
+                    }
+                }
+                else
+                {
+                    qWarning() << "Document::swapBackingFile: Unhandled undo command" << uc;
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < d->m_pagesVector.count(); ++i)
+            {
+                // switch the PagePrivate* from newPage to oldPage
+                // this way everyone still holding Page* doesn't get
+                // disturbed by it
+                Page *oldPage = d->m_pagesVector[i];
+                Page *newPage = newPagesVector[i];
+                newPage->d->adoptGeneratedContents(oldPage->d);
+
+                pagePrivatesToDelete << oldPage->d;
+                oldPage->d = newPage->d;
+                oldPage->d->m_page = oldPage;
+                oldPage->d->m_doc = d;
+                newPage->d = nullptr;
+
+                annotationsToDelete << oldPage->m_annotations;
+                rectsToDelete << oldPage->m_rects;
+                oldPage->m_annotations = newPage->m_annotations;
+                oldPage->m_rects = newPage->m_rects;
+            }
+            qDeleteAll( newPagesVector );
+        }
+
+        d->m_url = url;
+        d->m_docFileName = newFileName;
+        d->updateMetadataXmlNameAndDocSize();
+        d->m_bookmarkManager->setUrl( d->m_url );
+
+        if ( d->m_synctex_scanner )
+        {
+            synctex_scanner_free( d->m_synctex_scanner );
+            d->m_synctex_scanner = synctex_scanner_new_with_output_file( QFile::encodeName( newFileName ).constData(), nullptr, 1);
+            if ( !d->m_synctex_scanner && QFile::exists(newFileName + QLatin1String( "sync" ) ) )
+            {
+                d->loadSyncFile(newFileName);
+            }
+        }
+
+        foreachObserver( notifySetup( d->m_pagesVector, DocumentObserver::UrlChanged ) );
+
+        qDeleteAll( annotationsToDelete );
+        qDeleteAll( rectsToDelete );
+        qDeleteAll( pagePrivatesToDelete );
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool Document::swapBackingFileArchive( const QString &newFileName, const QUrl &url )
+{
+    qCDebug(OkularCoreDebug) << "Swapping backing archive to" << newFileName;
+
+    ArchiveData *newArchive = DocumentPrivate::unpackDocumentArchive( newFileName );
+    if ( !newArchive )
+        return false;
+
+    const QString tempFileName = newArchive->document.fileName();
+
+    const bool success = swapBackingFile( tempFileName, url );
+
+    if ( success )
+    {
+        delete d->m_archiveData;
+        d->m_archiveData = newArchive;
+    }
+
+    return success;
+}
+
+void Document::setHistoryClean( bool clean )
+{
+    if ( clean )
+        d->m_undoStack->setClean();
+    // Since we only use the resetClean
+    // in some cases and we're past the dependency freeze
+    // if you happen to compile with an old Qt you will miss
+    // some extra nicety when saving an okular file with annotations to png file
+    // it's quite corner case compared to how important the whole save feature
+    // is so you'll have to live without it
+#if QT_VERSION > QT_VERSION_CHECK(5, 8, 0)
+    else
+        d->m_undoStack->resetClean();
+#endif
 }
 
 bool Document::canSaveChanges() const
@@ -4476,7 +4688,7 @@ void Document::unregisterView( View *view )
     if ( !viewDoc || viewDoc != this )
         return;
 
-    view->d_func()->document = 0;
+    view->d_func()->document = nullptr;
     d->m_views.remove( view );
 }
 
@@ -4492,31 +4704,31 @@ QByteArray Document::fontData(const FontInfo &font) const
     return result;
 }
 
-Document::OpenResult Document::openDocumentArchive( const QString & docFile, const QUrl & url, const QString & password )
+ArchiveData *DocumentPrivate::unpackDocumentArchive( const QString &archivePath )
 {
     QMimeDatabase db;
-    const QMimeType mime = db.mimeTypeForFile( docFile, QMimeDatabase::MatchExtension );
+    const QMimeType mime = db.mimeTypeForFile( archivePath, QMimeDatabase::MatchExtension );
     if ( !mime.inherits( QStringLiteral("application/vnd.kde.okular-archive") ) )
-        return OpenError;
+        return nullptr;
 
-    KZip okularArchive( docFile );
+    KZip okularArchive( archivePath );
     if ( !okularArchive.open( QIODevice::ReadOnly ) )
-        return OpenError;
+        return nullptr;
 
     const KArchiveDirectory * mainDir = okularArchive.directory();
     const KArchiveEntry * mainEntry = mainDir->entry( QStringLiteral("content.xml") );
     if ( !mainEntry || !mainEntry->isFile() )
-        return OpenError;
+        return nullptr;
 
     std::unique_ptr< QIODevice > mainEntryDevice( static_cast< const KZipFileEntry * >( mainEntry )->createDevice() );
     QDomDocument doc;
     if ( !doc.setContent( mainEntryDevice.get() ) )
-        return OpenError;
+        return nullptr;
     mainEntryDevice.reset();
 
     QDomElement root = doc.documentElement();
-    if ( root.tagName() != QLatin1String("OkularArchive") )
-        return OpenError;
+   if ( root.tagName() != QLatin1String("OkularArchive") )
+        return nullptr;
 
     QString documentFileName;
     QString metadataFileName;
@@ -4536,20 +4748,21 @@ Document::OpenResult Document::openDocumentArchive( const QString & docFile, con
         }
     }
     if ( documentFileName.isEmpty() )
-        return OpenError;
+        return nullptr;
 
     const KArchiveEntry * docEntry = mainDir->entry( documentFileName );
     if ( !docEntry || !docEntry->isFile() )
-        return OpenError;
+        return nullptr;
 
     std::unique_ptr< ArchiveData > archiveData( new ArchiveData() );
     const int dotPos = documentFileName.indexOf( QLatin1Char('.') );
     if ( dotPos != -1 )
         archiveData->document.setFileTemplate(QDir::tempPath() + QLatin1String("/okular_XXXXXX") + documentFileName.mid(dotPos));
     if ( !archiveData->document.open() )
-        return OpenError;
+        return nullptr;
 
-    QString tempFileName = archiveData->document.fileName();
+    archiveData->originalFileName = documentFileName;
+
     {
     std::unique_ptr< QIODevice > docEntryDevice( static_cast< const KZipFileEntry * >( docEntry )->createDevice() );
     copyQIODevice( docEntryDevice.get(), &archiveData->document );
@@ -4568,18 +4781,24 @@ Document::OpenResult Document::openDocumentArchive( const QString & docFile, con
         }
     }
 
+    return archiveData.release();
+}
+
+Document::OpenResult Document::openDocumentArchive( const QString & docFile, const QUrl & url, const QString & password )
+{
+    d->m_archiveData = DocumentPrivate::unpackDocumentArchive( docFile );
+    if ( !d->m_archiveData )
+        return OpenError;
+
+    const QString tempFileName = d->m_archiveData->document.fileName();
+    QMimeDatabase db;
     const QMimeType docMime = db.mimeTypeForFile( tempFileName, QMimeDatabase::MatchContent );
-    d->m_archiveData = archiveData.get();
-    d->m_archivedFileName = documentFileName;
     const OpenResult ret = openDocument( tempFileName, url, docMime, password );
 
-    if ( ret == OpenSuccess )
+    if ( ret != OpenSuccess )
     {
-        archiveData.release();
-    }
-    else
-    {
-        d->m_archiveData = 0;
+        delete d->m_archiveData;
+        d->m_archiveData = nullptr;
     }
 
     return ret;
@@ -4592,7 +4811,7 @@ bool Document::saveDocumentArchive( const QString &fileName )
 
     /* If we opened an archive, use the name of original file (eg foo.pdf)
      * instead of the archive's one (eg foo.okular) */
-    QString docFileName = d->m_archiveData ? d->m_archivedFileName : d->m_url.fileName();
+    QString docFileName = d->m_archiveData ? d->m_archiveData->originalFileName : d->m_url.fileName();
     if ( docFileName == QLatin1String( "-" ) )
         return false;
 
@@ -4633,7 +4852,8 @@ bool Document::saveDocumentArchive( const QString &fileName )
     // If the generator can save annotations natively, do it
     QTemporaryFile modifiedFile;
     bool annotationsSavedNatively = false;
-    if ( d->canAddAnnotationsNatively() )
+    bool formsSavedNatively = false;
+    if ( d->canAddAnnotationsNatively() || canSaveChanges( SaveFormsCapability ) )
     {
         if ( !modifiedFile.open() )
             return false;
@@ -4644,7 +4864,8 @@ bool Document::saveDocumentArchive( const QString &fileName )
         if ( saveChanges( modifiedFile.fileName(), &errorText ) )
         {
             docPath = modifiedFile.fileName(); // Save this instead of the original file
-            annotationsSavedNatively = true;
+            annotationsSavedNatively = d->canAddAnnotationsNatively();
+            formsSavedNatively = canSaveChanges( SaveFormsCapability );
         }
         else
         {
@@ -4653,8 +4874,13 @@ bool Document::saveDocumentArchive( const QString &fileName )
         }
     }
 
+    PageItems saveWhat = None;
+    if ( !annotationsSavedNatively )
+        saveWhat |= AnnotationPageItems;
+    if ( !formsSavedNatively )
+        saveWhat |= FormFieldPageItems;
+
     QTemporaryFile metadataFile;
-    PageItems saveWhat = annotationsSavedNatively ? None : AnnotationPageItems;
     if ( !d->savePageDocumentInfo( &metadataFile, saveWhat ) )
         return false;
 
@@ -4671,6 +4897,17 @@ bool Document::saveDocumentArchive( const QString &fileName )
         return false;
 
     return true;
+}
+
+bool Document::extractArchivedFile( const QString &destFileName )
+{
+    if ( !d->m_archiveData )
+        return false;
+
+    // Remove existing file, if present (QFile::copy doesn't overwrite by itself)
+    QFile::remove( destFileName );
+
+    return d->m_archiveData->document.copy( destFileName );
 }
 
 QPrinter::Orientation Document::orientation() const
@@ -4710,9 +4947,23 @@ void Document::walletDataForFile( const QString &fileName, QString *walletName, 
     }
 }
 
+bool Document::isDocdataMigrationNeeded() const
+{
+    return d->m_docdataMigrationNeeded;
+}
+
+void Document::docdataMigrationDone()
+{
+    if (d->m_docdataMigrationNeeded)
+    {
+        d->m_docdataMigrationNeeded = false;
+        foreachObserver( notifySetup( d->m_pagesVector, 0 ) );
+    }
+}
+
 QAbstractItemModel * Document::layersModel() const
 {
-    return d->m_generator ? d->m_generator->layersModel() : NULL;
+    return d->m_generator ? d->m_generator->layersModel() : nullptr;
 }
 
 void DocumentPrivate::requestDone( PixmapRequest * req )
@@ -4839,7 +5090,7 @@ void DocumentPrivate::textGenerationDone( Page *page )
         int pageToKick = m_allocatedTextPagesFifo.takeFirst();
         if (pageToKick != page->number()) // this should never happen but better be safe than sorry
         {
-            m_pagesVector.at(pageToKick)->setTextPage( 0 ); // deletes the textpage
+            m_pagesVector.at(pageToKick)->setTextPage( nullptr ); // deletes the textpage
         }
     }
 

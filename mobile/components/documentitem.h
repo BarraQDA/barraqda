@@ -95,7 +95,7 @@ class DocumentItem : public QObject
 
 public:
 
-    explicit DocumentItem(QObject *parent=0);
+    explicit DocumentItem(QObject *parent=nullptr);
     ~DocumentItem();
 
     void setPath(const QString &path);
@@ -173,7 +173,7 @@ public:
     ~Observer();
 
     // inherited from DocumentObserver
-    void notifyPageChanged(int page, int flags);
+    void notifyPageChanged(int page, int flags) override;
 
 Q_SIGNALS:
     void pageChanged(int page, int flags);

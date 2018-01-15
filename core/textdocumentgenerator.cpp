@@ -19,9 +19,7 @@
 #include <QtGui/QImage>
 #include <QtGui/QPainter>
 #include <QtPrintSupport/QPrinter>
-#if QT_VERSION >= 0x040500
 #include <QtGui/QTextDocumentWriter>
-#endif
 
 #include "action.h"
 #include "annotations.h"
@@ -36,7 +34,7 @@ using namespace Okular;
  * Generic Converter Implementation
  */
 TextDocumentConverter::TextDocumentConverter()
-    : QObject( 0 ), d_ptr( new TextDocumentConverterPrivate )
+    : QObject( nullptr ), d_ptr( new TextDocumentConverterPrivate )
 {
 }
 
@@ -47,14 +45,14 @@ TextDocumentConverter::~TextDocumentConverter()
 
 QTextDocument *TextDocumentConverter::convert( const QString & )
 {
-    return 0;
+    return nullptr;
 }
 
 Document::OpenResult TextDocumentConverter::convertWithPassword( const QString &fileName, const QString & )
 {
     QTextDocument *doc = convert( fileName );
     setDocument( doc );
-    return doc != 0 ? Document::OpenSuccess : Document::OpenError;
+    return doc != nullptr ? Document::OpenSuccess : Document::OpenError;
 }
 
 QTextDocument *TextDocumentConverter::document()
@@ -74,7 +72,7 @@ DocumentViewport TextDocumentConverter::calculateViewport( QTextDocument *docume
 
 TextDocumentGenerator* TextDocumentConverter::generator() const
 {
-    return d_ptr->mParent ? d_ptr->mParent->q_func() : 0;
+    return d_ptr->mParent ? d_ptr->mParent->q_func() : nullptr;
 }
 
 /**
@@ -292,7 +290,7 @@ Document::OpenResult TextDocumentGenerator::loadDocumentWithPassword( const QStr
 
     if ( openResult != Document::OpenSuccess )
     {
-        d->mDocument = 0;
+        d->mDocument = nullptr;
 
         // loading failed, cleanup all the stuff eventually gathered from the converter
         d->mTitlePositions.clear();
@@ -358,7 +356,7 @@ bool TextDocumentGenerator::doCloseDocument()
 {
     Q_D( TextDocumentGenerator );
     delete d->mDocument;
-    d->mDocument = 0;
+    d->mDocument = nullptr;
 
     d->mTitlePositions.clear();
     d->mLinkPositions.clear();
@@ -455,7 +453,7 @@ const Okular::DocumentSynopsis* TextDocumentGenerator::generateDocumentSynopsis(
 {
     Q_D( TextDocumentGenerator );
     if ( !d->mDocumentSynopsis.hasChildNodes() )
-        return 0;
+        return nullptr;
     else
         return &d->mDocumentSynopsis;
 }
@@ -476,14 +474,12 @@ Okular::ExportFormat::List TextDocumentGenerator::exportFormats(   ) const
     if ( formats.isEmpty() ) {
         formats.append( Okular::ExportFormat::standardFormat( Okular::ExportFormat::PlainText ) );
         formats.append( Okular::ExportFormat::standardFormat( Okular::ExportFormat::PDF ) );
-#if QT_VERSION >= 0x040500
         if ( QTextDocumentWriter::supportedDocumentFormats().contains( "ODF" ) ) {
             formats.append( Okular::ExportFormat::standardFormat( Okular::ExportFormat::OpenDocumentText ) );
         }
         if ( QTextDocumentWriter::supportedDocumentFormats().contains( "HTML" ) ) {
             formats.append( Okular::ExportFormat::standardFormat( Okular::ExportFormat::HTML ) );
         }
-#endif
     }
 
     return formats;
@@ -515,7 +511,6 @@ bool TextDocumentGenerator::exportTo( const QString &fileName, const Okular::Exp
         out << d->mDocument->toPlainText();
 
         return true;
-#if QT_VERSION >= 0x040500
     } else if ( format.mimeType().name() == QLatin1String( "application/vnd.oasis.opendocument.text" ) ) {
         QTextDocumentWriter odfWriter( fileName, "odf" );
 
@@ -524,7 +519,6 @@ bool TextDocumentGenerator::exportTo( const QString &fileName, const Okular::Exp
         QTextDocumentWriter odfWriter( fileName, "html" );
 
         return odfWriter.write( d->mDocument );
-#endif
     }
     return false;
 }

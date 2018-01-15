@@ -15,6 +15,7 @@
 #include <QIcon>
 
 #include "annotationmodel.h"
+#include "debug_ui.h"
 
 static quint32 mixIndex( int row, int column )
 {
@@ -183,7 +184,7 @@ QModelIndex PageGroupProxyModel::mapToSource( const QModelIndex &proxyIndex ) co
 
       return mTreeIndexes[ proxyIndex.row() ].first;
     } else {
-      if ( proxyIndex.internalId() - 1 >= mTreeIndexes.count() ||
+      if ( qint32(proxyIndex.internalId()) - 1 >= mTreeIndexes.count() ||
            proxyIndex.row() >= mTreeIndexes[ proxyIndex.internalId() - 1 ].second.count() )
         return QModelIndex();
 
@@ -289,7 +290,7 @@ class AuthorGroupItem
             QString prefix;
             for ( int i = 0; i < level; ++i ) prefix += QLatin1Char(' ');
 
-            qDebug( "%s%s", qPrintable( prefix ), ( mType == Page ? "Page" : (mType == Author ? "Author" : "Annotation") ) );
+            qCDebug(OkularUiDebug, "%s%s", qPrintable( prefix ), ( mType == Page ? "Page" : (mType == Author ? "Author" : "Annotation") ) );
 
             for ( int i = 0; i < mChilds.count(); ++i )
                 mChilds[ i ]->dump( level + 2 );
@@ -306,7 +307,7 @@ class AuthorGroupItem
                     return item;
             }
 
-            return 0;
+            return nullptr;
         }
 
         int row() const
@@ -332,7 +333,7 @@ class AuthorGroupProxyModel::Private
 {
     public:
         Private( AuthorGroupProxyModel *parent )
-            : mParent( parent ), mRoot( 0 ),
+            : mParent( parent ), mRoot( nullptr ),
             mGroupByAuthor( false )
         {
         }
@@ -364,7 +365,7 @@ int AuthorGroupProxyModel::columnCount( const QModelIndex& ) const
 
 int AuthorGroupProxyModel::rowCount( const QModelIndex &parentIndex ) const
 {
-    AuthorGroupItem *item = 0;
+    AuthorGroupItem *item = nullptr;
     if ( !parentIndex.isValid() )
         item = d->mRoot;
     else
@@ -378,7 +379,7 @@ QModelIndex AuthorGroupProxyModel::index( int row, int column, const QModelIndex
     if ( !hasIndex( row, column, parentIndex ) )
         return QModelIndex();
 
-    AuthorGroupItem *parentItem = 0;
+    AuthorGroupItem *parentItem = nullptr;
     if ( !parentIndex.isValid() )
         parentItem = d->mRoot;
     else
@@ -520,7 +521,7 @@ void AuthorGroupProxyModel::rebuildIndexes()
 {
     beginResetModel();
     delete d->mRoot;
-    d->mRoot = new AuthorGroupItem( 0 );
+    d->mRoot = new AuthorGroupItem( nullptr );
 
     if ( d->mGroupByAuthor ) {
         QMap<QString, AuthorGroupItem*> authorMap;

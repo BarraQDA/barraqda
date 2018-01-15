@@ -18,7 +18,7 @@
 using namespace Okular;
 
 FormFieldPrivate::FormFieldPrivate( FormField::FieldType type )
-    : m_type( type ), m_activateAction( 0 )
+    : m_type( type ), m_activateAction( nullptr )
 {
 }
 
@@ -71,6 +71,19 @@ void FormField::setActivationAction( Action *action )
     Q_D( FormField );
     delete d->m_activateAction;
     d->m_activateAction = action;
+}
+
+Action* FormField::additionalAction( AdditionalActionType type ) const
+{
+    Q_D( const FormField );
+    return d->m_additionalActions.value(type);
+}
+
+void FormField::setAdditionalAction( AdditionalActionType type, Action *action )
+{
+    Q_D( FormField );
+    delete d->m_additionalActions.value(type);
+    d->m_additionalActions[type] = action;
 }
 
 

@@ -12,6 +12,7 @@
 
 #include <qwidget.h>
 #include "core/observer.h"
+#include "core/document.h"
 #include <QModelIndex>
 
 #include "okularpart_export.h"
@@ -37,8 +38,8 @@ Q_OBJECT
         ~TOC();
 
         // inherited from DocumentObserver
-        void notifySetup( const QVector< Okular::Page * > & pages, int setupFlags ) Q_DECL_OVERRIDE;
-        void notifyCurrentPageChanged( int previous, int current ) Q_DECL_OVERRIDE;
+        void notifySetup( const QVector< Okular::Page * > & pages, int setupFlags ) override;
+        void notifyCurrentPageChanged( int previous, int current ) override;
 
         void reparseConfig();
 
@@ -48,10 +49,14 @@ Q_OBJECT
 
     Q_SIGNALS:
         void hasTOC(bool has);
+        void rightClick( const Okular::DocumentViewport &, const QPoint &, const QString & );
 
     private Q_SLOTS:
         void slotExecuted( const QModelIndex & );
         void saveSearchOptions();
+
+    protected:
+        void contextMenuEvent( QContextMenuEvent * e ) override;
 
     private:
         QVector<QModelIndex> expandedNodes( const QModelIndex & parent=QModelIndex() ) const;

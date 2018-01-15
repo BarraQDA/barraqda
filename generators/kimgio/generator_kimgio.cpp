@@ -2,6 +2,9 @@
  *   Copyright (C) 2005 by Albert Astals Cid <aacid@kde.org>               *
  *   Copyright (C) 2006-2007 by Pino Toscano <pino@kde.org>                *
  *   Copyright (C) 2006-2007 by Tobias Koenig <tokoe@kde.org>              *
+ *   Copyright (C) 2017      Klarälvdalens Datakonsult AB, a KDAB Group    *
+ *                           company, info@kdab.com. Work sponsored by the *
+ *                           LiMux project of the city of Munich           *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -39,6 +42,7 @@ KIMGIOGenerator::KIMGIOGenerator( QObject *parent, const QVariantList &args )
     setFeature( TiledRendering );
     setFeature( PrintNative );
     setFeature( PrintToFile );
+    setFeature( SwapBackingFile );
 }
 
 KIMGIOGenerator::~KIMGIOGenerator()
@@ -69,8 +73,12 @@ bool KIMGIOGenerator::loadDocumentInternal(const QByteArray & fileData, const QS
     QImageReader reader( &buffer, QImageReader::imageFormat( &buffer ) );
     reader.setAutoDetectImageFormat( true );
     if ( !reader.read( &m_img ) ) {
-        emit error( i18n( "Unable to load document: %1", reader.errorString() ), -1 );
-        return false;
+        if (!m_img.isNull()) {
+            emit warning( i18n( "This document appears malformed. Here is a best approximation of the document's intended appearance." ), -1 );
+        } else {
+            emit error( i18n( "Unable to load document: %1", reader.errorString() ), -1 );
+            return false;
+        }
     }
     QMimeDatabase db;
     auto mime = db.mimeTypeForFileNameAndData( fileName, fileData );
@@ -79,17 +87,7 @@ bool KIMGIOGenerator::loadDocumentInternal(const QByteArray & fileData, const QS
     // Apply transformations dictated by Exif metadata
     KExiv2Iface::KExiv2 exifMetadata;
     if ( exifMetadata.loadFromData( fileData ) ) {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0) && QT_VERSION < QT_VERSION_CHECK(5, 4, 2)
-        // Qt 5.4 (up to 5.4.1) rotates jpeg images automatically with no way of disabling it
-        // See https://bugreports.qt.io/browse/QTBUG-37946
-        // and https://codereview.qt-project.org/#/c/98013/
-        // and https://codereview.qt-project.org/#/c/110668/
-        if (reader.format() != QByteArrayLiteral("jpeg")) {
-            exifMetadata.rotateExifQImage( m_img, exifMetadata.getImageOrientation() );
-        }
-#else
         exifMetadata.rotateExifQImage(m_img, exifMetadata.getImageOrientation());
-#endif
     }
 
     pagesVector.resize( 1 );
@@ -98,6 +96,13 @@ bool KIMGIOGenerator::loadDocumentInternal(const QByteArray & fileData, const QS
     pagesVector[0] = page;
 
     return true;
+}
+
+KIMGIOGenerator::SwapBackingFileResult KIMGIOGenerator::swapBackingFile( QString const &/*newFileName*/, QVector<Okular::Page*> & /*newPagesVector*/ )
+{
+    // NOP: We don't actually need to do anything because all data has already
+    // been loaded in RAM
+    return SwapBackingFileNoOp;
 }
 
 bool KIMGIOGenerator::doCloseDocument()

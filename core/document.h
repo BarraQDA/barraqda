@@ -1,6 +1,9 @@
 /***************************************************************************
  *   Copyright (C) 2004-2005 by Enrico Ros <eros.kde@email.it>             *
  *   Copyright (C) 2004-2008 by Albert Astals Cid <aacid@kde.org>          *
+ *   Copyright (C) 2017      Klarälvdalens Datakonsult AB, a KDAB Group    *
+ *                           company, info@kdab.com. Work sponsored by the *
+ *                           LiMux project of the city of Munich           *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -302,7 +305,7 @@ class OKULARCORE_EXPORT Document : public QObject
          * Sets the list of visible page rectangles.
          * @see VisiblePageRect
          */
-        void setVisiblePageRects( const QVector< VisiblePageRect * > & visiblePageRects, DocumentObserver *excludeObserver = 0 );
+        void setVisiblePageRects( const QVector< VisiblePageRect * > & visiblePageRects, DocumentObserver *excludeObserver = nullptr );
 
         /**
          * Returns the list of visible page rectangles.
@@ -419,7 +422,7 @@ class OKULARCORE_EXPORT Document : public QObject
          * @param excludeObserver The observer ids which shouldn't be effected by this change.
          * @param smoothMove Whether the move shall be animated smoothly.
          */
-        void setViewportPage( int page, DocumentObserver *excludeObserver = 0, bool smoothMove = false );
+        void setViewportPage( int page, DocumentObserver *excludeObserver = nullptr, bool smoothMove = false );
 
         /**
          * Sets the current document viewport to the given @p viewport.
@@ -427,7 +430,7 @@ class OKULARCORE_EXPORT Document : public QObject
          * @param excludeObserver The observer which shouldn't be effected by this change.
          * @param smoothMove Whether the move shall be animated smoothly.
          */
-        void setViewport( const DocumentViewport &viewport, DocumentObserver *excludeObserver = 0, bool smoothMove = false );
+        void setViewport( const DocumentViewport &viewport, DocumentObserver *excludeObserver = nullptr, bool smoothMove = false );
 
         /**
          * Sets the current document viewport to the next viewport in the
@@ -456,7 +459,7 @@ class OKULARCORE_EXPORT Document : public QObject
         /**
          * Sets the zoom for the current document.
          */
-        void setZoom( int factor, DocumentObserver *excludeObserver = 0 );
+        void setZoom( int factor, DocumentObserver *excludeObserver = nullptr );
 
         /**
          * Describes the possible options for the pixmap requests.
@@ -522,12 +525,25 @@ class OKULARCORE_EXPORT Document : public QObject
          * Translates the position of the given @p annotation on the given @p page by a distance @p delta in normalized coordinates.
          *
          * Consecutive translations applied to the same @p annotation are merged together on the undo stack if the
-         * BeingMoved flag is set on the @P annotation
+         * BeingMoved flag is set on the @P annotation.
          *
          * @since 0.17 (KDE 4.11)
          */
         void translatePageAnnotation( int page, Annotation *annotation, const Okular::NormalizedPoint & delta );
 
+        /**
+         * Adjusts the position of the top-left and bottom-right corners of given @p annotation on the given @p page.
+         *
+         * Can be used to implement resize functionality.
+         * @p delta1 in normalized coordinates is added to top-left.
+         * @p delta2 in normalized coordinates is added to bottom-right.
+         *
+         * Consecutive adjustments applied to the same @p annotation are merged together on the undo stack if the
+         * BeingResized flag is set on the @P annotation.
+         *
+         * @since 1.1.0
+         */
+        void adjustPageAnnotation( int page, Annotation * annotation, const Okular::NormalizedPoint & delta1, const Okular::NormalizedPoint & delta2 );
 
         /**
          * Edits the plain text contents of the given @p annotation on the given @p page.
@@ -626,19 +642,20 @@ class OKULARCORE_EXPORT Document : public QObject
             NextMatch,      ///< Search next match
             PreviousMatch,  ///< Search previous match
             AllDocument,    ///< Search complete document
-            GoogleAll,      ///< Search all words in google style
-            GoogleAny       ///< Search any words in google style
+            GoogleAll,      ///< Search complete document (all words in google style)
+            GoogleAny       ///< Search complete document (any words in google style)
         };
 
         /**
          * Describes how search ended
          */
+        // TODO remove EndOfDocumentReached when we break API
         enum SearchStatus
         {
             MatchFound,           ///< Any match was found
             NoMatchFound,         ///< No match was found
             SearchCancelled,      ///< The search was cancelled
-            EndOfDocumentReached  ///< The end of document was reached without any match @since 0.20 (KDE 4.14)
+            EndOfDocumentReached  ///< This is not ever emitted since 1.3. The end of document was reached without any match @since 0.20 (KDE 4.14)
         };
 
         /**
@@ -762,6 +779,48 @@ class OKULARCORE_EXPORT Document : public QObject
         KPluginMetaData generatorInfo() const;
 
         /**
+         * Returns whether the generator supports hot-swapping the current file
+         * with another identical file
+         *
+         * @since 1.3
+         */
+        bool canSwapBackingFile() const;
+
+        /**
+         * Reload the document from a new location, without any visible effect
+         * to the user.
+         *
+         * The new file must be identical to the current one or, if the document
+         * has been modified (eg the user edited forms and annotations), the new
+         * document must have these changes too. For example, you can call
+         * saveChanges first to write changes to a file and then swapBackingFile
+         * to switch to the new location.
+         *
+         * @since 1.3
+         */
+        bool swapBackingFile( const QString &newFileName, const QUrl &url );
+
+        /**
+         * Same as swapBackingFile, but newFileName must be a .okular file.
+         *
+         * The new file must be identical to the current one or, if the document
+         * has been modified (eg the user edited forms and annotations), the new
+         * document must have these changes too. For example, you can call
+         * saveDocumentArchive first to write changes to a file and then
+         * swapBackingFileArchive to switch to the new location.
+         *
+         * @since 1.3
+         */
+        bool swapBackingFileArchive( const QString &newFileName, const QUrl &url );
+
+        /**
+         * Sets the history to be clean
+         *
+         * @since 1.3
+         */
+        void setHistoryClean( bool clean );
+
+        /**
          * Saving capabilities. Their availability varies according to the
          * underlying generator and/or the document type.
          *
@@ -847,6 +906,15 @@ class OKULARCORE_EXPORT Document : public QObject
         bool saveDocumentArchive( const QString &fileName );
 
         /**
+         * Extract the document file from the current archive.
+         *
+         * @warning This function only works if the current file is a document archive
+         *
+         * @since 1.3
+         */
+        bool extractArchivedFile( const QString &destFileName );
+
+        /**
          * Asks the generator to dynamically generate a SourceReference for a given
          * page number and absolute X and Y position on this page.
          *
@@ -880,6 +948,25 @@ class OKULARCORE_EXPORT Document : public QObject
          * @since 0.20 (KDE 4.14)
         */
         void walletDataForFile( const QString &fileName, QString *walletName, QString *walletFolder, QString *walletKey ) const;
+
+        /**
+         * Since version 0.21, okular does not allow editing annotations and
+         * form data if they are stored in the docdata directory (like older
+         * okular versions did by default).
+         * If this flag is set, then annotations and forms cannot be edited.
+         *
+         * @since 1.3
+        */
+        bool isDocdataMigrationNeeded() const;
+
+        /**
+         * Delete annotations and form data from the docdata folder. Call it if
+         * isDocdataMigrationNeeded() was true and you've just saved them to an
+         * external file.
+         *
+         * @since 1.3
+        */
+        void docdataMigrationDone();
 
         /**
          * Returns the model for rendering layers (NULL if the document has no layers)
@@ -1018,7 +1105,7 @@ class OKULARCORE_EXPORT Document : public QObject
          * This signal is emitted whenever an error occurred.
          *
          * @param text The description of the error.
-         * @param duration The time in seconds the message should be shown to the user.
+         * @param duration The time in milliseconds the message should be shown to the user.
          */
         void error( const QString &text, int duration );
 
@@ -1026,7 +1113,7 @@ class OKULARCORE_EXPORT Document : public QObject
          * This signal is emitted to signal a warning.
          *
          * @param text The description of the warning.
-         * @param duration The time in seconds the message should be shown to the user.
+         * @param duration The time in milliseconds the message should be shown to the user.
          */
         void warning( const QString &text, int duration );
 
@@ -1034,7 +1121,7 @@ class OKULARCORE_EXPORT Document : public QObject
          * This signal is emitted to signal a notice.
          *
          * @param text The description of the notice.
-         * @param duration The time in seconds the message should be shown to the user.
+         * @param duration The time in milliseconds the message should be shown to the user.
          */
         void notice( const QString &text, int duration );
 
@@ -1089,6 +1176,12 @@ class OKULARCORE_EXPORT Document : public QObject
          * @since 0.17 (KDE 4.11)
          */
         void canRedoChanged( bool redoAvailable );
+
+        /**
+         * This signal is emmitted whenever the undo history is clean (i.e. the same status the last time it was saved)
+         * @since 1.3
+         */
+        void undoHistoryCleanChanged( bool clean );
 
         /**
          * This signal is emitted whenever an rendition action is triggered and the UI should process it.
@@ -1164,7 +1257,7 @@ class OKULARCORE_EXPORT Document : public QObject
         Q_PRIVATE_SLOT( d, void slotTimedMemoryCheck() )
         Q_PRIVATE_SLOT( d, void sendGeneratorPixmapRequest() )
         Q_PRIVATE_SLOT( d, void rotationFinished( int page, Okular::Page *okularPage ) )
-        Q_PRIVATE_SLOT( d, void fontReadingProgress( int page ) )
+        Q_PRIVATE_SLOT( d, void slotFontReadingProgress( int page ) )
         Q_PRIVATE_SLOT( d, void fontReadingGotFont( const Okular::FontInfo& font ) )
         Q_PRIVATE_SLOT( d, void slotGeneratorConfigChanged( const QString& ) )
         Q_PRIVATE_SLOT( d, void refreshPixmaps( int ) )

@@ -25,7 +25,7 @@ class FindBar
     Q_OBJECT
 
     public:
-        explicit FindBar( Okular::Document * document, QWidget * parent = Q_NULLPTR );
+        explicit FindBar( Okular::Document * document, QWidget * parent = nullptr );
         virtual ~FindBar();
 
         QString text() const;
@@ -46,13 +46,15 @@ class FindBar
     private Q_SLOTS:
         void caseSensitivityChanged();
         void fromCurrentPageChanged();
+        void findAsYouTypeChanged();
         void closeAndStopSearch();
 
     private:
         SearchLineWidget * m_search;
         QAction * m_caseSensitiveAct;
         QAction * m_fromCurrentPageAct;
-        bool eventFilter( QObject *target, QEvent *event );
+        QAction * m_findAsYouTypeAct;
+        bool eventFilter( QObject *target, QEvent *event ) override;
         bool m_active;
 };
 

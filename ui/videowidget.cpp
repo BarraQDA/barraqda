@@ -59,7 +59,7 @@ class VideoWidget::Private
 {
 public:
     Private( Okular::Movie *m, Okular::Document *doc, VideoWidget *qq )
-        : q( qq ), movie( m ), document( doc ), player( 0 ), loaded( false )
+        : q( qq ), movie( m ), document( doc ), player( nullptr ), loaded( false )
     {
     }
 
@@ -99,6 +99,25 @@ public:
     double repetitionsLeft;
 };
 
+static QUrl urlFromUrlString(const QString &url, Okular::Document *document)
+{
+    QUrl newurl;
+    if ( url.startsWith( QLatin1Char( '/' ) ) )
+    {
+        newurl = QUrl::fromLocalFile( url );
+    }
+    else
+    {
+        newurl = QUrl( url );
+        if ( newurl.isRelative() )
+        {
+            newurl = document->currentDocument().adjusted(QUrl::RemoveFilename);
+            newurl.setPath( newurl.path() + url );
+        }
+    }
+    return newurl;
+}
+
 void VideoWidget::Private::load()
 {
     repetitionsLeft = movie->playRepetitions();
@@ -107,21 +126,7 @@ void VideoWidget::Private::load()
 
     loaded = true;
 
-    QString url = movie->url();
-    QUrl newurl;
-    if ( QDir::isRelativePath( url ) )
-    {
-        newurl = document->currentDocument().adjusted(QUrl::RemoveFilename);
-        newurl.setPath( newurl.path() + url );
-    }
-    else
-    {
-        newurl = QUrl::fromLocalFile(url);
-    }
-    if ( newurl.isLocalFile() )
-        player->load( newurl );
-    else
-        player->load( newurl );
+    player->load( urlFromUrlString( movie->url(), document ) );
 
     connect( player->mediaObject(), SIGNAL( stateChanged( Phonon::State, Phonon::State ) ),
              q, SLOT( stateChanged( Phonon::State, Phonon::State ) ) );
@@ -145,23 +150,8 @@ void VideoWidget::Private::setupPlayPauseAction( PlayPauseMode mode )
 
 void VideoWidget::Private::takeSnapshot()
 {
-    const QString url = movie->url();
-    QUrl newurl;
-    if ( QDir::isRelativePath( url ) )
-    {
-        newurl = document->currentDocument().adjusted(QUrl::RemoveFilename);
-        newurl.setPath( newurl.path() + url );
-    }
-    else
-    {
-        newurl = QUrl::fromLocalFile(url);
-    }
-
-    SnapshotTaker *taker = 0;
-    if ( newurl.isLocalFile() )
-        taker = new SnapshotTaker( newurl, q );
-    else
-        taker = new SnapshotTaker( newurl, q );
+    const QUrl url = urlFromUrlString( movie->url(), document );
+    SnapshotTaker *taker = new SnapshotTaker( url, q );
 
     q->connect( taker, SIGNAL( finished( const QImage& ) ), q, SLOT( setPosterImage( const QImage& ) ) );
 }
@@ -270,7 +260,7 @@ VideoWidget::VideoWidget( const Okular::Annotation *annotation, Okular::Movie *m
     d->seekSliderAction = d->controlBar->addWidget( d->seekSlider );
     d->seekSlider->setEnabled( false );
 
-    Phonon::SeekSlider *verticalSeekSlider = new Phonon::SeekSlider( d->player->mediaObject(), 0 );
+    Phonon::SeekSlider *verticalSeekSlider = new Phonon::SeekSlider( d->player->mediaObject(), nullptr );
     verticalSeekSlider->setMaximumHeight( 100 );
     d->seekSliderMenuAction = createToolBarButtonWithWidgetPopup(
         d->controlBar, verticalSeekSlider, QIcon::fromTheme( QStringLiteral("player-time") ) );
@@ -404,6 +394,7 @@ bool VideoWidget::eventFilter( QObject * object, QEvent * event )
                     }
                     event->accept();
                 }
+                break;
             }
             case QEvent::Wheel:
             {

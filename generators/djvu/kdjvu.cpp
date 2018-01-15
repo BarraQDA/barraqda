@@ -429,7 +429,7 @@ class KDjVu::Private
 {
     public:
         Private()
-          : m_djvu_cxt( 0 ), m_djvu_document( 0 ), m_format( 0 ), m_docBookmarks( 0 ),
+          : m_djvu_cxt( nullptr ), m_djvu_document( nullptr ), m_format( nullptr ), m_docBookmarks( nullptr ),
             m_cacheEnabled( true )
         {
         }
@@ -494,6 +494,10 @@ QImage KDjVu::Private::generateImageTile( ddjvu_page_t *djvupage, int& res,
     ddjvu_page_get_width( djvupage );
     res = ddjvu_page_render( djvupage, DDJVU_RENDER_COLOR,
                   &pagerect, &renderrect, m_format, res_img.bytesPerLine(), (char *)res_img.bits() );
+    if (!res)
+    {
+        res_img.fill(Qt::white);
+    }
 #ifdef KDJVU_DEBUG
     qDebug() << "rendering result:" << res;
 #endif
@@ -674,7 +678,7 @@ bool KDjVu::openFile( const QString & fileName )
     if ( ddjvu_document_decoding_error( d->m_djvu_document ) )
     {
         ddjvu_document_release( d->m_djvu_document );
-        d->m_djvu_document = 0;
+        d->m_djvu_document = nullptr;
         return false;
     }
 
@@ -749,7 +753,7 @@ void KDjVu::closeFile()
 {
     // deleting the old TOC
     delete d->m_docBookmarks;
-    d->m_docBookmarks = 0;
+    d->m_docBookmarks = nullptr;
     // deleting the pages
     qDeleteAll( d->m_pages );
     d->m_pages.clear();
@@ -768,7 +772,7 @@ void KDjVu::closeFile()
     // releasing the old document
     if ( d->m_djvu_document )
         ddjvu_document_release( d->m_djvu_document );
-    d->m_djvu_document = 0;
+    d->m_djvu_document = nullptr;
 }
 
 QVariant KDjVu::metaData( const QString & key ) const
@@ -814,8 +818,8 @@ void KDjVu::linksAndAnnotationsForPage( int pageNum, QList<KDjVu::Link*> *links,
         QString type;
         if ( miniexp_symbolp( miniexp_nth( 0, miniexp_nth( 3, cur ) ) ) )
             type = QString::fromUtf8( miniexp_to_name( miniexp_nth( 0, miniexp_nth( 3, cur ) ) ) );
-        KDjVu::Link* link = 0;
-        KDjVu::Annotation* ann = 0;
+        KDjVu::Link* link = nullptr;
+        KDjVu::Annotation* ann = nullptr;
         miniexp_t urlexp = miniexp_nth( 1, cur );
         if ( links &&
              ( type == QLatin1String( "rect" ) ||
@@ -909,27 +913,27 @@ QImage KDjVu::image( int page, int width, int height, int rotation )
 {
     if ( d->m_cacheEnabled )
     {
-    bool found = false;
-    QList<ImageCacheItem*>::Iterator it = d->mImgCache.begin(), itEnd = d->mImgCache.end();
-    for ( ; ( it != itEnd ) && !found; ++it )
-    {
-        ImageCacheItem* cur = *it;
-        if ( ( cur->page == page ) &&
-             ( rotation % 2 == 0
-               ? cur->width == width && cur->height == height
-               : cur->width == height && cur->height == width ) )
-            found = true;
-    }
-    if ( found )
-    {
-        // taking the element and pushing to the top of the list
-        --it;
-        ImageCacheItem* cur2 = *it;
-        d->mImgCache.erase( it );
-        d->mImgCache.push_front( cur2 );
+        bool found = false;
+        QList<ImageCacheItem*>::Iterator it = d->mImgCache.begin(), itEnd = d->mImgCache.end();
+        for ( ; ( it != itEnd ) && !found; ++it )
+        {
+            ImageCacheItem* cur = *it;
+            if ( ( cur->page == page ) &&
+                ( rotation % 2 == 0
+                ? cur->width == width && cur->height == height
+                : cur->width == height && cur->height == width ) )
+                found = true;
+        }
+        if ( found )
+        {
+            // taking the element and pushing to the top of the list
+            --it;
+            ImageCacheItem* cur2 = *it;
+            d->mImgCache.erase( it );
+            d->mImgCache.push_front( cur2 );
 
-        return cur2->img;
-    }
+            return cur2->img;
+        }
     }
 
     if ( !d->m_pages_cache.at( page ) )
@@ -1082,7 +1086,7 @@ QList<KDjVu::TextEntity> KDjVu::textEntities( int page, const QString & granular
         return QList<KDjVu::TextEntity>();
 
     miniexp_t r;
-    while ( ( r = ddjvu_document_get_pagetext( d->m_djvu_document, page, 0 ) ) == miniexp_dummy )
+    while ( ( r = ddjvu_document_get_pagetext( d->m_djvu_document, page, nullptr ) ) == miniexp_dummy )
         handle_ddjvu_messages( d->m_djvu_cxt, true );
 
     if ( r == miniexp_nil )

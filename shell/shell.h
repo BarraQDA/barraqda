@@ -32,7 +32,9 @@ class KPluginFactory;
 class KDocumentViewer;
 class Part;
 
+#ifndef Q_OS_WIN
 namespace KActivities { class ResourceInstance; }
+#endif
 
 /**
  * This is the application "Shell".  It has a menubar and a toolbar
@@ -60,7 +62,7 @@ public:
    */
   virtual ~Shell();
 
-  QSize sizeHint() const Q_DECL_OVERRIDE;
+  QSize sizeHint() const override;
 
   /**
    * Returns false if Okular component wasn't found
@@ -79,14 +81,14 @@ protected:
    * This method is called when it is time for the app to save its
    * properties for session management purposes.
    */
-  void saveProperties(KConfigGroup&) Q_DECL_OVERRIDE;
+  void saveProperties(KConfigGroup&) override;
 
   /**
    * This method is called when this app is restored.  The KConfig
    * object points to the session management config file that was saved
    * with @ref saveProperties
    */
-  void readProperties(const KConfigGroup&) Q_DECL_OVERRIDE;
+  void readProperties(const KConfigGroup&) override;
 
   /**
    * Expose internal functions for session restore testing
@@ -97,9 +99,13 @@ protected:
   void readSettings();
   void writeSettings();
   void setFullScreen( bool );
-  bool queryClose() Q_DECL_OVERRIDE;
 
-  void showEvent(QShowEvent *event) Q_DECL_OVERRIDE;
+  using KParts::MainWindow::setCaption;
+  void setCaption( const QString &caption ) override;
+
+  bool queryClose() override;
+
+  void showEvent(QShowEvent *event) override;
 
 private Q_SLOTS:
   void fileOpen();
@@ -138,7 +144,7 @@ private:
   int  findTabIndex( QObject* sender );
 
 private:
-  bool eventFilter(QObject *obj, QEvent *event) Q_DECL_OVERRIDE;
+  bool eventFilter(QObject *obj, QEvent *event) override;
 
   KPluginFactory* m_partFactory;
   KRecentFilesAction* m_recent;
@@ -168,7 +174,9 @@ private:
   QAction* m_nextTabAction;
   QAction* m_prevTabAction;
 
+#ifndef Q_OS_WIN
   KActivities::ResourceInstance* m_activityResource;
+#endif
   bool m_isValid;
 };
 

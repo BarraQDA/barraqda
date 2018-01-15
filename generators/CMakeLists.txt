@@ -20,7 +20,7 @@ set_package_properties(LibSpectre PROPERTIES
         TYPE RECOMMENDED
         PURPOSE "Support for PS files in okular.")
 
-find_package(KF5KExiv2)
+find_package(KF5KExiv2 CONFIG)
 set_package_properties("LibKExiv2" PROPERTIES
         DESCRIPTION  "Wrapper around Exiv2 library"
         URL "http://www.digikam.org/sharedlibs"
@@ -31,6 +31,19 @@ find_package(CHM)
 set_package_properties("CHM" PROPERTIES
         DESCRIPTION  "A library for dealing with Microsoft ITSS/CHM format files"
         URL "http://www.jedrea.com/chmlib"
+        TYPE RECOMMENDED
+        PURPOSE "Support CHM files in okular.")
+
+find_package(KF5KHtml CONFIG)
+set_package_properties("KF5KHtml" PROPERTIES
+        DESCRIPTION "HTML rendering library"
+        TYPE RECOMMENDED
+        PURPOSE "Support CHM files in okular.")
+
+find_package(LibZip)
+set_package_properties("LibZip" PROPERTIES
+        DESCRIPTION  "A library for reading, creating, and modifying zip archives"
+        URL "https://libzip.org/"
         TYPE RECOMMENDED
         PURPOSE "Support CHM files in okular.")
 
@@ -60,7 +73,7 @@ set_package_properties("JPEG" PROPERTIES
         DESCRIPTION  "A library for reading and writing JPEG image files."
         URL "http://www.ijg.org"
         TYPE RECOMMENDED
-        PURPOSE "Support fof PalmDB documents in okular.")
+        PURPOSE "Support for PalmDB documents in okular.")
 
 find_package(ZLIB)
 set_package_properties("ZLib" PROPERTIES
@@ -76,12 +89,19 @@ set_package_properties("libepub" PROPERTIES
         TYPE RECOMMENDED
         PURPOSE "Support for EPub documents in Okular.")
 
-find_package(QMobipocket "2")
+find_package(QMobipocket "2" CONFIG)
 set_package_properties("libqmobipocket" PROPERTIES
         DESCRIPTION  "A library for reading Mobipocket documents"
         URL "https://commits.kde.org/kdegraphics-mobipocket"
         TYPE RECOMMENDED
         PURPOSE "Support for Mobipocket documents in Okular.")
+        
+find_package(Discount "2")
+set_package_properties("discount" PROPERTIES
+        DESCRIPTION "A library that gives you formatting functions suitable for marking down entire documents or lines of text"
+        URL "http://www.pell.portland.or.us/~orc/Code/discount/"
+        TYPE RECOMMENDED
+        PURPOSE "Support for Markdown documents in Okular.")
 
 # let's enable the generators properly configured
 
@@ -97,9 +117,9 @@ if(KF5KExiv2_FOUND)
   add_subdirectory( kimgio )
 endif()
 
-if(CHM_FOUND)
+if(CHM_FOUND AND KF5KHtml_FOUND AND LIBZIP_FOUND)
   add_subdirectory( chm )
-endif(CHM_FOUND)
+endif()
 
 if(DJVULIBRE_FOUND)
   add_subdirectory(djvu)
@@ -133,4 +153,8 @@ add_subdirectory(txt)
 
 if(QMobipocket_FOUND)
   add_subdirectory(mobipocket)
+endif()
+
+if(discount_FOUND)
+  add_subdirectory(markdown)
 endif()

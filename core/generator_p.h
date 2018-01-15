@@ -1,5 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2007  Tobias Koenig <tokoe@kde.org>                     *
+ *   Copyright (C) 2017  Klarälvdalens Datakonsult AB, a KDAB Group        *
+ *                       company, info@kdab.com. Work sponsored by the     *
+ *                       LiMux project of the city of Munich               *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,6 +21,8 @@
 
 class QEventLoop;
 class QMutex;
+
+#include "page.h"
 
 namespace Okular {
 
@@ -83,6 +88,7 @@ class PixmapRequestPrivate
         int mFeatures;
         bool mForce : 1;
         bool mTile : 1;
+        bool mPartialUpdatesWanted : 1;
         Page *mPage;
         NormalizedRect mNormalizedRect;
 };
@@ -106,7 +112,7 @@ class PixmapGenerationThread : public QThread
         NormalizedRect boundingBox() const;
 
     protected:
-        virtual void run();
+        void run() override;
 
     private:
         Generator *mGenerator;
@@ -124,16 +130,17 @@ class TextPageGenerationThread : public QThread
     public:
         TextPageGenerationThread( Generator *generator );
 
-        void startGeneration( Page *page );
-
         void endGeneration();
 
         Page *page() const;
 
         TextPage* textPage() const;
 
+    public slots:
+        void startGeneration( Okular::Page *page );
+
     protected:
-        virtual void run();
+        void run() override;
 
     private:
         Generator *mGenerator;
@@ -156,7 +163,7 @@ class FontExtractionThread : public QThread
         void progress( int page );
 
     protected:
-        virtual void run();
+        void run() override;
 
     private:
         Generator *mGenerator;
@@ -165,5 +172,7 @@ class FontExtractionThread : public QThread
 };
 
 }
+
+Q_DECLARE_METATYPE(Okular::Page*)
 
 #endif

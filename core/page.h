@@ -1,5 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2004 by Enrico Ros <eros.kde@email.it>                  *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -200,7 +203,7 @@ class OKULARCORE_EXPORT Page
          *                 right/below the coordinates of the given rect.
          */
         RegularAreaRect* findText( int id, const QString & text, SearchDirection direction,
-                                   Qt::CaseSensitivity caseSensitivity, const RegularAreaRect * lastRect=0) const;
+                                   Qt::CaseSensitivity caseSensitivity, const RegularAreaRect * lastRect=nullptr) const;
 
          /**
          * Returns the page reference (or part of it).
@@ -224,7 +227,7 @@ class OKULARCORE_EXPORT Page
          * Returns the page text (or part of it).
          * @see TextPage::text()
          */
-        QString text( const RegularAreaRect * rect = 0 ) const;
+        QString text( const RegularAreaRect * rect = nullptr ) const;
 
         /**
          * Returns the page text (or part of it).
@@ -248,7 +251,7 @@ class OKULARCORE_EXPORT Page
          * @see TextPage::wordAt()
          * @since 0.15 (KDE 4.9)
          */
-        RegularAreaRect * wordAt( const NormalizedPoint &p, QString *word = 0 ) const;
+        RegularAreaRect * wordAt( const NormalizedPoint &p, QString *word = nullptr ) const;
 
         /**
          * Returns the rectangular area of the given @p selection.
@@ -283,6 +286,12 @@ class OKULARCORE_EXPORT Page
          * Returns the list of annotations of the page.
          */
         QLinkedList< Annotation* > annotations() const;
+
+        /**
+         * Returns the annotation with the given unique name.
+         * @since 1.3
+         */
+        Annotation * annotation( const QString & uniqueName ) const;
 
         /**
          * Returns the @ref Action object which is associated with the given page @p action
@@ -441,7 +450,7 @@ class OKULARCORE_EXPORT Page
         QList<Tile> tilesAt( const DocumentObserver *observer, const NormalizedRect &rect ) const;
 
     private:
-        PagePrivate* const d;
+        PagePrivate* d;
         /// @cond PRIVATE
         friend class PagePrivate;
         friend class Document;

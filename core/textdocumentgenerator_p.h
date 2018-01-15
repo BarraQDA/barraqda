@@ -102,7 +102,7 @@ class TextDocumentConverterPrivate
 {
     public:
         TextDocumentConverterPrivate()
-            : mParent( 0 )
+            : mParent( nullptr )
         {
         }
 
@@ -116,7 +116,7 @@ class TextDocumentGeneratorPrivate : public GeneratorPrivate
 
     public:
         TextDocumentGeneratorPrivate( TextDocumentConverter *converter )
-            : mConverter( converter ), mDocument( 0 ), mGeneralSettings( 0 )
+            : mConverter( converter ), mDocument( nullptr ), mGeneralSettings( nullptr )
         {
         }
 
@@ -130,8 +130,8 @@ class TextDocumentGeneratorPrivate : public GeneratorPrivate
 
         Q_DECLARE_PUBLIC( TextDocumentGenerator )
 
-        /* reimp */ QVariant metaData( const QString &key, const QVariant &option ) const;
-        /* reimp */ QImage image( PixmapRequest * );
+        /* reimp */ QVariant metaData( const QString &key, const QVariant &option ) const override;
+        /* reimp */ QImage image( PixmapRequest * ) override;
 
         void calculateBoundingRect( int startPosition, int endPosition, QRectF &rect, int &page ) const;
         void calculatePositions( int page, int &start, int &end ) const;

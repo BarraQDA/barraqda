@@ -10,6 +10,9 @@
  *   Copyright (C) 2003 by Malcolm Hunter <malcolm.hunter@gmx.co.uk>       *
  *   Copyright (C) 2004 by Dominique Devriese <devriese@kde.org>           *
  *   Copyright (C) 2004 by Dirk Mueller <mueller@kde.org>                  *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -46,7 +49,9 @@
 #include <KLocalizedString>
 #include <KSharedConfig>
 #include <KIO/Global>
+#ifndef Q_OS_WIN
 #include <KActivities/ResourceInstance>
+#endif
 
 // local includes
 #include "kdocumentviewer.h"
@@ -61,7 +66,9 @@ static const char* const SESSION_TAB_KEY = "ActiveTab";
 
 Shell::Shell( const QString &serializedOptions )
   : KParts::MainWindow(), m_menuBarWasShown(true), m_toolBarWasShown(true)
-    , m_activityResource(0)
+#ifndef Q_OS_WIN
+    , m_activityResource(nullptr)
+#endif
     , m_isValid(true)
 {
   setObjectName( QStringLiteral( "okular::Shell#" ) );
@@ -71,7 +78,7 @@ Shell::Shell( const QString &serializedOptions )
   // set the shell's ui resource file
   setXMLFile(QStringLiteral("shell.rc"));
   m_fileformatsscanned = false;
-  m_showMenuBarAction = 0;
+  m_showMenuBarAction = nullptr;
   // this routine will find and load our Part.  it finds the Part by
   // name which is a bad idea usually.. but it's alright in this
   // case since our Part is made for this Shell
@@ -261,8 +268,8 @@ void Shell::openUrl( const QUrl & url, const QString &serializedOptions )
                 else
                 {
                     Shell* newShell = new Shell( serializedOptions );
-                    newShell->openUrl( url, serializedOptions );
                     newShell->show();
+                    newShell->openUrl( url, serializedOptions );
                 }
             }
         }
@@ -276,10 +283,12 @@ void Shell::openUrl( const QUrl & url, const QString &serializedOptions )
             {
                 if ( openOk )
                 {
+#ifndef Q_OS_WIN
                     if ( !m_activityResource )
                         m_activityResource = new KActivities::ResourceInstance( window()->winId(), this );
 
                     m_activityResource->setUri( url );
+#endif
                     m_recent->addUrl( url );
                 }
                 else
@@ -489,9 +498,31 @@ void Shell::setFullScreen( bool useFullScreen )
         setWindowState( windowState() & ~Qt::WindowFullScreen ); // reset
 }
 
+void Shell::setCaption( const QString &caption )
+{
+    bool modified = false;
+
+    const int activeTab = m_tabWidget->currentIndex();
+    if ( activeTab >= 0 && activeTab < m_tabs.size() )
+    {
+        KParts::ReadWritePart* const activePart = m_tabs[activeTab].part;
+        QString tabCaption = activePart->url().fileName();
+        if ( activePart->isModified() ) {
+            modified = true;
+            if ( !tabCaption.isEmpty() ) {
+                tabCaption.append( QStringLiteral( " *" ) );
+            }
+        }
+
+        m_tabWidget->setTabText( activeTab, tabCaption );
+    }
+
+    setCaption( caption, modified );
+}
+
 void Shell::showEvent(QShowEvent *e)
 {
-    if (m_showMenuBarAction)
+    if (!menuBar()->isNativeMenuBar() && m_showMenuBarAction)
         m_showMenuBarAction->setChecked( menuBar()->isVisible() );
 
     KParts::MainWindow::showEvent(e);
@@ -538,6 +569,39 @@ QSize Shell::sizeHint() const
 
 bool Shell::queryClose()
 {
+    if (m_tabs.count() > 1)
+    {
+        const QString dontAskAgainName = "ShowTabWarning";
+        KMessageBox::ButtonCode dummy;
+        if (shouldBeShownYesNo(dontAskAgainName, dummy))
+        {
+            QDialog *dialog = new QDialog(this);
+            dialog->setWindowTitle(i18n("Confirm Close"));
+
+            QDialogButtonBox *buttonBox = new QDialogButtonBox(dialog);
+            buttonBox->setStandardButtons(QDialogButtonBox::Yes | QDialogButtonBox::No);
+            KGuiItem::assign(buttonBox->button(QDialogButtonBox::Yes), KGuiItem(i18n("Close Tabs"), "tab-close"));
+            KGuiItem::assign(buttonBox->button(QDialogButtonBox::No), KStandardGuiItem::cancel());
+
+
+            bool checkboxResult = true;
+            const int result = KMessageBox::createKMessageBox(dialog, buttonBox, QMessageBox::Question,
+                                                i18n("You are about to close %1 tabs. Are you sure you want to continue?", m_tabs.count()), QStringList(),
+                                                i18n("Warn me when I attempt to close multiple tabs"),
+                                                &checkboxResult, KMessageBox::Notify);
+
+            if (!checkboxResult)
+            {
+                saveDontShowAgainYesNo(dontAskAgainName, dummy);
+            }
+
+            if (result != QDialogButtonBox::Yes)
+            {
+                return false;
+            }
+        }
+    }
+
     for( int i = 0; i < m_tabs.size(); ++i )
     {
         KParts::ReadWritePart* const part = m_tabs[i].part;

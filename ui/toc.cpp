@@ -14,6 +14,7 @@
 #include <qheaderview.h>
 #include <qlayout.h>
 #include <qtreeview.h>
+#include <QContextMenuEvent>
 
 #include <klineedit.h>
 
@@ -72,7 +73,7 @@ void TOC::notifySetup( const QVector< Okular::Page * > & /*pages*/, int setupFla
         if ( m_document->isOpened() )
         {
             // Make sure we clear the reload old model data
-            m_model->setOldModelData( 0, QVector<QModelIndex>() );
+            m_model->setOldModelData( nullptr, QVector<QModelIndex>() );
         }
         emit hasTOC( false );
         return;
@@ -96,7 +97,7 @@ void TOC::prepareForReload()
     TOCModel *m = m_model;
     m_model = new TOCModel( m_document, m_treeView );
     m_model->setOldModelData( m, list );
-    m->setParent( 0 );
+    m->setParent( nullptr );
 }
 
 void TOC::rollbackReload()
@@ -173,6 +174,17 @@ void TOC::saveSearchOptions()
     Okular::Settings::setContentsSearchRegularExpression( m_searchLine->regularExpression() );
     Okular::Settings::setContentsSearchCaseSensitive( m_searchLine->caseSensitivity() == Qt::CaseSensitive ? true : false );
     Okular::Settings::self()->save();
+}
+
+void TOC::contextMenuEvent(QContextMenuEvent* e)
+{
+    QModelIndex index = m_treeView->currentIndex();
+    if (!index.isValid())
+        return;
+
+    Okular::DocumentViewport viewport = m_model->viewportForIndex(index);
+
+    emit rightClick(viewport, e->globalPos(), m_model->data(index).toString());
 }
 
 #include "moc_toc.cpp"

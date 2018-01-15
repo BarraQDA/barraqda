@@ -68,8 +68,7 @@ class TextPagePrivate
         // variables those can be accessed directly from TextPage
         TextList m_words;
         QMap< int, SearchPoint* > m_searchPoints;
-        PagePrivate *m_page;
-        int m_offset;
+        Page *m_page;
 
     private:
         RegularAreaRect * searchPointToArea(const SearchPoint* sp);

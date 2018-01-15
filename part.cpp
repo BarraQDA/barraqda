@@ -14,6 +14,9 @@
  *   Copyright (C) 2004 by Waldo Bastian <bastian@kde.org>                 *
  *   Copyright (C) 2004-2008 by Albert Astals Cid <aacid@kde.org>          *
  *   Copyright (C) 2004 by Antti Markus <antti.markus@starman.ee>          *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -69,6 +72,12 @@
 #include <KXMLGUIClient>
 #include <KXMLGUIFactory>
 
+
+#if PURPOSE_FOUND
+#include <Purpose/AlternativesModel>
+#include <PurposeWidgets/Menu>
+#endif
+
 #if 0
 #include <knewstuff2/engine.h>
 #endif
@@ -111,7 +120,7 @@ class FileKeeper
 {
     public:
         FileKeeper()
-            : m_handle( NULL )
+            : m_handle( nullptr )
         {
         }
 
@@ -131,14 +140,14 @@ class FileKeeper
             {
                 int ret = std::fclose( m_handle );
                 Q_UNUSED( ret )
-                m_handle = NULL;
+                m_handle = nullptr;
             }
         }
 
         QTemporaryFile* copyToTemporary() const
         {
             if ( !m_handle )
-                return 0;
+                return nullptr;
 
             QTemporaryFile * retFile = new QTemporaryFile;
             retFile->open();
@@ -294,8 +303,8 @@ Part::Part(QWidget *parentWidget,
 QObject *parent,
 const QVariantList &args)
 : KParts::ReadWritePart(parent),
-m_tempfile( 0 ), m_fileWasRemoved( false ), m_showMenuBarAction( 0 ), m_showFullScreenAction( 0 ), m_actionsSearched( false ),
-m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentWidget, parent, args)), m_generatorGuiClient(0), m_keeper( 0 )
+m_tempfile( nullptr ), m_documentOpenWithPassword( false ), m_swapInsteadOfOpening( false ), m_isReloading( false ), m_fileWasRemoved( false ), m_showMenuBarAction( nullptr ), m_showFullScreenAction( nullptr ), m_actionsSearched( false ),
+m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentWidget, parent, args)), m_generatorGuiClient(nullptr), m_keeper( nullptr )
 {
     // make sure that the component name is okular otherwise the XMLGUI .rc files are not found
     // when this part is used in an application other than okular (e.g. unit tests)
@@ -349,10 +358,11 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
 
     numberOfParts++;
     if (numberOfParts == 1) {
-        QDBusConnection::sessionBus().registerObject(QStringLiteral("/okular"), this, QDBusConnection::ExportScriptableSlots);
+        m_registerDbusName = QStringLiteral("/okular");
     } else {
-        QDBusConnection::sessionBus().registerObject(QStringLiteral("/okular%1").arg(numberOfParts), this, QDBusConnection::ExportScriptableSlots);
+        m_registerDbusName = QStringLiteral("/okular%1").arg(numberOfParts);
     }
+    QDBusConnection::sessionBus().registerObject(m_registerDbusName, this, QDBusConnection::ExportScriptableSlots);
 
     // connect the started signal to tell the job the mimetypes we like,
     // and get some more information from it
@@ -382,6 +392,13 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
     connect( m_document, &Document::openUrl, this, &Part::openUrlFromDocument );
     connect( m_document->bookmarkManager(), &BookmarkManager::openUrl, this, &Part::openUrlFromBookmarks );
     connect( m_document, &Document::close, this, &Part::close );
+    connect( m_document, &Document::undoHistoryCleanChanged, this,
+            [this](bool clean)
+            {
+                setModified( !clean );
+                setWindowTitleFromDocument();
+            }
+    );
 
     if ( parent && parent->metaObject()->indexOfSlot( QMetaObject::normalizedSignature( "slotQuit()" ).constData() ) != -1 )
         connect( m_document, SIGNAL(quit()), parent, SLOT(slotQuit()) );
@@ -396,19 +413,20 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
     //      m_searchToolBar->setStretchableWidget( m_searchWidget );
 
     // [left toolbox: Table of Contents] | []
-    m_toc = new TOC( 0, m_document );
+    m_toc = new TOC( nullptr, m_document );
     connect( m_toc.data(), &TOC::hasTOC, this, &Part::enableTOC );
+    connect( m_toc.data(), &TOC::rightClick, this, &Part::slotShowTOCMenu );
     m_sidebar->addItem( m_toc, QIcon::fromTheme(QApplication::isLeftToRight() ? QStringLiteral("format-justify-left") : QStringLiteral("format-justify-right")), i18n("Contents") );
     enableTOC( false );
 
     // [left toolbox: Layers] | []
-    m_layers = new Layers( 0, m_document );
+    m_layers = new Layers( nullptr, m_document );
     connect( m_layers.data(), &Layers::hasLayers, this, &Part::enableLayers );
     m_sidebar->addItem( m_layers, QIcon::fromTheme( QStringLiteral("draw-freehand") ), i18n( "Layers" ) );
     enableLayers( false );
 
     // [left toolbox: Thumbnails and Bookmarks] | []
-    QWidget * thumbsBox = new ThumbnailsBox( 0 );
+    QWidget * thumbsBox = new ThumbnailsBox( nullptr );
     thumbsBox->layout()->setSpacing( 6 );
     m_searchWidget = new SearchWidget( thumbsBox, m_document );
     thumbsBox->layout()->addWidget(m_searchWidget);
@@ -421,12 +439,12 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
     m_sidebar->setCurrentItem( thumbsBox );
 
     // [left toolbox: Reviews] | []
-    m_reviewsWidget = new Reviews( 0, m_document );
+    m_reviewsWidget = new Reviews( nullptr, m_document );
     m_sidebar->addItem( m_reviewsWidget, QIcon::fromTheme(QStringLiteral("draw-freehand")), i18n("Reviews") );
     m_sidebar->setItemEnabled( m_reviewsWidget, false );
 
     // [left toolbox: Bookmarks] | []
-    m_bookmarkList = new BookmarkList( m_document, 0 );
+    m_bookmarkList = new BookmarkList( m_document, nullptr );
     m_sidebar->addItem( m_bookmarkList, QIcon::fromTheme(QStringLiteral("bookmarks")), i18n("Bookmarks") );
     m_sidebar->setItemEnabled( m_bookmarkList, false );
 
@@ -450,13 +468,19 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
 #endif
 
     // widgets: [] | [right 'pageView']
-    QWidget * rightContainer = new QWidget( 0 );
+    QWidget * rightContainer = new QWidget( nullptr );
     m_sidebar->setMainWidget( rightContainer );
     QVBoxLayout * rightLayout = new QVBoxLayout( rightContainer );
     rightLayout->setMargin( 0 );
     rightLayout->setSpacing( 0 );
     //	KToolBar * rtb = new KToolBar( rightContainer, "mainToolBarSS" );
     //	rightLayout->addWidget( rtb );
+    m_migrationMessage = new KMessageWidget( rightContainer );
+    m_migrationMessage->setVisible( false );
+    m_migrationMessage->setWordWrap( true );
+    m_migrationMessage->setMessageType( KMessageWidget::Warning );
+    m_migrationMessage->setText( i18n( "This document contains annotations or form data that were saved internally by a previous Okular version. Internal storage is <b>no longer supported</b>.<br/>Please save to a file in order to move them if you want to continue to edit the document." ) );
+    rightLayout->addWidget( m_migrationMessage );
     m_topMessage = new KMessageWidget( rightContainer );
     m_topMessage->setVisible( false );
     m_topMessage->setWordWrap( true );
@@ -503,7 +527,7 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
     bottomBarLayout->addWidget( m_pageSizeLabel );
     rightLayout->addWidget( m_bottomBar );
 
-    m_pageNumberTool = new MiniBar( 0, m_miniBarLogic );
+    m_pageNumberTool = new MiniBar( nullptr, m_miniBarLogic );
 
     connect( m_findBar, SIGNAL(forwardKeyPressEvent(QKeyEvent*)), m_pageView, SLOT(externalKeyPressEvent(QKeyEvent*)));
     connect( m_findBar, SIGNAL(onCloseButtonPressed()), m_pageView, SLOT(setFocus()));
@@ -545,9 +569,11 @@ m_cliPresentation(false), m_cliPrint(false), m_embedMode(detectEmbedMode(parentW
     // document watcher and reloader
     m_watcher = new KDirWatch( this );
     connect( m_watcher, &KDirWatch::dirty, this, &Part::slotFileDirty );
+    connect( m_watcher, &KDirWatch::created, this, &Part::slotFileDirty );
+    connect( m_watcher, &KDirWatch::deleted, this, &Part::slotFileDirty );
     m_dirtyHandler = new QTimer( this );
     m_dirtyHandler->setSingleShot( true );
-    connect( m_dirtyHandler, &QTimer::timeout,this, &Part::slotDoFileDirty );
+    connect( m_dirtyHandler, &QTimer::timeout, this, [this] { slotAttemptReload(); } );
 
     slotNewConfig();
 
@@ -647,8 +673,8 @@ void Part::setupViewerActions()
     m_endOfDocument->setWhatsThis( i18n( "Moves to the end of the document" ) );
 
     // we do not want back and next in history in the dummy mode
-    m_historyBack = 0;
-    m_historyNext = 0;
+    m_historyBack = nullptr;
+    m_historyNext = nullptr;
 
     m_addBookmark = KStandardAction::addBookmark( this, SLOT(slotAddBookmark()), ac );
     m_addBookmarkText = m_addBookmark->text();
@@ -672,9 +698,9 @@ void Part::setupViewerActions()
     m_nextBookmark->setWhatsThis( i18n( "Go to the next bookmark" ) );
     connect( m_nextBookmark, &QAction::triggered, this, &Part::slotNextBookmark );
 
-    m_copy = 0;
+    m_copy = nullptr;
 
-    m_selectAll = 0;
+    m_selectAll = nullptr;
 
     // Find and other actions
     m_find = KStandardAction::find( this, SLOT(slotShowFindBar()), ac );
@@ -689,8 +715,8 @@ void Part::setupViewerActions()
     m_findPrev = KStandardAction::findPrev( this, SLOT(slotFindPrev()), ac );
     m_findPrev->setEnabled( false );
 
-    m_saveCopyAs = 0;
-    m_saveAs = 0;
+    m_save = nullptr;
+    m_saveAs = nullptr;
 
     QAction * prefs = KStandardAction::preferences( this, SLOT(slotPreferences()), ac);
     if ( m_embedMode == NativeShellMode )
@@ -720,8 +746,8 @@ void Part::setupViewerActions()
     m_printPreview = KStandardAction::printPreview( this, SLOT(slotPrintPreview()), ac );
     m_printPreview->setEnabled( false );
 
-    m_showLeftPanel = 0;
-    m_showBottomBar = 0;
+    m_showLeftPanel = nullptr;
+    m_showBottomBar = nullptr;
 
     m_showProperties = ac->addAction(QStringLiteral("properties"));
     m_showProperties->setText(i18n("&Properties"));
@@ -729,14 +755,20 @@ void Part::setupViewerActions()
     connect(m_showProperties, &QAction::triggered, this, &Part::slotShowProperties);
     m_showProperties->setEnabled( false );
 
-    m_showEmbeddedFiles = 0;
-    m_showPresentation = 0;
+    m_showEmbeddedFiles = nullptr;
+    m_showPresentation = nullptr;
 
-    m_exportAs = 0;
-    m_exportAsMenu = 0;
-    m_exportAsText = 0;
-    m_exportAsDocArchive = 0;
-    m_presentationDrawingActions = 0;
+    m_exportAs = nullptr;
+    m_exportAsMenu = nullptr;
+    m_exportAsText = nullptr;
+    m_exportAsDocArchive = nullptr;
+
+#if PURPOSE_FOUND
+    m_share = nullptr;
+    m_shareMenu = nullptr;
+#endif
+
+    m_presentationDrawingActions = nullptr;
 
     m_aboutBackend = ac->addAction(QStringLiteral("help_about_backend"));
     m_aboutBackend->setText(i18n("About Backend"));
@@ -792,15 +824,12 @@ void Part::setupActions()
 
     m_selectAll = KStandardAction::selectAll( m_pageView, SLOT(selectAll()), ac );
 
-    m_saveCopyAs = KStandardAction::saveAs( this, SLOT(slotSaveCopyAs()), ac );
-    m_saveCopyAs->setText( i18n( "Save &Copy As..." ) );
-    ac->addAction( QStringLiteral("file_save_copy"), m_saveCopyAs );
-    ac->setDefaultShortcuts(m_saveCopyAs, KStandardShortcut::shortcut(KStandardShortcut::SaveAs));
-    m_saveCopyAs->setEnabled( false );
+    m_save = KStandardAction::save( this, [this] { saveFile(); }, ac );
+    m_save->setEnabled( false );
 
     m_saveAs = KStandardAction::saveAs( this, SLOT(slotSaveFileAs()), ac );
-    ac->setDefaultShortcuts(m_saveAs, KStandardShortcut::shortcut(KStandardShortcut::Save));
     m_saveAs->setEnabled( false );
+    m_migrationMessage->addAction( m_saveAs );
 
     m_showLeftPanel = ac->add<KToggleAction>(QStringLiteral("show_leftpanel"));
     m_showLeftPanel->setText(i18n( "Show &Navigation Panel"));
@@ -832,11 +861,16 @@ void Part::setupActions()
     m_exportAsMenu->addAction( m_exportAsText );
     m_exportAs->setEnabled( false );
     m_exportAsText->setEnabled( false );
-    m_exportAsDocArchive = actionForExportFormat( Okular::ExportFormat(
-            i18nc( "A document format, Okular-specific", "Document Archive" ),
-            db.mimeTypeForName( QStringLiteral("application/vnd.kde.okular-archive") ) ), m_exportAsMenu );
-    m_exportAsMenu->addAction( m_exportAsDocArchive );
-    m_exportAsDocArchive->setEnabled( false );
+
+#if PURPOSE_FOUND
+    m_share = ac->addAction( QStringLiteral("file_share") );
+    m_share->setText( i18n("S&hare") );
+    m_share->setIcon( QIcon::fromTheme( QStringLiteral("document-share") ) );
+    m_share->setEnabled( false );
+    m_shareMenu = new Purpose::Menu();
+    connect(m_shareMenu, &Purpose::Menu::finished, this, &Part::slotShareActionFinished);
+    m_share->setMenu( m_shareMenu );
+#endif
 
     m_showPresentation = ac->addAction(QStringLiteral("presentation"));
     m_showPresentation->setText(i18n("P&resentation"));
@@ -881,6 +915,8 @@ void Part::setupActions()
 
 Part::~Part()
 {
+    QDBusConnection::sessionBus().unregisterObject(m_registerDbusName);
+
     GuiUtils::removeIconLoader( iconLoader() );
     m_document->removeObserver( this );
 
@@ -910,6 +946,9 @@ Part::~Part()
     qDeleteAll( m_bookmarkActions );
 
     delete m_exportAsMenu;
+#if PURPOSE_FOUND
+    delete m_shareMenu;
+#endif
 
 #ifdef OKULAR_KEEP_FILE_OPEN
     delete m_keeper;
@@ -1090,7 +1129,7 @@ void Part::loadCancelled(const QString &reason)
     emit setWindowCaption( QString() );
     resetStartArguments();
 
-    // when m_viewportDirty.pageNumber != -1 we come from slotDoFileDirty
+    // when m_viewportDirty.pageNumber != -1 we come from slotAttemptReload
     // so we don't want to show an ugly messagebox just because the document is
     // taking more than usual to be recreated
     if (m_viewportDirty.pageNumber == -1)
@@ -1148,6 +1187,11 @@ KConfigDialog * Part::slotGeneratorPreferences( )
 
 void Part::notifySetup( const QVector< Okular::Page * > & /*pages*/, int setupFlags )
 {
+    // Hide the migration message if the user has just migrated. Otherwise,
+    // if m_migrationMessage is already hidden, this does nothing.
+    if ( !m_document->isDocdataMigrationNeeded() )
+        m_migrationMessage->animatedHide();
+
     if ( !( setupFlags & Okular::DocumentObserver::DocumentChanged ) )
         return;
 
@@ -1164,9 +1208,6 @@ void Part::notifyViewportChanged( bool /*smoothMove*/ )
 
 void Part::notifyPageChanged( int page, int flags )
 {
-    if ( flags & Okular::DocumentObserver::NeedSaveAs )
-        setModified();
-
     if ( !(flags & Okular::DocumentObserver::Bookmark ) )
         return;
 
@@ -1251,12 +1292,39 @@ bool Part::slotImportPSFile()
     return false;
 }
 
-static void addFileToWatcher( KDirWatch *watcher, const QString &filePath)
+void Part::setFileToWatch( const QString &filePath )
 {
-    if ( !watcher->contains( filePath ) ) watcher->addFile(filePath);
+    if ( !m_watchedFilePath.isEmpty() )
+        unsetFileToWatch();
+
     const QFileInfo fi(filePath);
-    if ( !watcher->contains( fi.absolutePath() ) ) watcher->addDir(fi.absolutePath());
-    if ( fi.isSymLink() ) watcher->addFile( fi.readLink() );
+
+    m_watchedFilePath = filePath;
+    m_watcher->addFile( m_watchedFilePath );
+
+    if ( fi.isSymLink() )
+    {
+        m_watchedFileSymlinkTarget = fi.readLink();
+        m_watcher->addFile( m_watchedFileSymlinkTarget );
+    }
+    else
+    {
+        m_watchedFileSymlinkTarget.clear();
+    }
+}
+
+void Part::unsetFileToWatch()
+{
+    if ( m_watchedFilePath.isEmpty() )
+        return;
+
+    m_watcher->removeFile( m_watchedFilePath );
+
+    if ( !m_watchedFileSymlinkTarget.isEmpty() )
+        m_watcher->removeFile( m_watchedFileSymlinkTarget );
+
+    m_watchedFilePath.clear();
+    m_watchedFileSymlinkTarget.clear();
 }
 
 Document::OpenResult Part::doOpenFile( const QMimeType &mimeA, const QString &fileNameToOpenA, bool *isCompressedFile )
@@ -1278,6 +1346,30 @@ Document::OpenResult Part::doOpenFile( const QMimeType &mimeA, const QString &fi
         *isCompressedFile = false;
     }
 
+    if ( m_swapInsteadOfOpening )
+    {
+        m_swapInsteadOfOpening = false;
+
+        if ( !uncompressOk )
+            return Document::OpenError;
+
+        if ( mime.inherits( QStringLiteral("application/vnd.kde.okular-archive") ) )
+        {
+            isDocumentArchive = true;
+            if (!m_document->swapBackingFileArchive( fileNameToOpen, url() ))
+                return Document::OpenError;
+        }
+        else
+        {
+            isDocumentArchive = false;
+            if (!m_document->swapBackingFile( fileNameToOpen, url() ))
+                return Document::OpenError;
+        }
+
+        m_fileLastModified = QFileInfo( fileNameToOpen ).lastModified();
+        return Document::OpenSuccess;
+    }
+
     isDocumentArchive = false;
     if ( uncompressOk )
     {
@@ -1290,13 +1382,14 @@ Document::OpenResult Part::doOpenFile( const QMimeType &mimeA, const QString &fi
         {
             openResult = m_document->openDocument( fileNameToOpen,  url(), mime );
         }
+        m_documentOpenWithPassword = false;
 
         // if the file didn't open correctly it might be encrypted, so ask for a pass
         QString walletName, walletFolder, walletKey;
         m_document->walletDataForFile(fileNameToOpen, &walletName, &walletFolder, &walletKey);
         bool firstInput = true;
         bool triedWallet = false;
-        KWallet::Wallet * wallet = 0;
+        KWallet::Wallet * wallet = nullptr;
         bool keep = true;
         while ( openResult == Document::OpenNeedsPassword )
         {
@@ -1354,14 +1447,23 @@ Document::OpenResult Part::doOpenFile( const QMimeType &mimeA, const QString &fi
                 openResult = m_document->openDocument( fileNameToOpen,  url(), mime, password );
             }
 
-            // 3. if the password is correct and the user chose to remember it, store it to the wallet
-            if ( openResult == Document::OpenSuccess && wallet && /*safety check*/ wallet->isOpen() && keep )
+            if ( openResult == Document::OpenSuccess )
             {
-                wallet->writePassword( walletKey, password );
+                m_documentOpenWithPassword = true;
+
+                // 3. if the password is correct and the user chose to remember it, store it to the wallet
+                if (wallet && /*safety check*/ wallet->isOpen() && keep )
+                {
+                    wallet->writePassword( walletKey, password );
+                }
             }
         }
     }
 
+    if ( openResult == Document::OpenSuccess )
+    {
+        m_fileLastModified = QFileInfo( fileNameToOpen ).lastModified();
+    }
     return openResult;
 }
 
@@ -1422,14 +1524,15 @@ bool Part::openFile()
     m_find->setEnabled( ok && canSearch );
     m_findNext->setEnabled( ok && canSearch );
     m_findPrev->setEnabled( ok && canSearch );
-    if( m_saveAs ) m_saveAs->setEnabled( ok && (m_document->canSaveChanges() || isDocumentArchive) );
-    if( m_saveCopyAs ) m_saveCopyAs->setEnabled( ok );
+    if( m_save ) m_save->setEnabled( ok && !( isstdin || mime.inherits( "inode/directory" ) ) );
+    if( m_saveAs ) m_saveAs->setEnabled( ok && !( isstdin || mime.inherits( "inode/directory" ) ) );
     emit enablePrintAction( ok && m_document->printingSupport() != Okular::Document::NoPrinting );
     m_printPreview->setEnabled( ok && m_document->printingSupport() != Okular::Document::NoPrinting );
     m_showProperties->setEnabled( ok );
     bool hasEmbeddedFiles = ok && m_document->embeddedFiles() && m_document->embeddedFiles()->count() > 0;
     if ( m_showEmbeddedFiles ) m_showEmbeddedFiles->setEnabled( hasEmbeddedFiles );
     m_topMessage->setVisible( hasEmbeddedFiles && Okular::Settings::showOSD() );
+    m_migrationMessage->setVisible( m_document->isDocdataMigrationNeeded() );
 
     // Warn the user that XFA forms are not supported yet (NOTE: poppler generator only)
     if ( ok && m_document->metaData( QStringLiteral("HasUnsupportedXfaForm") ).toBool() == true )
@@ -1465,6 +1568,17 @@ bool Part::openFile()
                 menu->addAction( actionForExportFormat( *it ) );
             }
         }
+#if PURPOSE_FOUND
+        if ( m_share )
+        {
+            m_shareMenu->model()->setInputData(QJsonObject{
+                { QStringLiteral("mimeType"), mime.name() },
+                { QStringLiteral("urls"), QJsonArray{ url().toString() } }
+            });
+            m_shareMenu->model()->setPluginType( QStringLiteral("Export") );
+            m_shareMenu->reload();
+        }
+#endif
         if ( isCompressedFile )
         {
             m_realUrl = url();
@@ -1475,8 +1589,10 @@ bool Part::openFile()
 #endif
     }
     if ( m_exportAsText ) m_exportAsText->setEnabled( ok && m_document->canExportToText() );
-    if ( m_exportAsDocArchive ) m_exportAsDocArchive->setEnabled( ok );
     if ( m_exportAs ) m_exportAs->setEnabled( ok );
+#if PURPOSE_FOUND
+    if ( m_share ) m_share->setEnabled( ok );
+#endif
 
     // update viewing actions
     updateViewActions();
@@ -1494,9 +1610,7 @@ bool Part::openFile()
 
     // set the file to the fileWatcher
     if ( url().isLocalFile() )
-    {
-        addFileToWatcher( m_watcher, localFilePath() );
-    }
+        setFileToWatch( localFilePath() );
 
     // if the 'OpenTOC' flag is set, open the TOC
     if ( m_document->metaData( QStringLiteral("OpenTOC") ).toBool() && m_sidebar->isItemEnabled( m_toc ) && !m_sidebar->isCollapsed() && m_sidebar->currentItem() != m_toc )
@@ -1523,7 +1637,7 @@ bool Part::openFile()
         if ( goAheadWithPresentationMode )
             QMetaObject::invokeMethod( this, "slotShowPresentation", Qt::QueuedConnection );
     }
-    m_generatorGuiClient = factory() ? m_document->guiClient() : 0;
+    m_generatorGuiClient = factory() ? m_document->guiClient() : nullptr;
     if ( m_generatorGuiClient )
         factory()->addClient( m_generatorGuiClient );
     if ( m_cliPrint )
@@ -1534,8 +1648,17 @@ bool Part::openFile()
     return true;
 }
 
-bool Part::openUrl(const QUrl &_url)
+bool Part::openUrl( const QUrl &url )
 {
+    return openUrl( url, false /* swapInsteadOfOpening */ );
+}
+
+bool Part::openUrl( const QUrl &_url, bool swapInsteadOfOpening )
+{
+    /* Store swapInsteadOfOpening, so that closeUrl and openFile will be able
+     * to read it */
+    m_swapInsteadOfOpening = swapInsteadOfOpening;
+
     // Close current document if any
     if ( !closeUrl() )
         return false;
@@ -1585,16 +1708,41 @@ bool Part::queryClose()
     if ( !isReadWrite() || !isModified() )
         return true;
 
+    // TODO When we get different saving backends we need to query the backend
+    // as to if it can save changes even if the open file has been modified,
+    // since we only have poppler as saving backend for now we're skipping that check
+    if ( m_fileLastModified != QFileInfo( localFilePath() ).lastModified() )
+    {
+        int res;
+        if ( m_isReloading )
+        {
+            res = KMessageBox::warningYesNo( widget(),
+                                             i18n( "There are unsaved changes, and the file '%1' has been modified by another program. Your changes will be lost, because the file can no longer be saved.<br>Do you want to continue reloading the file?", url().fileName() ),
+                                             i18n( "File Changed" ),
+                                             KGuiItem( i18n( "Continue Reloading" ) ), // <- KMessageBox::Yes
+                                             KGuiItem( i18n( "Abort Reloading" ) ));
+        }
+        else
+        {
+            res = KMessageBox::warningYesNo( widget(),
+                                        i18n( "There are unsaved changes, and the file '%1' has been modified by another program. Your changes will be lost, because the file can no longer be saved.<br>Do you want to continue closing the file?", url().fileName() ),
+                                        i18n( "File Changed" ),
+                                        KGuiItem( i18n( "Continue Closing" ) ), // <- KMessageBox::Yes
+                                        KGuiItem( i18n( "Abort Closing" ) ));
+        }
+        return res == KMessageBox::Yes;
+    }
+
     const int res = KMessageBox::warningYesNoCancel( widget(),
-                        i18n( "Do you want to save your annotation changes or discard them?" ),
+                        i18n( "Do you want to save your changes to \"%1\" or discard them?", url().fileName() ),
                         i18n( "Close Document" ),
-                        KStandardGuiItem::saveAs(),
+                        KStandardGuiItem::save(),
                         KStandardGuiItem::discard() );
 
     switch ( res )
     {
-        case KMessageBox::Yes: // Save as
-            slotSaveFileAs();
+        case KMessageBox::Yes: // Save
+            saveFile();
             return !isModified(); // Only allow closing if file was really saved
         case KMessageBox::No: // Discard
             return true;
@@ -1608,7 +1756,14 @@ bool Part::closeUrl(bool promptToSave)
     if ( promptToSave && !queryClose() )
         return false;
 
-    setModified( false );
+    if ( m_swapInsteadOfOpening )
+    {
+        // If we're swapping the backing file, we don't want to close the
+        // current one when openUrl() calls us internally
+        return true; // pretend it worked
+    }
+
+    m_document->setHistoryClean( true );
 
     if (!m_temporaryLocalFile.isNull() && m_temporaryLocalFile != localFilePath())
     {
@@ -1621,48 +1776,51 @@ bool Part::closeUrl(bool promptToSave)
     m_find->setEnabled( false );
     m_findNext->setEnabled( false );
     m_findPrev->setEnabled( false );
+    if( m_save )  m_save->setEnabled( false );
     if( m_saveAs )  m_saveAs->setEnabled( false );
-    if( m_saveCopyAs ) m_saveCopyAs->setEnabled( false );
     m_printPreview->setEnabled( false );
     m_showProperties->setEnabled( false );
     if ( m_showEmbeddedFiles ) m_showEmbeddedFiles->setEnabled( false );
     if ( m_exportAs ) m_exportAs->setEnabled( false );
     if ( m_exportAsText ) m_exportAsText->setEnabled( false );
-    if ( m_exportAsDocArchive ) m_exportAsDocArchive->setEnabled( false );
     m_exportFormats.clear();
     if ( m_exportAs )
     {
         QMenu *menu = m_exportAs->menu();
         QList<QAction*> acts = menu->actions();
         int num = acts.count();
-        for ( int i = 2; i < num; ++i )
+        for ( int i = 1; i < num; ++i )
         {
             menu->removeAction( acts.at(i) );
             delete acts.at(i);
         }
     }
+#if PURPOSE_FOUND
+    if ( m_share )
+    {
+        m_share->setEnabled(false);
+        m_shareMenu->clear();
+    }
+#endif
     if ( m_showPresentation ) m_showPresentation->setEnabled( false );
     emit setWindowCaption(QLatin1String(""));
     emit enablePrintAction(false);
     m_realUrl = QUrl();
     if ( url().isLocalFile() )
-    {
-        m_watcher->removeFile( localFilePath() );
-        QFileInfo fi(localFilePath());
-        m_watcher->removeDir( fi.absolutePath() );
-        if ( fi.isSymLink() ) m_watcher->removeFile( fi.readLink() );
-    }
+        unsetFileToWatch();
     m_fileWasRemoved = false;
     if ( m_generatorGuiClient )
         factory()->removeClient( m_generatorGuiClient );
-    m_generatorGuiClient = 0;
+    m_generatorGuiClient = nullptr;
     m_document->closeDocument();
+    m_fileLastModified = QDateTime();
     updateViewActions();
     delete m_tempfile;
-    m_tempfile = 0;
+    m_tempfile = nullptr;
     if ( widget() )
     {
         m_searchWidget->clearText();
+        m_migrationMessage->setVisible( false );
         m_topMessage->setVisible( false );
         m_formsMessage->setVisible( false );
     }
@@ -1751,8 +1909,8 @@ void Part::slotFileDirty( const QString& path )
             else if (m_fileWasRemoved && QFile::exists(localFilePath()))
             {
                 // we need to watch the new file
-                m_watcher->removeFile(localFilePath());
-                m_watcher->addFile(localFilePath());
+                unsetFileToWatch();
+                setFileToWatch( localFilePath() );
                 m_dirtyHandler->start( 750 );
             }
         }
@@ -1766,16 +1924,22 @@ void Part::slotFileDirty( const QString& path )
     }
 }
 
-
-void Part::slotDoFileDirty()
+// Attempt to reload the document, one or more times, optionally from a different URL
+bool Part::slotAttemptReload( bool oneShot, const QUrl &newUrl )
 {
+    // Skip reload when another reload is already in progress
+    if ( m_isReloading ) {
+        return false;
+    }
+    QScopedValueRollback<bool> rollback(m_isReloading, true);
+
     bool tocReloadPrepared = false;
 
     // do the following the first time the file is reloaded
     if ( m_viewportDirty.pageNumber == -1 )
     {
         // store the url of the current document
-        m_oldUrl = url();
+        m_oldUrl = newUrl.isEmpty() ? url() : newUrl;
 
         // store the current viewport
         m_viewportDirty = m_document->viewport();
@@ -1786,7 +1950,7 @@ void Part::slotDoFileDirty()
         m_wasSidebarCollapsed = m_sidebar->isCollapsed();
 
         // store if presentation view was open
-        m_wasPresentationOpen = ((PresentationWidget*)m_presentationWidget != 0);
+        m_wasPresentationOpen = ((PresentationWidget*)m_presentationWidget != nullptr);
 
         // preserves the toc state after reload
         m_toc->prepareForReload();
@@ -1809,7 +1973,7 @@ void Part::slotDoFileDirty()
         {
             m_toc->rollbackReload();
         }
-        return;
+        return false;
     }
 
     if ( tocReloadPrepared )
@@ -1817,6 +1981,8 @@ void Part::slotDoFileDirty()
 
     // inform the user about the operation in progress
     m_pageView->displayMessage( i18n("Reloading the document...") );
+
+    bool reloadSucceeded = false;
 
     if ( KParts::ReadWritePart::openUrl( m_oldUrl ) )
     {
@@ -1842,13 +2008,17 @@ void Part::slotDoFileDirty()
         }
         if (m_wasPresentationOpen) slotShowPresentation();
         emit enablePrintAction(true && m_document->printingSupport() != Okular::Document::NoPrinting);
+
+        reloadSucceeded = true;
     }
-    else
+    else if ( !oneShot )
     {
-        // start watching the file again (since we dropped it on close)
-        addFileToWatcher( m_watcher, localFilePath() );
+        // start watching the file again (since we dropped it on close) 
+        setFileToWatch( localFilePath() );
         m_dirtyHandler->start( 750 );
     }
+
+    return reloadSucceeded;
 }
 
 
@@ -2018,7 +2188,7 @@ class GotoPageDialog : public QDialog
 
             QVBoxLayout *topLayout = new QVBoxLayout(this);
             topLayout->setMargin(6);
-            QHBoxLayout *midLayout = new QHBoxLayout(this);
+            QHBoxLayout *midLayout = new QHBoxLayout();
             spinbox = new QSpinBox(this);
             spinbox->setRange(1, max);
             spinbox->setValue(current);
@@ -2155,6 +2325,26 @@ void Part::slotRenameBookmarkFromMenu()
     }
 }
 
+void Part::slotRemoveBookmarkFromMenu()
+{
+    QAction *action = dynamic_cast<QAction *>(sender());
+    Q_ASSERT( action );
+    if ( action )
+    {
+        DocumentViewport vp ( action->data().toString() );
+        slotRemoveBookmark( vp );
+    }
+}
+
+void Part::slotRemoveBookmark(const DocumentViewport &viewport)
+{
+    Q_ASSERT(m_document->bookmarkManager()->isBookmarked( viewport ));
+    if ( m_document->bookmarkManager()->isBookmarked( viewport ) )
+    {
+        m_document->bookmarkManager()->removeBookmark( viewport );
+    }
+}
+
 void Part::slotRenameCurrentViewportBookmark()
 {
     slotRenameBookmark( m_document->viewport() );
@@ -2163,13 +2353,16 @@ void Part::slotRenameCurrentViewportBookmark()
 bool Part::aboutToShowContextMenu(QMenu * /*menu*/, QAction *action, QMenu *contextMenu)
 {
     KBookmarkAction *ba = dynamic_cast<KBookmarkAction*>(action);
-    if (ba != NULL)
+    if (ba != nullptr)
     {
         QAction *separatorAction = contextMenu->addSeparator();
         separatorAction->setObjectName(QStringLiteral("OkularPrivateRenameBookmarkActions"));
         QAction *renameAction = contextMenu->addAction( QIcon::fromTheme( QStringLiteral("edit-rename") ), i18n( "Rename this Bookmark" ), this, SLOT(slotRenameBookmarkFromMenu()) );
         renameAction->setData(ba->property("htmlRef").toString());
         renameAction->setObjectName(QStringLiteral("OkularPrivateRenameBookmarkActions"));
+        QAction *deleteAction = contextMenu->addAction( QIcon::fromTheme( QStringLiteral("list-remove") ), i18n("Remove this Bookmark"), this, SLOT(slotRemoveBookmarkFromMenu()));
+        deleteAction->setData(ba->property("htmlRef").toString());
+        deleteAction->setObjectName(QStringLiteral("OkularPrivateRenameBookmarkActions"));
     }
     return ba;
 }
@@ -2202,7 +2395,7 @@ void Part::slotFind()
 {
     // when in presentation mode, there's already a search bar, taking care of
     // the 'find' requests
-    if ( (PresentationWidget*)m_presentationWidget != 0 )
+    if ( (PresentationWidget*)m_presentationWidget != nullptr )
     {
         m_presentationWidget->slotFind();
     }
@@ -2232,56 +2425,91 @@ void Part::slotFindPrev()
 
 bool Part::saveFile()
 {
-    qCDebug(OkularUiDebug) << "Okular part doesn't support saving the file in the location from which it was opened";
-    return false;
+    if ( !isModified() )
+        return true;
+    else
+        return saveAs( url() );
 }
 
-void Part::slotSaveFileAs()
+bool Part::slotSaveFileAs( bool showOkularArchiveAsDefaultFormat )
 {
     if ( m_embedMode == PrintPreviewMode )
-       return;
+       return false;
 
-    /* Show a warning before saving if the generator can't save annotations,
-     * unless we are going to save a .okular archive. */
-    if ( !isDocumentArchive && !m_document->canSaveChanges( Document::SaveAnnotationsCapability ) )
+    // Determine the document's mimetype
+    QMimeDatabase db;
+    QMimeType originalMimeType;
+    const QString typeName = m_document->documentInfo().get( DocumentInfo::MimeType );
+    if ( !typeName.isEmpty() )
+        originalMimeType = db.mimeTypeForName( typeName );
+
+    // What data would we lose if we saved natively?
+    bool wontSaveForms, wontSaveAnnotations;
+    checkNativeSaveDataLoss(&wontSaveForms, &wontSaveAnnotations);
+
+    const QMimeType okularArchiveMimeType =  db.mimeTypeForName( QStringLiteral("application/vnd.kde.okular-archive") );
+
+    // Prepare "Save As" dialog
+    const QString originalMimeTypeFilter = i18nc("File type name and pattern", "%1 (%2)", originalMimeType.comment(), originalMimeType.globPatterns().join(QLatin1Char(' ')));
+    const QString okularArchiveMimeTypeFilter = i18nc("File type name and pattern", "%1 (%2)", okularArchiveMimeType.comment(), okularArchiveMimeType.globPatterns().join(QLatin1Char(' ')));
+
+    // What format choice should we show as default?
+    QString selectedFilter = (isDocumentArchive || showOkularArchiveAsDefaultFormat ||
+        wontSaveForms || wontSaveAnnotations) ?
+        okularArchiveMimeTypeFilter : originalMimeTypeFilter;
+
+    QString filter = originalMimeTypeFilter + QStringLiteral(";;") + okularArchiveMimeTypeFilter;
+
+    const QUrl saveUrl = QFileDialog::getSaveFileUrl(widget(), i18n("Save As"), url(), filter, &selectedFilter);
+
+    if ( !saveUrl.isValid() || saveUrl.isEmpty() )
+        return false;
+
+    // Has the user chosen to save in .okular archive format?
+    const bool saveAsOkularArchive = ( selectedFilter == okularArchiveMimeTypeFilter );
+
+    return saveAs( saveUrl, saveAsOkularArchive ? SaveAsOkularArchive : NoSaveAsFlags );
+}
+
+bool Part::saveAs(const QUrl & saveUrl)
+{
+    // Save in the same format (.okular vs native) as the current file
+    return saveAs( saveUrl, isDocumentArchive ? SaveAsOkularArchive : NoSaveAsFlags );
+}
+
+bool Part::saveAs( const QUrl & saveUrl, SaveAsFlags flags )
+{
+    // TODO When we get different saving backends we need to query the backend
+    // as to if it can save changes even if the open file has been modified,
+    // since we only have poppler as saving backend for now we're skipping that check
+    if ( m_fileLastModified != QFileInfo( localFilePath() ).lastModified() )
     {
-        /* Search local annotations */
-        bool containsLocalAnnotations = false;
-        const int pagecount = m_document->pages();
+        QMessageBox::warning( widget(),
+                              i18n( "File Changed" ),
+                              i18n( "The file '%1' has been modified by another program, which means it can no longer be saved.", url().fileName() ) );
+        return false;
+    }
 
-        for ( int pageno = 0; pageno < pagecount; ++pageno )
+    bool hasUserAcceptedReload = false;
+    if ( m_documentOpenWithPassword )
+    {
+        const int res = KMessageBox::warningYesNo( widget(),
+                    i18n( "The current document is protected with a password.<br />In order to save, the file needs to be reloaded. You will be asked for the password again and your undo/redo history will be lost.<br />Do you want to continue?" ),
+                    i18n( "Save - Warning" ) );
+
+        switch ( res )
         {
-            const Okular::Page *page = m_document->page( pageno );
-            foreach ( const Okular::Annotation *ann, page->annotations() )
-            {
-                if ( !(ann->flags() & Okular::Annotation::External) )
-                {
-                    containsLocalAnnotations = true;
-                    break;
-                }
-            }
-            if ( containsLocalAnnotations )
+            case KMessageBox::Yes:
+                hasUserAcceptedReload = true;
+                // do nothing
                 break;
-        }
-
-        /* Don't show it if there are no local annotations */
-        if ( containsLocalAnnotations )
-        {
-            int res = KMessageBox::warningContinueCancel( widget(), i18n("Your annotations will not be exported.\nYou can export the annotated document using File -> Export As -> Document Archive") );
-            if ( res != KMessageBox::Continue )
-                return; // Canceled
+            case KMessageBox::No: // User said no to continue, so return true even if save didn't happen otherwise we will get an error
+                return true;
         }
     }
 
-    QUrl saveUrl = QFileDialog::getSaveFileUrl( widget(), QString(), url() );
-    if ( !saveUrl.isValid() || saveUrl.isEmpty() )
-        return;
+    bool setModifiedAfterSave = false;
 
-    saveAs( saveUrl );
-}
-
-bool Part::saveAs( const QUrl & saveUrl )
-{
     QTemporaryFile tf;
     QString fileName;
     if ( !tf.open() )
@@ -2292,85 +2520,283 @@ bool Part::saveAs( const QUrl & saveUrl )
     fileName = tf.fileName();
     tf.close();
 
-    QString errorText;
-    bool saved;
+    QScopedPointer<QTemporaryFile> tempFile;
+    KIO::Job *copyJob = nullptr; // this will be filled with the job that writes to saveUrl
 
-    if ( isDocumentArchive )
-        saved = m_document->saveDocumentArchive( fileName );
-    else
-        saved = m_document->saveChanges( fileName, &errorText );
-
-    if ( !saved )
+    // Does the user want a .okular archive?
+    if ( flags & SaveAsOkularArchive )
     {
-        if (errorText.isEmpty())
+        if ( !hasUserAcceptedReload && !m_document->canSwapBackingFile() )
+        {
+            const int res = KMessageBox::warningYesNo( widget(),
+                        i18n( "After saving, the current document format requires the file to be reloaded. Your undo/redo history will be lost.<br />Do you want to continue?" ),
+                        i18n( "Save - Warning" ) );
+
+            switch ( res )
+            {
+                case KMessageBox::Yes:
+                    // do nothing
+                    break;
+                case KMessageBox::No: // User said no to continue, so return true even if save didn't happen otherwise we will get an error
+                    return true;
+            }
+        }
+
+        if ( !m_document->saveDocumentArchive( fileName ) )
         {
             KMessageBox::information( widget(), i18n("File could not be saved in '%1'. Try to save it to another location.", fileName ) );
+            return false;
         }
-        else
-        {
-            KMessageBox::information( widget(), i18n("File could not be saved in '%1'. %2", fileName, errorText ) );
-        }
-        return false;
+
+        copyJob = KIO::file_copy( QUrl::fromLocalFile( fileName ), saveUrl, -1, KIO::Overwrite );
     }
-
-    KIO::Job *copyJob = KIO::file_copy( QUrl::fromLocalFile(fileName), saveUrl, -1, KIO::Overwrite );
-    KJobWidgets::setWindow(copyJob, widget());
-    if ( !copyJob->exec() )
+    else
     {
-        KMessageBox::information( widget(), i18n("File could not be saved in '%1'. Try to save it to another location.", saveUrl.toDisplayString() ) );
-        return false;
-    }
+        bool wontSaveForms, wontSaveAnnotations;
+        checkNativeSaveDataLoss(&wontSaveForms, &wontSaveAnnotations);
 
-    setModified( false );
-    return true;
-}
-
-
-void Part::slotSaveCopyAs()
-{
-    if ( m_embedMode == PrintPreviewMode )
-       return;
-
-    QUrl saveUrl = QFileDialog::getSaveFileUrl( widget(), QString(), url());
-
-    if ( saveUrl.isValid() && !saveUrl.isEmpty() )
-    {
-        // make use of the already downloaded (in case of remote URLs) file,
-        // no point in downloading that again
-        QUrl srcUrl = QUrl::fromLocalFile( localFilePath() );
-        QTemporaryFile * tempFile = 0;
-        // duh, our local file disappeared...
-        if ( !QFile::exists( localFilePath() ) )
+        // If something can't be saved in this format, ask for confirmation
+        QStringList listOfwontSaves;
+        if ( wontSaveForms ) listOfwontSaves << i18n( "Filled form contents" );
+        if ( wontSaveAnnotations ) listOfwontSaves << i18n( "User annotations" );
+        if ( !listOfwontSaves.isEmpty() )
         {
-            if ( url().isLocalFile() )
+            if ( saveUrl == url()  )
             {
-#ifdef OKULAR_KEEP_FILE_OPEN
-                // local file: try to get it back from the open handle on it
-                if ( ( tempFile = m_keeper->copyToTemporary() ) )
-                    srcUrl = QUrl::fromLocalFile( tempFile->fileName() );
-#else
-                const QString msg = i18n( "Okular cannot copy %1 to the specified location.\n\nThe document does not exist anymore.", localFilePath() );
-                KMessageBox::sorry( widget(), msg );
-                return;
-#endif
+                // Save
+                const QString warningMessage = i18n( "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Okular document archive</i> format to preserve them." );
+                const int result = KMessageBox::warningYesNoList( widget(),
+                    warningMessage,
+                    listOfwontSaves, i18n( "Warning" ),
+                    KGuiItem( i18n( "Save as Okular document archive..." ), "document-save-as" ), // <- KMessageBox::Yes
+                    KStandardGuiItem::cancel() );
+
+                switch (result)
+                {
+                    case KMessageBox::Yes: // -> Save as Okular document archive
+                        return slotSaveFileAs( true /* showOkularArchiveAsDefaultFormat */ );
+                    default:
+                        return false;
+                }
             }
             else
             {
-                // we still have the original remote URL of the document,
-                // so copy the document from there
-                srcUrl = url();
+                // Save as
+                const QString warningMessage = m_document->canSwapBackingFile() ?
+                            i18n( "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Okular document archive</i> format to preserve them. Click <i>Continue</i> to save the document and discard these elements." ) :
+                            i18n( "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Okular document archive</i> format to preserve them. Click <i>Continue</i> to save, but you will lose these elements as well as the undo/redo history." );
+                const QString continueMessage = m_document->canSwapBackingFile() ?
+                            i18n( "Continue" ) :
+                            i18n( "Continue losing changes" );
+                const int result = KMessageBox::warningYesNoCancelList( widget(),
+                    warningMessage,
+                    listOfwontSaves, i18n( "Warning" ),
+                    KGuiItem( i18n( "Save as Okular document archive..." ), "document-save-as" ), // <- KMessageBox::Yes
+                    KGuiItem( continueMessage, "arrow-right" ) ); // <- KMessageBox::NO
+
+                switch (result)
+                {
+                    case KMessageBox::Yes: // -> Save as Okular document archive
+                        return slotSaveFileAs( true /* showOkularArchiveAsDefaultFormat */ );
+                    case KMessageBox::No: // -> Continue
+                        setModifiedAfterSave = m_document->canSwapBackingFile();
+                        break;
+                    case KMessageBox::Cancel:
+                        return false;
+                }
             }
         }
 
-        KIO::Job *copyJob = KIO::file_copy( srcUrl, saveUrl, -1, KIO::Overwrite );
-        KJobWidgets::setWindow(copyJob, widget());
-        if ( !copyJob->exec() )
-            KMessageBox::information( widget(), i18n("File could not be saved in '%1'. Try to save it to another location.", saveUrl.toDisplayString() ) );
+        if ( m_document->canSaveChanges() )
+        {
+            // If the generator supports saving changes, save them
 
-        delete tempFile;
+            QString errorText;
+            if ( !m_document->saveChanges( fileName, &errorText ) )
+            {
+                if (errorText.isEmpty())
+                    KMessageBox::information( widget(), i18n("File could not be saved in '%1'. Try to save it to another location.", fileName ) );
+                else
+                    KMessageBox::information( widget(), i18n("File could not be saved in '%1'. %2", fileName, errorText ) );
+
+                return false;
+            }
+
+            copyJob = KIO::file_copy( QUrl::fromLocalFile( fileName ), saveUrl, -1, KIO::Overwrite );
+        }
+        else
+        {
+            // If the generators doesn't support saving changes, we will
+            // just copy the original file.
+
+            if ( isDocumentArchive )
+            {
+                // Special case: if the user is extracting the contents of a
+                // .okular archive back to the native format, we can't just copy
+                // the open file (which is a .okular). So let's ask to core to
+                // extract and give us the real file
+
+                if ( !m_document->extractArchivedFile( fileName ) )
+                {
+                    KMessageBox::information( widget(), i18n("File could not be saved in '%1'. Try to save it to another location.", fileName ) );
+                    return false;
+                }
+
+                copyJob = KIO::file_copy( QUrl::fromLocalFile( fileName ), saveUrl, -1, KIO::Overwrite );
+            }
+            else
+            {
+                // Otherwise just copy the open file.
+                // make use of the already downloaded (in case of remote URLs) file,
+                // no point in downloading that again
+                QUrl srcUrl = QUrl::fromLocalFile( localFilePath() );
+                // duh, our local file disappeared...
+                if ( !QFile::exists( localFilePath() ) )
+                {
+                    if ( url().isLocalFile() )
+                    {
+#ifdef OKULAR_KEEP_FILE_OPEN
+                        // local file: try to get it back from the open handle on it
+                        tempFile.reset( m_keeper->copyToTemporary() );
+                        if ( tempFile )
+                            srcUrl = KUrl::fromPath( tempFile->fileName() );
+#else
+                        const QString msg = i18n( "Okular cannot copy %1 to the specified location.\n\nThe document does not exist anymore.", localFilePath() );
+                        KMessageBox::sorry( widget(), msg );
+                        return false;
+#endif
+                    }
+                    else
+                    {
+                        // we still have the original remote URL of the document,
+                        // so copy the document from there
+                        srcUrl = url();
+                    }
+                }
+
+                if ( srcUrl != saveUrl )
+                {
+                    copyJob = KIO::file_copy( srcUrl, saveUrl, -1, KIO::Overwrite );
+                }
+                else
+                {
+                    // Don't do a real copy in this case, just update the timestamps
+                    copyJob = KIO::setModificationTime( saveUrl, QDateTime::currentDateTime() );
+                }
+            }
+        }
     }
+
+    // Stop watching for changes while we write the new file (useful when
+    // overwriting)
+    if ( url().isLocalFile() )
+        unsetFileToWatch();
+
+    KJobWidgets::setWindow(copyJob, widget());
+    if ( !copyJob->exec() )
+    {
+        KMessageBox::information( widget(), i18n("File could not be saved in '%1'. Error: '%2'. Try to save it to another location.", saveUrl.toDisplayString(), copyJob->errorString() ) );
+
+        // Restore watcher
+        if ( url().isLocalFile() )
+            setFileToWatch( localFilePath() );
+
+        return false;
+    }
+
+    m_document->setHistoryClean( true );
+
+    if ( m_document->isDocdataMigrationNeeded() )
+        m_document->docdataMigrationDone();
+
+    bool reloadedCorrectly = true;
+
+    // Make the generator use the new new file instead of the old one
+    if ( m_document->canSwapBackingFile() && !m_documentOpenWithPassword )
+    {
+        // this calls openFile internally, which in turn actually calls
+        // m_document->swapBackingFile() instead of the regular loadDocument
+        if ( openUrl( saveUrl, true /* swapInsteadOfOpening */ ) )
+        {
+            if ( setModifiedAfterSave )
+            {
+                m_document->setHistoryClean( false );
+            }
+        }
+        else
+        {
+            reloadedCorrectly = false;
+        }
+    }
+    else
+    {
+        // If the generator doesn't support swapping file, then just reload
+        // the document from the new location
+        if ( !slotAttemptReload( true, saveUrl ) )
+            reloadedCorrectly = false;
+    }
+
+    // In case of file swapping errors, close the document to avoid inconsistencies
+    if ( !reloadedCorrectly )
+    {
+        qWarning() << "The document hasn't been reloaded/swapped correctly";
+        closeUrl();
+    }
+
+    // Restore watcher
+    if ( url().isLocalFile() )
+        setFileToWatch( localFilePath() );
+
+    return true;
 }
 
+// If the user wants to save in the original file's format, some features might
+// not be available. Find out what cannot be saved in this format
+void Part::checkNativeSaveDataLoss(bool *out_wontSaveForms, bool *out_wontSaveAnnotations) const
+{
+    bool wontSaveForms = false;
+    bool wontSaveAnnotations = false;
+
+    if ( !m_document->canSaveChanges( Document::SaveFormsCapability ) )
+    {
+        /* Set wontSaveForms only if there are forms */
+        const int pagecount = m_document->pages();
+
+        for ( int pageno = 0; pageno < pagecount; ++pageno )
+        {
+            const Okular::Page *page = m_document->page( pageno );
+            if ( !page->formFields().empty() )
+            {
+                wontSaveForms = true;
+                break;
+            }
+        }
+    }
+
+    if ( !m_document->canSaveChanges( Document::SaveAnnotationsCapability ) )
+    {
+        /* Set wontSaveAnnotations only if there are local annotations */
+        const int pagecount = m_document->pages();
+
+        for ( int pageno = 0; pageno < pagecount; ++pageno )
+        {
+            const Okular::Page *page = m_document->page( pageno );
+            foreach ( const Okular::Annotation *ann, page->annotations() )
+            {
+                if ( !(ann->flags() & Okular::Annotation::External) )
+                {
+                    wontSaveAnnotations = true;
+                    break;
+                }
+            }
+            if ( wontSaveAnnotations )
+                break;
+        }
+    }
+
+    *out_wontSaveForms = wontSaveForms;
+    *out_wontSaveAnnotations = wontSaveAnnotations;
+}
 
 void Part::slotGetNewStuff()
 {
@@ -2479,8 +2905,17 @@ void Part::slotPrintPreview()
     }
 }
 
+void Part::slotShowTOCMenu(const Okular::DocumentViewport &vp, const QPoint &point, const QString &title)
+{
+    showMenu(m_document->page(vp.pageNumber), point, title, vp);
+}
 
 void Part::slotShowMenu(const Okular::Page *page, const QPoint &point)
+{
+    showMenu(page, point);
+}
+
+void Part::showMenu(const Okular::Page *page, const QPoint &point, const QString &bookmarkTitle, const Okular::DocumentViewport &vp)
 {
     if ( m_embedMode == PrintPreviewMode )
        return;
@@ -2514,9 +2949,9 @@ void Part::slotShowMenu(const Okular::Page *page, const QPoint &point)
     }
 
     QMenu *popup = new QMenu( widget() );
-    QAction *addBookmark = 0;
-    QAction *removeBookmark = 0;
-    QAction *fitPageWidth = 0;
+    QAction *addBookmark = nullptr;
+    QAction *removeBookmark = nullptr;
+    QAction *fitPageWidth = nullptr;
     if (page)
     {
         popup->addAction( new OKMenuTitle( popup, i18n( "Page %1", page->number() + 1 ) ) );
@@ -2548,8 +2983,10 @@ void Part::slotShowMenu(const Okular::Page *page, const QPoint &point)
         {
             if (res == addBookmark)
             {
-                if (currentPage)
+                if ( currentPage && bookmarkTitle.isEmpty() )
                     m_document->bookmarkManager()->addBookmark( m_document->viewport() );
+                else if ( !bookmarkTitle.isEmpty() )
+                    m_document->bookmarkManager()->addBookmark( m_document->currentDocument(), vp, bookmarkTitle );
                 else
                     m_document->bookmarkManager()->addBookmark( page->number() );
             }
@@ -2569,20 +3006,19 @@ void Part::slotShowMenu(const Okular::Page *page, const QPoint &point)
     delete popup;
 }
 
-
 void Part::slotShowProperties()
 {
     PropertiesDialog *d = new PropertiesDialog(widget(), m_document);
-    d->exec();
-    delete d;
+    connect(d, &QDialog::finished, d, &QObject::deleteLater);
+    d->open();
 }
 
 
 void Part::slotShowEmbeddedFiles()
 {
     EmbeddedFilesDialog *d = new EmbeddedFilesDialog(widget(), m_document);
-    d->exec();
-    delete d;
+    connect(d, &QDialog::finished, d, &QObject::deleteLater);
+    d->open();
 }
 
 
@@ -2673,9 +3109,6 @@ void Part::slotExportAs(QAction * act)
         case 0:
             mimeType = mimeDatabase.mimeTypeForName(QStringLiteral("text/plain"));
             break;
-        case 1:
-            mimeType = mimeDatabase.mimeTypeForName(QStringLiteral("application/vnd.kde.okular-archive"));
-            break;
         default:
             mimeType = m_exportFormats.at( id - 2 ).mimeType();
             break;
@@ -2692,11 +3125,8 @@ void Part::slotExportAs(QAction * act)
             case 0:
                 saved = m_document->exportToText( fileName );
                 break;
-            case 1:
-                saved = m_document->saveDocumentArchive( fileName );
-                break;
             default:
-                saved = m_document->exportTo( fileName, m_exportFormats.at( id - 2 ) );
+                saved = m_document->exportTo( fileName, m_exportFormats.at( id - 1 ) );
                 break;
         }
         if ( !saved )
@@ -2711,7 +3141,7 @@ void Part::slotReload()
     // auto-refresh system
     m_dirtyHandler->stop();
 
-    slotDoFileDirty();
+    slotAttemptReload();
 }
 
 
@@ -2724,8 +3154,8 @@ void Part::slotPrint()
 #else
     QPrinter printer;
 #endif
-    QPrintDialog *printDialog = 0;
-    QWidget *printConfigWidget = 0;
+    QPrintDialog *printDialog = nullptr;
+    QWidget *printConfigWidget = nullptr;
 
     // Must do certain QPrinter setup before creating QPrintDialog
     setupPrint( printer );
@@ -2906,7 +3336,6 @@ void Part::unsetDummyMode()
 
     // attach the actions of the children widgets too
     m_formsMessage->addAction( m_pageView->toggleFormsAction() );
-    m_formsMessage->setVisible( m_pageView->toggleFormsAction() != 0 );
 
     // ensure history actions are in the correct state
     updateViewActions();
@@ -2915,7 +3344,7 @@ void Part::unsetDummyMode()
 
 bool Part::handleCompressed( QString &destpath, const QString &path, KFilterDev::CompressionType compressionType)
 {
-    m_tempfile = 0;
+    m_tempfile = nullptr;
 
     // we are working with a compressed file, decompressing
     // temporary file for decompressing
@@ -2994,7 +3423,7 @@ void Part::rebuildBookmarkMenu( bool unplugActions )
     if ( m_bookmarkActions.isEmpty() )
     {
         havebookmarks = false;
-        QAction * a = new QAction( 0 );
+        QAction * a = new QAction( nullptr );
         a->setText( i18n( "No Bookmarks" ) );
         a->setEnabled( false );
         m_bookmarkActions.append( a );
@@ -3063,6 +3492,25 @@ void Part::resetStartArguments()
 {
     m_cliPrint = false;
 }
+
+#if PURPOSE_FOUND
+void Part::slotShareActionFinished(const QJsonObject &output, int error, const QString &message)
+{
+    if (error) {
+        KMessageBox::error(widget(), i18n("There was a problem sharing the document: %1", message),
+                           i18n("Share"));
+    } else {
+        const QString url = output["url"].toString();
+        if (url.isEmpty()) {
+            m_pageView->displayMessage(i18n("Document shared successfully"));
+        } else {
+            KMessageBox::information(widget(), i18n("You can find the shared document at: <a href=\"%1\">%1</a>", url),
+                                     i18n("Share"), QString(),
+                                     KMessageBox::Notify | KMessageBox::AllowLink);
+        }
+    }
+}
+#endif
 
 void Part::setReadWrite(bool readwrite)
 {

@@ -1,5 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2005 by Albert Astals Cid <aacid@kde.org>               *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -25,18 +28,19 @@ class KIMGIOGenerator : public Okular::Generator
         virtual ~KIMGIOGenerator();
 
         // [INHERITED] load a document and fill up the pagesVector
-        bool loadDocument( const QString & fileName, QVector<Okular::Page*> & pagesVector );
-        bool loadDocumentFromData( const QByteArray & fileData, QVector<Okular::Page*> & pagesVector );
+        bool loadDocument( const QString & fileName, QVector<Okular::Page*> & pagesVector ) override;
+        bool loadDocumentFromData( const QByteArray & fileData, QVector<Okular::Page*> & pagesVector ) override;
+        SwapBackingFileResult swapBackingFile( QString const &newFileName, QVector<Okular::Page*> & newPagesVector ) override;
 
         // [INHERITED] print document using already configured kprinter
-        bool print( QPrinter& printer );
+        bool print( QPrinter& printer ) override;
 
         // [INHERITED] document information
-        Okular::DocumentInfo generateDocumentInfo( const QSet<Okular::DocumentInfo::Key> &keys ) const;
+        Okular::DocumentInfo generateDocumentInfo( const QSet<Okular::DocumentInfo::Key> &keys ) const override;
 
     protected:
-        bool doCloseDocument();
-        QImage image( Okular::PixmapRequest * request );
+        bool doCloseDocument() override;
+        QImage image( Okular::PixmapRequest * request ) override;
 
     private:
         bool loadDocumentInternal(const QByteArray & fileData, const QString & fileName,

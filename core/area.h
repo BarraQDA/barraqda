@@ -455,18 +455,18 @@ class OKULARCORE_EXPORT AnnotationObjectRect : public ObjectRect
          * Returns the bounding rect of the annotation object rectangle for the
          * scaling factor @p xScale and @p yScale.
          */
-        virtual QRect boundingRect( double xScale, double yScale ) const;
+        QRect boundingRect( double xScale, double yScale ) const override;
 
         /**
          * Returns whether the annotation object rectangle contains the point @p x, @p y for the
          * scaling factor @p xScale and @p yScale.
          */
-        virtual bool contains( double x, double y, double xScale, double yScale ) const;
+        bool contains( double x, double y, double xScale, double yScale ) const override;
 
         /**
          * Transforms the annotation object rectangle with the operations defined by @p matrix.
          */
-        virtual void transform( const QTransform &matrix );
+        void transform( const QTransform &matrix ) override;
 
     private:
         Annotation * m_annotation;
@@ -535,13 +535,13 @@ class OKULARCORE_EXPORT SourceRefObjectRect : public ObjectRect
          * Returns the bounding rect of the source reference object rectangle for the
          * scaling factor @p xScale and @p yScale.
          */
-        virtual QRect boundingRect( double xScale, double yScale ) const;
+        QRect boundingRect( double xScale, double yScale ) const override;
 
         /**
          * Returns whether the source reference object rectangle contains the point @p x, @p y for the
          * scaling factor @p xScale and @p yScale.
          */
-        virtual bool contains( double x, double y, double xScale, double yScale ) const;
+        bool contains( double x, double y, double xScale, double yScale ) const override;
 
     private:
         NormalizedPoint m_point;
@@ -905,7 +905,7 @@ class HighlightAreaRect : public RegularAreaRect
          * Creates a new highlight area rect with the coordinates of
          * the given @p area.
          */
-        HighlightAreaRect( const RegularAreaRect *area = 0 );
+        HighlightAreaRect( const RegularAreaRect *area = nullptr );
 
         /**
          * The search ID of the highlight owner.

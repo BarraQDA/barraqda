@@ -10,10 +10,10 @@
 
 #include "generator_chm.h"
 
-#include <QtCore/QEventLoop>
-#include <QtCore/QMutex>
-#include <QtGui/QPainter>
-#include <QtXml/QDomElement>
+#include <QEventLoop>
+#include <QMutex>
+#include <QPainter>
+#include <QDomElement>
 
 #include <KAboutData>
 #include <khtml_part.h>
@@ -55,7 +55,6 @@ CHMGenerator::CHMGenerator( QObject *parent, const QVariantList &args )
 
     m_syncGen=0;
     m_file=0;
-    m_pixmapRequestZoom=1;
     m_request = 0;
 }
 
@@ -66,58 +65,72 @@ CHMGenerator::~CHMGenerator()
 
 bool CHMGenerator::loadDocument( const QString & fileName, QVector< Okular::Page * > & pagesVector )
 {
-    m_file = new LCHMFile();
-    if (!m_file->loadFile(fileName))
+    m_file = new EBook_CHM();
+    m_file = EBook::loadFile( fileName );
+    if (!m_file)
     {
-        delete m_file;
-        m_file = 0;
         return false;
     }
     m_fileName=fileName;
-    QVector< LCHMParsedEntry > topics;
-    m_file->parseTableOfContents(&topics);
+    QList< EBookTocEntry > topics;
+    m_file->getTableOfContents(topics);
     
     // fill m_docSyn
     QMap<int, QDomElement> lastIndentElement;
-    foreach(const LCHMParsedEntry &e, topics)
+    QMap<QString, int> tmpPageList;
+    int pageNum = 0;
+
+    foreach(const EBookTocEntry &e, topics)
     {
         QDomElement item = m_docSyn.createElement(e.name);
-        if (!e.urls.isEmpty())
+        if (!e.url.isEmpty())
         {
-            QString url = e.urls.first();
-            if (url.contains(QChar::fromLatin1('%')))
-                url = QString::fromUtf8(QByteArray::fromPercentEncoding(url.toUtf8()));
+            QString url = e.url.toString();
             item.setAttribute(QStringLiteral("ViewportName"), url);
+            if(!tmpPageList.contains(url))
+            {//add a page only once
+                tmpPageList.insert(url, pageNum);
+                pageNum++;
+            }
         }
-        item.setAttribute(QStringLiteral("Icon"), e.imageid);
+        item.setAttribute(QStringLiteral("Icon"), e.iconid);
         if (e.indent == 0) m_docSyn.appendChild(item);
         else lastIndentElement[e.indent - 1].appendChild(item);
         lastIndentElement[e.indent] = item;
     }
     
     // fill m_urlPage and m_pageUrl
-    int pageNum = 0;
-    QStringList pageList;
-    m_file->enumerateFiles(&pageList);
-    const QString home = m_file->homeUrl();
+    QList<QUrl> pageList;
+    m_file->enumerateFiles(pageList);
+    const QString home = m_file->homeUrl().toString();
     if (home != QLatin1String("/"))
         pageList.prepend(home);
-    foreach (const QString &url, pageList)
+    m_pageUrl.resize(pageNum);
+
+    foreach (const QUrl &qurl, pageList)
     {
+        QString url = qurl.toString();
         const QString urlLower = url.toLower();
         if (!urlLower.endsWith(QLatin1String(".html")) && !urlLower.endsWith(QLatin1String(".htm")))
             continue;
 
         int pos = url.indexOf (QLatin1Char(('#')));
+        // insert the url into the maps, but insert always the variant without the #ref part
         QString tmpUrl = pos == -1 ? url : url.left(pos);
 
         // url already there, abort insertion
         if (m_urlPage.contains(tmpUrl)) continue;
 
-        // insert the url into the maps, but insert always the variant without the #ref part
-        m_urlPage.insert(tmpUrl, pageNum);
-        m_pageUrl.append(tmpUrl);
-        pageNum++;
+        int foundPage = tmpPageList.value(tmpUrl, -1);
+        if (foundPage != -1 ) {
+            m_urlPage.insert(tmpUrl, foundPage);
+            m_pageUrl[foundPage] = tmpUrl;
+        } else {
+            //add pages not present in toc
+            m_urlPage.insert(tmpUrl, pageNum);
+            m_pageUrl.append(tmpUrl);
+            pageNum++;
+        }
     }
 
     pagesVector.resize(m_pageUrl.count());
@@ -132,7 +145,7 @@ bool CHMGenerator::loadDocument( const QString & fileName, QVector< Okular::Page
 
     for (int i = 0; i < m_pageUrl.count(); ++i)
     {
-        preparePageForSyncOperation(100, m_pageUrl.at(i));
+        preparePageForSyncOperation(m_pageUrl.at(i));
         pagesVector[ i ] = new Okular::Page (i, m_syncGen->view()->contentsWidth(),
             m_syncGen->view()->contentsHeight(), Okular::Rotation0 );
     }
@@ -161,11 +174,11 @@ bool CHMGenerator::doCloseDocument()
     return true;
 }
 
-void CHMGenerator::preparePageForSyncOperation( int zoom , const QString & url)
+void CHMGenerator::preparePageForSyncOperation(const QString & url)
 {
-    QString pAddress= QStringLiteral("ms-its:") + m_fileName + QStringLiteral("::") + url;
+    QString pAddress = QStringLiteral("ms-its:") + m_fileName + QStringLiteral("::") + m_file->urlToPath(QUrl(url));
     m_chmUrl = url;
-    m_syncGen->setZoomFactor(zoom);
+
     m_syncGen->openUrl(QUrl(pAddress));
     m_syncGen->view()->layout();
 
@@ -183,7 +196,7 @@ void CHMGenerator::slotCompleted()
         return;
 
     QImage image( m_request->width(), m_request->height(), QImage::Format_ARGB32 );
-    image.fill( qRgb( 255, 255, 255 ) );
+    image.fill( Qt::white );
 
     QPainter p( &image );
     QRect r( 0, 0, m_request->width(), m_request->height() );
@@ -192,9 +205,6 @@ void CHMGenerator::slotCompleted()
     m_syncGen->paint( &p, r, 0, &moreToPaint );
 
     p.end();
-
-    if ( m_pixmapRequestZoom > 1 )
-        m_pixmapRequestZoom = 1;
 
     if ( !m_textpageAddedList.at( m_request->pageNumber() ) ) {
         additionalRequestData();
@@ -245,23 +255,13 @@ void CHMGenerator::generatePixmap( Okular::PixmapRequest * request )
 {
     int requestWidth = request->width();
     int requestHeight = request->height();
-    if (requestWidth<300)
-    {
-        m_pixmapRequestZoom=900/requestWidth;
-        requestWidth*=m_pixmapRequestZoom;
-        requestHeight*=m_pixmapRequestZoom;
-    }
 
     userMutex()->lock();
     QString url= m_pageUrl[request->pageNumber()];
-    int zoom = qRound( qMax( static_cast<double>(requestWidth)/static_cast<double>(request->page()->width())
-        , static_cast<double>(requestHeight)/static_cast<double>(request->page()->height())
-        ) ) * 100;
 
-    QString pAddress= QStringLiteral("ms-its:") + m_fileName + QStringLiteral("::") + url;
+    QString pAddress= QStringLiteral("ms-its:") + m_fileName + QStringLiteral("::") + m_file->urlToPath(QUrl(url));
     m_chmUrl = url;
-    m_syncGen->setZoomFactor(zoom);
-    m_syncGen->view()->resize(requestWidth,requestHeight);
+    m_syncGen->view()->resizeContents(requestWidth,requestHeight);
     m_request=request;
     // will emit openURL without problems
     m_syncGen->openUrl ( QUrl(pAddress) );
@@ -411,10 +411,10 @@ void CHMGenerator::additionalRequestData()
 Okular::TextPage* CHMGenerator::textPage( Okular::Page * page )
 {
     userMutex()->lock();
-    const int zoom = 100;
+
     m_syncGen->view()->resize(page->width(), page->height());
     
-    preparePageForSyncOperation(zoom, m_pageUrl[page->number()]);
+    preparePageForSyncOperation(m_pageUrl[page->number()]);
     Okular::TextPage *tp=new Okular::TextPage();
     recursiveExploreNodes( m_syncGen->htmlDocument(), tp);
     userMutex()->unlock();

@@ -1,5 +1,9 @@
 /***************************************************************************
  *   Copyright (C) 2004 by Enrico Ros <eros.kde@email.it>                  *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -69,10 +73,10 @@ static void deleteObjectRects( QLinkedList< ObjectRect * >& rects, const QSet<Ob
 
 PagePrivate::PagePrivate( Page *page, uint n, double w, double h, Rotation o )
     : m_page( page ), m_number( n ), m_orientation( o ),
-      m_width( w ), m_height( h ), m_offset( -1 ), m_doc( 0 ), m_boundingBox( 0, 0, 1, 1 ),
+      m_width( w ), m_height( h ), m_doc( nullptr ), m_boundingBox( 0, 0, 1, 1 ),
       m_rotation( Rotation0 ),
-      m_text( 0 ), m_transition( 0 ), m_textSelections( 0 ),
-      m_openingAction( 0 ), m_closingAction( 0 ), m_duration( -1 ),
+      m_text( nullptr ), m_transition( nullptr ), m_textSelections( nullptr ),
+      m_openingAction( nullptr ), m_closingAction( nullptr ), m_duration( -1 ),
       m_isBoundingBoxKnown( false )
 {
     // avoid Division-By-Zero problems in the program
@@ -92,6 +96,10 @@ PagePrivate::~PagePrivate()
     delete m_transition;
 }
 
+PagePrivate *PagePrivate::get( Page * page )
+{
+    return page ? page->d : nullptr;
+}
 
 void PagePrivate::imageRotationDone( RotationJob * job )
 {
@@ -133,6 +141,7 @@ Page::Page( uint page, double w, double h, Rotation o )
 
 Page::~Page()
 {
+<<<<<<< HEAD
     deletePixmaps();
     deleteRects();
     d->deleteHighlights();
@@ -142,6 +151,19 @@ Page::~Page()
     deleteTaggings();
 
     delete d;
+=======
+    if (d)
+    {
+        deletePixmaps();
+        deleteRects();
+        d->deleteHighlights();
+        deleteAnnotations();
+        d->deleteTextSelections();
+        deleteSourceReferences();
+
+        delete d;
+    }
+>>>>>>> 3676ee995746e8e26f07653508c913b3e49c551b
 }
 
 int Page::number() const
@@ -209,7 +231,11 @@ bool Page::hasPixmap( DocumentObserver *observer, int width, int height, const N
     {
         if ( width != tm->width() || height != tm->height() )
         {
-            tm->setSize( width, height );
+            // FIXME hasPixmap should not be calling setSize on the TilesManager this is not very "const"
+            // as this function claims to be
+            if ( width != -1 && height != -1 ) {
+                tm->setSize( width, height );
+            }
             return false;
         }
 
@@ -230,7 +256,7 @@ bool Page::hasPixmap( DocumentObserver *observer, int width, int height, const N
 
 bool Page::hasTextPage() const
 {
-    return d->m_text != 0;
+    return d->m_text != nullptr;
 }
 
 Document *Page::document() const
@@ -274,7 +300,7 @@ RegularAreaRect * Page::wordAt( const NormalizedPoint &p, QString *word ) const
     if ( d->m_text )
         return d->m_text->wordAt( p, word );
 
-    return 0;
+    return nullptr;
 }
 
 RegularAreaRect * Page::textArea ( TextSelection * selection ) const
@@ -282,7 +308,7 @@ RegularAreaRect * Page::textArea ( TextSelection * selection ) const
     if ( d->m_text )
         return d->m_text->textArea( selection );
 
-    return 0;
+    return nullptr;
 }
 
 bool Page::hasObjectRect( double x, double y, double xScale, double yScale ) const
@@ -316,7 +342,7 @@ bool Page::hasHighlights( int s_id ) const
 
 bool Page::hasTransition() const
 {
-    return d->m_transition != 0;
+    return d->m_transition != nullptr;
 }
 
 bool Page::hasAnnotations() const
@@ -327,7 +353,7 @@ bool Page::hasAnnotations() const
 RegularAreaRect * Page::findText( int id, const QString & text, SearchDirection direction,
                                   Qt::CaseSensitivity caseSensitivity, const RegularAreaRect *lastRect ) const
 {
-    RegularAreaRect* rect = 0;
+    RegularAreaRect* rect = nullptr;
     if ( text.isEmpty() || !d->m_text )
         return rect;
 
@@ -405,7 +431,7 @@ QString Page::text( const RegularAreaRect * area, TextPage::TextAreaInclusionBeh
         ret = d->m_text->text( &rotatedArea, b );
     }
     else
-        ret = d->m_text->text( 0, b );
+        ret = d->m_text->text( nullptr, b );
 
     return ret;
 }
@@ -425,7 +451,7 @@ TextEntity::List Page::words( const RegularAreaRect * area, TextPage::TextAreaIn
         ret = d->m_text->words( &rotatedArea, b );
     }
     else
-        ret = d->m_text->words( 0, b );
+        ret = d->m_text->words( nullptr, b );
 
     for (int i = 0; i < ret.length(); ++i)
     {
@@ -519,7 +545,7 @@ const ObjectRect * Page::objectRect( ObjectRect::ObjectType type, double x, doub
             return objrect;
     }
 
-    return 0;
+    return nullptr;
 }
 
 QLinkedList< const ObjectRect * > Page::objectRects( ObjectRect::ObjectType type, double x, double y, double xScale, double yScale ) const
@@ -541,7 +567,7 @@ QLinkedList< const ObjectRect * > Page::objectRects( ObjectRect::ObjectType type
 
 const ObjectRect* Page::nearestObjectRect( ObjectRect::ObjectType type, double x, double y, double xScale, double yScale, double * distance ) const
 {
-    ObjectRect * res = 0;
+    ObjectRect * res = nullptr;
     double minDistance = std::numeric_limits<double>::max();
 
     QLinkedList< ObjectRect * >::const_iterator it = m_rects.constBegin(), end = m_rects.constEnd();
@@ -573,6 +599,16 @@ QLinkedList< Annotation* > Page::annotations() const
     return m_annotations;
 }
 
+Annotation * Page::annotation( const QString & uniqueName ) const
+{
+    foreach(Annotation *a, m_annotations)
+    {
+        if ( a->uniqueName() == uniqueName )
+            return a;
+    }
+    return nullptr;
+}
+
 const Action * Page::pageAction( PageAction action ) const
 {
     switch ( action )
@@ -585,7 +621,7 @@ const Action * Page::pageAction( PageAction action ) const
             break;
     }
 
-    return 0;
+    return nullptr;
 }
 
 QLinkedList< FormField * > Page::formFields() const
@@ -616,10 +652,14 @@ void Page::setPixmap( DocumentObserver *observer, QPixmap *pixmap, const Normali
         it.value().m_pixmap = pixmap;
         it.value().m_rotation = d->m_rotation;
     } else {
-        RotationJob *job = new RotationJob( pixmap->toImage(), Rotation0, d->m_rotation, observer );
-        job->setPage( d );
-        job->setRect( TilesManager::toRotatedRect( rect, d->m_rotation ) );
-        d->m_doc->m_pageController->addRotationJob(job);
+        // it can happen that we get a setPixmap while closing and thus the page controller is gone
+        if ( d->m_doc->m_pageController )
+        {
+            RotationJob *job = new RotationJob( pixmap->toImage(), Rotation0, d->m_rotation, observer );
+            job->setPage( d );
+            job->setRect( TilesManager::toRotatedRect( rect, d->m_rotation ) );
+            d->m_doc->m_pageController->addRotationJob(job);
+        }
 
         delete pixmap;
     }
@@ -632,7 +672,7 @@ void Page::setTextPage( TextPage * textPage )
     d->m_text = textPage;
     if ( d->m_text )
     {
-        d->m_text->d->m_page = d;
+        d->m_text->d->m_page = this;
         /**
          * Correct text order for before text selection
          */
@@ -757,7 +797,7 @@ bool Page::removeAnnotation( Annotation * annotation )
                     rectfound = true;
                 }
             qCDebug(OkularCoreDebug) << "removed annotation:" << annotation->uniqueName();
-            annotation->d_ptr->m_page = 0;
+            annotation->d_ptr->m_page = nullptr;
             m_annotations.erase( aIt );
             break;
         }
@@ -918,7 +958,7 @@ void PagePrivate::deleteHighlights( int s_id )
 void PagePrivate::deleteTextSelections()
 {
     delete m_textSelections;
-    m_textSelections = 0;
+    m_textSelections = nullptr;
 }
 
 void Page::deleteSourceReferences()
@@ -937,8 +977,10 @@ void Page::deleteAnnotations()
     m_annotations.clear();
 }
 
-void PagePrivate::restoreLocalContents( const QDomNode & pageNode )
+bool PagePrivate::restoreLocalContents( const QDomNode & pageNode )
 {
+    bool loadedAnything = false; // set if something actually gets loaded
+
     // iterate over all chilren (annotationList, ...)
     QDomNode childNode = pageNode.firstChild();
     while ( childNode.isElement() )
@@ -973,6 +1015,7 @@ void PagePrivate::restoreLocalContents( const QDomNode & pageNode )
                 {
                     m_doc->performAddPageAnnotation(m_number, annotation);
                     qCDebug(OkularCoreDebug) << "restored annot:" << annotation->uniqueName();
+                    loadedAnything = true;
                 }
                 else
                     qCWarning(OkularCoreDebug).nospace() << "page (" << m_number << "): can't restore an annotation from XML.";
@@ -1019,6 +1062,10 @@ void PagePrivate::restoreLocalContents( const QDomNode & pageNode )
         // parse formList child element
         else if ( childElement.tagName() == QLatin1String("forms") )
         {
+            // Clone forms as root node in restoredFormFieldList
+            const QDomNode clonedNode = restoredFormFieldList.importNode( childElement, true );
+            restoredFormFieldList.appendChild( clonedNode );
+
             if ( formfields.isEmpty() )
                 continue;
 
@@ -1051,9 +1098,12 @@ void PagePrivate::restoreLocalContents( const QDomNode & pageNode )
 
                 QString value = formElement.attribute( QStringLiteral("value") );
                 (*wantedIt)->d_ptr->setValue( value );
+                loadedAnything = true;
             }
         }
     }
+
+    return loadedAnything;
 }
 
 void PagePrivate::saveLocalContents( QDomNode & parentNode, QDomDocument & document, PageItems what ) const
@@ -1138,7 +1188,17 @@ void PagePrivate::saveLocalContents( QDomNode & parentNode, QDomDocument & docum
     }
 
     // add forms info if has got any
-    if ( ( what & FormFieldPageItems ) && !formfields.isEmpty() )
+    if ( ( what & FormFieldPageItems ) && ( what & OriginalFormFieldPageItems ) )
+    {
+        const QDomElement savedDocRoot = restoredFormFieldList.documentElement();
+        if ( !savedDocRoot.isNull() )
+        {
+            // Import and append node in target document
+            const QDomNode importedNode = document.importNode( savedDocRoot, true );
+            pageElement.appendChild( importedNode );
+        }
+    }
+    else if ( ( what & FormFieldPageItems ) && !formfields.isEmpty() )
     {
         // create the formList
         QDomElement formListElement = document.createElement( QStringLiteral("forms") );
@@ -1175,7 +1235,7 @@ const QPixmap * Page::_o_nearestPixmap( DocumentObserver *observer, int w, int h
 {
     Q_UNUSED( h )
 
-    const QPixmap * pixmap = 0;
+    const QPixmap * pixmap = nullptr;
 
     // if a pixmap is present for given id, use it
     QMap< DocumentObserver*, PagePrivate::PixmapObject >::const_iterator itPixmap = d->m_pixmaps.constFind( observer );
@@ -1203,7 +1263,7 @@ const QPixmap * Page::_o_nearestPixmap( DocumentObserver *observer, int w, int h
 
 bool Page::hasTilesManager( const DocumentObserver *observer ) const
 {
-    return d->tilesManager( observer ) != 0;
+    return d->tilesManager( observer ) != nullptr;
 }
 
 QList<Tile> Page::tilesAt( const DocumentObserver *observer, const NormalizedRect &rect ) const
@@ -1226,4 +1286,60 @@ void PagePrivate::setTilesManager( const DocumentObserver *observer, TilesManage
     delete old;
 
     m_tilesManagers.insert(observer, tm);
+}
+
+void PagePrivate::adoptGeneratedContents( PagePrivate *oldPage )
+{
+    rotateAt( oldPage->m_rotation );
+
+    m_pixmaps = oldPage->m_pixmaps;
+    oldPage->m_pixmaps.clear();
+
+    m_tilesManagers = oldPage->m_tilesManagers;
+    oldPage->m_tilesManagers.clear();
+
+    m_boundingBox = oldPage->m_boundingBox;
+    m_isBoundingBoxKnown = oldPage->m_isBoundingBoxKnown;
+    m_text = oldPage->m_text;
+    oldPage->m_text = nullptr;
+
+    m_textSelections = oldPage->m_textSelections;
+    oldPage->m_textSelections = nullptr;
+
+    restoredLocalAnnotationList = oldPage->restoredLocalAnnotationList;
+    restoredFormFieldList = oldPage->restoredFormFieldList;
+}
+
+FormField *PagePrivate::findEquivalentForm( const Page *p, FormField *oldField )
+{
+    // given how id is not very good of id (at least for pdf) we do a few passes
+    // same rect, type and id
+    foreach(FormField *f, p->d->formfields)
+    {
+        if (f->rect() == oldField->rect() && f->type() == oldField->type() && f->id() == oldField->id())
+            return f;
+    }
+    // same rect and type
+    foreach(FormField *f, p->d->formfields)
+    {
+        if (f->rect() == oldField->rect() && f->type() == oldField->type())
+            return f;
+    }
+    // fuzzy rect, same type and id
+    foreach(FormField *f, p->d->formfields)
+    {
+        if (f->type() == oldField->type() && f->id() == oldField->id() && qFuzzyCompare(f->rect().left, oldField->rect().left) && qFuzzyCompare(f->rect().top, oldField->rect().top) && qFuzzyCompare(f->rect().right, oldField->rect().right) && qFuzzyCompare(f->rect().bottom, oldField->rect().bottom))
+        {
+            return f;
+        }
+    }
+    // fuzzy rect and same type
+    foreach(FormField *f, p->d->formfields)
+    {
+        if (f->type() == oldField->type() && qFuzzyCompare(f->rect().left, oldField->rect().left) && qFuzzyCompare(f->rect().top, oldField->rect().top) && qFuzzyCompare(f->rect().right, oldField->rect().right) && qFuzzyCompare(f->rect().bottom, oldField->rect().bottom))
+        {
+            return f;
+        }
+    }
+    return nullptr;
 }

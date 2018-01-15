@@ -1,3 +1,6 @@
+remove_definitions(-DTRANSLATION_DOMAIN="okular")
+add_definitions(-DTRANSLATION_DOMAIN="okular_poppler")
+
 add_subdirectory( conf )
 
 if (Poppler_VERSION VERSION_GREATER "0.23.99")
@@ -15,6 +18,48 @@ endif()
 if (Poppler_VERSION VERSION_GREATER "0.36.99")
   set (HAVE_POPPLER_0_37 1)
 endif()
+
+set(CMAKE_REQUIRED_LIBRARIES Poppler::Qt5 Qt5::Core Qt5::Gui)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+int main()
+{
+  Poppler::LinkOCGState *l = 0;
+  return 0;
+}
+" HAVE_POPPLER_0_50)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+#include <poppler-form.h>
+int main()
+{
+  Poppler::FormFieldButton *ff = 0;
+  Poppler::Link *l = ff->additionalAction(Poppler::FormField::CalculateField);
+  return 0;
+}
+" HAVE_POPPLER_0_53)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+int main()
+{
+  Poppler::Document::RenderHint hint = Poppler::Document::HideAnnotations;
+  return 0;
+}
+" HAVE_POPPLER_0_60)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+#include <QImage>
+int main()
+{
+  Poppler::Page *p;
+  p->renderToImage(0, 0, 0, 0, 0, 0, Poppler::Page::Rotate0, nullptr, nullptr, QVariant());
+  return 0;
+}
+" HAVE_POPPLER_0_62)
 
 configure_file(
    ${CMAKE_CURRENT_SOURCE_DIR}/config-okular-poppler.h.cmake

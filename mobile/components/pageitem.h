@@ -83,7 +83,7 @@ class PageItem : public QQuickPaintedItem, public Okular::View
 
 public:
 
-    explicit PageItem(QQuickItem *parent=0);
+    explicit PageItem(QQuickItem *parent=nullptr);
     ~PageItem();
 
     void setFlickable(QQuickItem *flickable);
@@ -135,10 +135,10 @@ public:
      */
     Q_INVOKABLE void removeBookmark(const QString &bookmark);
 
-    void paint(QPainter *painter);
+    void paint(QPainter *painter) override;
 
     void geometryChanged(const QRectF &newGeometry,
-                         const QRectF &oldGeometry);
+                         const QRectF &oldGeometry) override;
 
 Q_SIGNALS:
     void flickableChanged();

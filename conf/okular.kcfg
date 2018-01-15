@@ -290,12 +290,20 @@
   <entry key="ShowSourceLocationsGraphically" type="Bool" >
    <default>false</default>
   </entry>
+  <entry key="UseCustomBackgroundColor" type="Bool" >
+   <default>false</default>
+  </entry>
+  <entry key="BackgroundColor" type="Color" >
+  </entry>
  </group>
  <group name="Search" >
   <entry key="SearchCaseSensitive" type="Bool">
    <default>false</default>
   </entry>
   <entry key="SearchFromCurrentPage" type="Bool">
+   <default>true</default>
+  </entry>
+  <entry key="FindAsYouType" type="Bool">
    <default>true</default>
   </entry>
  </group>

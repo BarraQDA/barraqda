@@ -2,6 +2,9 @@
  *   Copyright (C) 2004-5 by Enrico Ros <eros.kde@email.it>                *
  *   Copyright (C) 2005   by Piotr Szymanski <niedakh@gmail.com>           *
  *   Copyright (C) 2008   by Albert Astals Cid <aacid@kde.org>             *
+ *   Copyright (C) 2017   Klarälvdalens Datakonsult AB, a KDAB Group       *
+ *                        company, info@kdab.com. Work sponsored by the    *
+ *                        LiMux project of the city of Munich              *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -41,6 +44,7 @@ class QIcon;
 
 namespace Okular {
 
+class BackendOpaqueAction;
 class DocumentFonts;
 class DocumentInfo;
 class DocumentObserver;
@@ -207,13 +211,14 @@ class OKULARCORE_EXPORT Generator : public QObject
             PrintNative,       ///< Whether the Generator supports native cross-platform printing (QPainter-based).
             PrintPostscript,   ///< Whether the Generator supports postscript-based file printing.
             PrintToFile,       ///< Whether the Generator supports export to PDF & PS through the Print Dialog
-            TiledRendering     ///< Whether the Generator can render tiles @since 0.16 (KDE 4.10)
+            TiledRendering,    ///< Whether the Generator can render tiles @since 0.16 (KDE 4.10)
+            SwapBackingFile    ///< Whether the Generator can hot-swap the file it's reading from @since 1.3
         };
 
         /**
          * Creates a new generator.
          */
-        Generator(QObject* parent = Q_NULLPTR, const QVariantList& args = QVariantList());
+        Generator(QObject* parent = nullptr, const QVariantList& args = QVariantList());
 
         /**
          * Destroys the generator.
@@ -268,6 +273,27 @@ class OKULARCORE_EXPORT Generator : public QObject
          */
         virtual Document::OpenResult loadDocumentFromDataWithPassword( const QByteArray & fileData, QVector< Page * > & pagesVector, const QString &password );
 
+        /**
+         * Describes the result of an swap file operation.
+         *
+         * @since 1.3
+         */
+        enum SwapBackingFileResult
+        {
+            SwapBackingFileError,               //< The document could not be swapped
+            SwapBackingFileNoOp,                //< The document was swapped and nothing needs to be done
+            SwapBackingFileReloadInternalData   //< The document was swapped and internal data (forms, annotations, etc) needs to be reloaded
+        };
+
+        /**
+         * Changes the path of the file we are reading from. The new path must
+         * point to a copy of the same document.
+         *
+         * @note the Generator has to have the feature @ref SwapBackingFile enabled
+         *
+         * @since 1.3
+         */
+        virtual SwapBackingFileResult swapBackingFile( const QString & newFileName, QVector<Okular::Page*> & newPagesVector );
 
         /**
          * This method is called when the document is closed and not used
@@ -440,6 +466,11 @@ class OKULARCORE_EXPORT Generator : public QObject
          */
         virtual QAbstractItemModel * layersModel() const;
 
+        /**
+         * Calls the backend to execute an BackendOpaqueAction
+         */
+        virtual void opaqueAction( const BackendOpaqueAction *action );
+
     Q_SIGNALS:
         /**
          * This signal should be emitted whenever an error occurred in the generator.
@@ -513,10 +544,28 @@ class OKULARCORE_EXPORT Generator : public QObject
         void setFeature( GeneratorFeature feature, bool on = true );
 
         /**
+         * Internal document setting
+         */
+        enum DocumentMetaDataKey {
+            PaperColorMetaData,         ///< Returns (QColor) the paper color if set in Settings or the default color (white) if option is true (otherwise returns a non initialized QColor)
+            TextAntialiasMetaData,      ///< Returns (bool) text antialias from Settings (option is not used)
+            GraphicsAntialiasMetaData,  ///< Returns (bool)graphic antialias from Settings (option is not used)
+            TextHintingMetaData         ///< Returns (bool)text hinting from Settings (option is not used)
+        };
+
+        /**
+         * Request a meta data of the Document, if available, like an internal
+         * setting.
+         *
+         * @since 1.1
+         */
+        QVariant documentMetaData( const DocumentMetaDataKey key, const QVariant &option = QVariant() ) const;
+
+        /**
          * Request a meta data of the Document, if available, like an internal
          * setting.
          */
-        QVariant documentMetaData( const QString &key, const QVariant &option = QVariant() ) const;
+        OKULARCORE_DEPRECATED QVariant documentMetaData( const QString &key, const QVariant &option = QVariant() ) const;
 
         /**
          * Return the pointer to a mutex the generator can use freely.
@@ -551,6 +600,13 @@ class OKULARCORE_EXPORT Generator : public QObject
          * @since 0.11 (KDE 4.5)
          */
         Okular::Generator::PrintError printError() const;
+
+        /**
+         * This method can be called to trigger a partial pixmap update for the given request
+         * Make sure you call it in a way it's executed in the main thread.
+         * @since 1.3
+         */
+        void signalPartialPixmapRequest( Okular::PixmapRequest *request, const QImage &image );
 
     protected:
         /// @cond PRIVATE
@@ -679,6 +735,20 @@ class OKULARCORE_EXPORT PixmapRequest
          */
         const NormalizedRect& normalizedRect() const;
 
+        /**
+         * Sets whether the request should report back updates if possible
+         *
+         * @since 1.3
+         */
+        void setPartialUpdatesWanted(bool partialUpdatesWanted);
+
+        /**
+         * Should the request report back updates if possible?
+         *
+         * @since 1.3
+         */
+        bool partialUpdatesWanted() const;
+
     private:
         Q_DISABLE_COPY( PixmapRequest )
 
@@ -689,6 +759,7 @@ class OKULARCORE_EXPORT PixmapRequest
 }
 
 Q_DECLARE_METATYPE(Okular::Generator::PrintError)
+Q_DECLARE_METATYPE(Okular::PixmapRequest*)
 
 #define OkularGeneratorInterface_iid "org.kde.okular.Generator"
 Q_DECLARE_INTERFACE(Okular::Generator, OkularGeneratorInterface_iid)

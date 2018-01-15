@@ -2,6 +2,9 @@
  *   Copyright (C) 2004-2008 by Albert Astals Cid <aacid@kde.org>          *
  *   Copyright (C) 2004 by Enrico Ros <eros.kde@email.it>                  *
  *   Copyright (C) 2012 by Guillermo A. Amaral B. <gamaral@kde.org>        *
+ *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
+ *                         company, info@kdab.com. Work sponsored by the   *
+ *                         LiMux project of the city of Munich             *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -25,6 +28,7 @@
 #include <qtextstream.h>
 #include <QPrinter>
 #include <QPainter>
+#include <QTimer>
 #include <QtCore/QDebug>
 
 #include <KAboutData>
@@ -59,6 +63,9 @@ Q_DECLARE_METATYPE(Poppler::Annotation*)
 Q_DECLARE_METATYPE(Poppler::FontInfo)
 Q_DECLARE_METATYPE(const Poppler::LinkMovie*)
 Q_DECLARE_METATYPE(const Poppler::LinkRendition*)
+#ifdef HAVE_POPPLER_0_50
+Q_DECLARE_METATYPE(const Poppler::LinkOCGState*)
+#endif
 
 static const int defaultPageWidth = 595;
 static const int defaultPageHeight = 842;
@@ -82,7 +89,7 @@ class PDFOptionsPage : public QWidget
            layout->addWidget(m_forceRaster);
            layout->addStretch(1);
 
-#if defined(Q_OS_WIN)
+#if defined(Q_OS_WIN) && !defined HAVE_POPPLER_0_60
            m_printAnnots->setVisible( false );
 #endif
            setPrintAnnots( true ); // Default value
@@ -306,6 +313,9 @@ QPair<Okular::Movie*, Okular::EmbeddedFile*> createMovieFromPopplerRichMedia( co
  */
 Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink)
 {
+    if (!popplerLink)
+        return nullptr;
+
     Okular::Action *link = 0;
     const Poppler::LinkGoto *popplerLinkGoto;
     const Poppler::LinkExecute *popplerLinkExecute;
@@ -506,6 +516,7 @@ PDFGenerator::PDFGenerator( QObject *parent, const QVariantList &args )
         setFeature( PrintToFile );
     setFeature( ReadRawData );
     setFeature( TiledRendering );
+    setFeature( SwapBackingFile );
 
     // You only need to do it once not for each of the documents but it is cheap enough
     // so doing it all the time won't hurt either
@@ -572,7 +583,7 @@ Okular::Document::OpenResult PDFGenerator::init(QVector<Okular::Page*> & pagesVe
     pagesVector.resize(pageCount);
     rectsGenerated.fill(false, pageCount);
 
-    annotationsHash.clear();
+    annotationsOnOpenHash.clear();
 
     loadPages(pagesVector, 0, false);
 
@@ -580,10 +591,20 @@ Okular::Document::OpenResult PDFGenerator::init(QVector<Okular::Page*> & pagesVe
     reparseConfig();
 
     // create annotation proxy
-    annotProxy = new PopplerAnnotationProxy( pdfdoc, userMutex() );
+    annotProxy = new PopplerAnnotationProxy( pdfdoc, userMutex(), &annotationsOnOpenHash );
 
     // the file has been loaded correctly
     return Okular::Document::OpenSuccess;
+}
+
+PDFGenerator::SwapBackingFileResult PDFGenerator::swapBackingFile( QString const &newFileName, QVector<Okular::Page*> & newPagesVector )
+{
+    doCloseDocument();
+    auto openResult = loadDocumentWithPassword(newFileName, newPagesVector, QString());
+    if (openResult != Okular::Document::OpenSuccess)
+        return SwapBackingFileError;
+
+    return SwapBackingFileReloadInternalData;
 }
 
 bool PDFGenerator::doCloseDocument()
@@ -853,6 +874,16 @@ QAbstractItemModel* PDFGenerator::layersModel() const
     return pdfdoc->hasOptionalContent() ? pdfdoc->optionalContentModel() : NULL;
 }
 
+void PDFGenerator::opaqueAction( const Okular::BackendOpaqueAction *action )
+{
+#ifdef HAVE_POPPLER_0_50
+    const Poppler::LinkOCGState *popplerLink = action->nativeId().value<const Poppler::LinkOCGState *>();
+    pdfdoc->optionalContentModel()->applyLink( const_cast< Poppler::LinkOCGState* >( popplerLink ) );
+#else
+    (void)action;
+#endif
+}
+
 bool PDFGenerator::isAllowed( Okular::Permission permission ) const
 {
     bool b = true;
@@ -877,6 +908,44 @@ bool PDFGenerator::isAllowed( Okular::Permission permission ) const
     }
     return b;
 }
+
+#ifdef HAVE_POPPLER_0_62
+struct PartialUpdatePayload
+{
+    PartialUpdatePayload(PDFGenerator *g, Okular::PixmapRequest *r) :
+        generator(g), request(r)
+    {
+        // Don't report partial updates for the first 500 ms
+        timer.setInterval(500);
+        timer.setSingleShot(true);
+        timer.start();
+    }
+
+    PDFGenerator *generator;
+    Okular::PixmapRequest *request;
+    QTimer timer;
+};
+Q_DECLARE_METATYPE(PartialUpdatePayload*)
+
+static bool shouldDoPartialUpdateCallback(const QVariant &vPayload)
+{
+    auto payload = vPayload.value<PartialUpdatePayload *>();
+
+    // Since the timer lives in a thread without an event loop we need to stop it ourselves
+    // when the remaining time has reached 0
+    if (payload->timer.isActive() && payload->timer.remainingTime() == 0) {
+        payload->timer.stop();
+    }
+
+    return !payload->timer.isActive();
+}
+
+static void partialUpdateCallback(const QImage &image, const QVariant &vPayload)
+{
+    auto payload = vPayload.value<PartialUpdatePayload *>();
+    QMetaObject::invokeMethod(payload->generator, "signalPartialPixmapRequest", Qt::QueuedConnection, Q_ARG(Okular::PixmapRequest*, payload->request), Q_ARG(QImage, image));
+}
+#endif
 
 QImage PDFGenerator::image( Okular::PixmapRequest * request )
 {
@@ -912,11 +981,33 @@ QImage PDFGenerator::image( Okular::PixmapRequest * request )
         if ( request->isTile() )
         {
             QRect rect = request->normalizedRect().geometry( request->width(), request->height() );
-            img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0 );
+#ifdef HAVE_POPPLER_0_62
+            if ( request->partialUpdatesWanted() )
+            {
+                PartialUpdatePayload payload( this, request );
+                img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0,
+                                        partialUpdateCallback, shouldDoPartialUpdateCallback, QVariant::fromValue( &payload ) );
+            }
+            else
+#endif
+            {
+                img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0 );
+            }
         }
         else
         {
-            img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0 );
+#ifdef HAVE_POPPLER_0_62
+            if ( request->partialUpdatesWanted() )
+            {
+                PartialUpdatePayload payload(this, request);
+                img = p->renderToImage( fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0,
+                                        partialUpdateCallback, shouldDoPartialUpdateCallback, QVariant::fromValue( &payload ) );
+            }
+            else
+#endif
+            {
+                img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0 );
+            }
         }
     }
     else
@@ -979,8 +1070,8 @@ void PDFGenerator::resolveMediaLinkReference( Okular::Action *action )
     if ( (action->actionType() != Okular::Action::Movie) && (action->actionType() != Okular::Action::Rendition) )
         return;
 
-    resolveMediaLinks<Poppler::LinkMovie, Okular::MovieAction, Poppler::MovieAnnotation, Okular::MovieAnnotation>( action, Okular::Annotation::AMovie, annotationsHash );
-    resolveMediaLinks<Poppler::LinkRendition, Okular::RenditionAction, Poppler::ScreenAnnotation, Okular::ScreenAnnotation>( action, Okular::Annotation::AScreen, annotationsHash );
+    resolveMediaLinks<Poppler::LinkMovie, Okular::MovieAction, Poppler::MovieAnnotation, Okular::MovieAnnotation>( action, Okular::Annotation::AMovie, annotationsOnOpenHash );
+    resolveMediaLinks<Poppler::LinkRendition, Okular::RenditionAction, Poppler::ScreenAnnotation, Okular::ScreenAnnotation>( action, Okular::Annotation::AScreen, annotationsOnOpenHash );
 }
 
 void PDFGenerator::resolveMediaLinkReferences( Okular::Page *page )
@@ -1050,7 +1141,34 @@ void PDFGenerator::requestFontData(const Okular::FontInfo &font, QByteArray *dat
 #define DUMMY_QPRINTER_COPY
 bool PDFGenerator::print( QPrinter& printer )
 {
+    bool printAnnots = true;
+    bool forceRasterize = false;
+
+    if ( pdfOptionsPage )
+    {
+        printAnnots = pdfOptionsPage->printAnnots();
+        forceRasterize = pdfOptionsPage->printForceRaster();
+    }
+
 #ifdef Q_OS_WIN
+    // Windows can only print by rasterization, because that is
+    // currently the only way Okular implements printing without using UNIX-specific
+    // tools like 'lpr'.
+    forceRasterize = true;
+#ifndef HAVE_POPPLER_0_60
+    // The Document::HideAnnotations flags was introduced in poppler 0.60
+    printAnnots = true;
+#endif
+#endif
+
+#ifdef HAVE_POPPLER_0_60
+    if ( forceRasterize )
+    {
+        pdfdoc->setRenderHint(Poppler::Document::HideAnnotations, !printAnnots);
+#else
+    if ( forceRasterize && printAnnots)
+    {
+#endif
     QPainter painter;
     painter.begin(&printer);
 
@@ -1067,7 +1185,12 @@ bool PDFGenerator::print( QPrinter& printer )
         Poppler::Page *pp = pdfdoc->page( page );
         if (pp)
         {
+#ifdef Q_OS_WIN
             QImage img = pp->renderToImage(  printer.physicalDpiX(), printer.physicalDpiY() );
+#else
+            // UNIX: Same resolution as the postscript rasterizer; see discussion at https://git.reviewboard.kde.org/r/130218/
+            QImage img = pp->renderToImage( 300, 300 );
+#endif
             painter.drawImage( painter.window(), img, QRectF(0, 0, img.width(), img.height()) );
             delete pp;
         }
@@ -1075,8 +1198,8 @@ bool PDFGenerator::print( QPrinter& printer )
     }
     painter.end();
     return true;
+    }
 
-#else
 #ifdef DUMMY_QPRINTER_COPY
     // Get the real page size to pass to the ps generator
     QPrinter dummy( QPrinter::PrinterResolution );
@@ -1119,14 +1242,6 @@ bool PDFGenerator::print( QPrinter& printer )
     if ( pstitle.trimmed().isEmpty() )
     {
         pstitle = document()->currentDocument().fileName();
-    }
-
-    bool printAnnots = true;
-    bool forceRasterize = false;
-    if ( pdfOptionsPage )
-    {
-        printAnnots = pdfOptionsPage->printAnnots();
-        forceRasterize = pdfOptionsPage->printForceRaster();
     }
 
     Poppler::PSConverter *psConverter = pdfdoc->psConverter();
@@ -1173,7 +1288,6 @@ bool PDFGenerator::print( QPrinter& printer )
     tf.close();
 
     return false;
-#endif
 }
 
 QVariant PDFGenerator::metaData( const QString & key, const QVariant & option ) const
@@ -1226,6 +1340,13 @@ QVariant PDFGenerator::metaData( const QString & key, const QVariant & option ) 
         QMutexLocker ml(userMutex());
         return pdfdoc->formType() == Poppler::Document::XfaForm;
     }
+    else if ( key == QLatin1String("FormCalculateOrder") )
+    {
+#ifdef HAVE_POPPLER_0_53
+        QMutexLocker ml(userMutex());
+        return QVariant::fromValue<QVector<int>>(pdfdoc->formCalculateOrder());
+#endif
+    }
     return QVariant();
 }
 
@@ -1236,7 +1357,7 @@ bool PDFGenerator::reparseConfig()
 
     bool somethingchanged = false;
     // load paper color
-    QColor color = documentMetaData( QStringLiteral("PaperColor"), true ).value< QColor >();
+    QColor color = documentMetaData( PaperColorMetaData, true ).value< QColor >();
     // if paper color is changed we have to rebuild every visible pixmap in addition
     // to the outputDevice. it's the 'heaviest' case, other effect are just recoloring
     // over the page rendered on 'standard' white background.
@@ -1268,16 +1389,16 @@ bool PDFGenerator::setDocumentRenderHints()
     const Poppler::Document::RenderHints oldhints = pdfdoc->renderHints();
 #define SET_HINT(hintname, hintdefvalue, hintflag) \
 { \
-    bool newhint = documentMetaData(QStringLiteral(hintname), hintdefvalue).toBool(); \
+    bool newhint = documentMetaData(hintname, hintdefvalue).toBool(); \
     if (newhint != oldhints.testFlag(hintflag)) \
     { \
         pdfdoc->setRenderHint(hintflag, newhint); \
         changed = true; \
     } \
 }
-    SET_HINT("GraphicsAntialias", true, Poppler::Document::Antialiasing)
-    SET_HINT("TextAntialias", true, Poppler::Document::TextAntialiasing)
-    SET_HINT("TextHinting", false, Poppler::Document::TextHinting)
+    SET_HINT(GraphicsAntialiasMetaData, true, Poppler::Document::Antialiasing)
+    SET_HINT(TextAntialiasMetaData, true, Poppler::Document::TextAntialiasing)
+    SET_HINT(TextHintingMetaData, false, Poppler::Document::TextHinting)
 #undef SET_HINT
 #ifdef HAVE_POPPLER_0_24
     // load thin line mode
@@ -1507,7 +1628,7 @@ void PDFGenerator::addAnnotations( Poppler::Page * popplerPage, Okular::Page * p
             }
 
             if ( !doDelete )
-                annotationsHash.insert( newann, a );
+                annotationsOnOpenHash.insert( newann, a );
         }
         if ( doDelete )
             delete a;
@@ -1660,6 +1781,18 @@ bool PDFGenerator::save( const QString &fileName, SaveOptions options, QString *
         pdfConv->setPDFOptions( pdfConv->pdfOptions() | Poppler::PDFConverter::WithChanges );
 
     QMutexLocker locker( userMutex() );
+
+    QHashIterator<Okular::Annotation*, Poppler::Annotation*> it( annotationsOnOpenHash );
+    while ( it.hasNext() )
+    {
+        it.next();
+
+        if ( it.value()->uniqueName().isEmpty() )
+        {
+            it.value()->setUniqueName( it.key()->uniqueName() );
+        }
+    }
+
     bool success = pdfConv->convert();
     if (!success)
     {
@@ -1690,6 +1823,6 @@ Okular::AnnotationProxy* PDFGenerator::annotationProxy() const
 
 #include "generator_pdf.moc"
 
-Q_LOGGING_CATEGORY(OkularPdfDebug, "org.kde.okular.generators.pdf")
+Q_LOGGING_CATEGORY(OkularPdfDebug, "org.kde.okular.generators.pdf", QtWarningMsg)
 
 /* kate: replace-tabs on; indent-width 4; */

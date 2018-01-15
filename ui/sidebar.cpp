@@ -41,7 +41,7 @@ class SidebarItem : public QListWidgetItem
 {
     public:
         SidebarItem( QWidget* w, const QIcon &icon, const QString &text )
-            : QListWidgetItem( 0, SidebarItemType ),
+            : QListWidgetItem( nullptr, SidebarItemType ),
               m_widget( w )
         {
             setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled );
@@ -96,8 +96,8 @@ class SidebarDelegate : public QAbstractItemDelegate
 
 SidebarDelegate::SidebarDelegate( QObject *parent )
     : QAbstractItemDelegate( parent ), m_showText( true ),
-    m_windowBackground( 0 ), m_windowForeground( 0 ),
-    m_selectionBackground( 0 ), m_selectionForeground( 0 )
+    m_windowBackground( nullptr ), m_windowForeground( nullptr ),
+    m_selectionBackground( nullptr ), m_selectionForeground( nullptr )
 {
     updateBrushCache();
     connect(qApp, &QGuiApplication::paletteChanged, this, &SidebarDelegate::updateBrushCache);
@@ -138,15 +138,20 @@ void SidebarDelegate::paint( QPainter *painter, const QStyleOptionViewItem &opti
         foreColor = m_windowForeground->brush(QPalette::Disabled).color();
         disabled = true;
     }
-    else if ( option.state & ( QStyle::State_HasFocus | QStyle::State_Selected ) )
+    else if ( option.state & QStyle::State_HasFocus )
     {
         backBrush = m_selectionBackground->brush(option.palette);
         foreColor = m_selectionForeground->brush(option.palette).color();
     }
+    else if ( option.state & QStyle::State_Selected )
+    {
+        backBrush = m_selectionBackground->brush(option.palette);
+        foreColor = m_windowForeground->brush(option.palette).color();
+    }
     else if ( option.state & QStyle::State_MouseOver )
     {
         backBrush = m_selectionBackground->brush(option.palette).color().light( 115 );
-        foreColor = m_selectionForeground->brush(option.palette).color();
+        foreColor = m_windowForeground->brush(option.palette).color();
         hover = true;
     }
     else /*if ( option.state & QStyle::State_Enabled )*/
@@ -167,7 +172,7 @@ void SidebarDelegate::paint( QPainter *painter, const QStyleOptionViewItem &opti
             opt.backgroundBrush = backBrush;
     }
     painter->save();
-    style->drawPrimitive( QStyle::PE_PanelItemViewItem, &opt, painter, 0 );
+    style->drawPrimitive( QStyle::PE_PanelItemViewItem, &opt, painter, nullptr );
     painter->restore();
     QIcon icon = index.data( Qt::DecorationRole ).value< QIcon >();
     if ( !icon.isNull() )
@@ -406,7 +411,7 @@ class Sidebar::Private
 {
 public:
     Private()
-        : sideWidget( 0 ), bottomWidget( 0 ), splitterSizesSet( false ),
+        : sideWidget( nullptr ), bottomWidget( nullptr ), splitterSizesSet( false ),
           itemsHeight( 0 )
     {
     }
@@ -641,7 +646,7 @@ QWidget *Sidebar::currentItem() const
 {
     const int row = d->list->currentRow();
     if (row < 0 || row >= d->pages.count())
-        return 0;
+        return nullptr;
 
     return d->pages[row]->widget();
 }

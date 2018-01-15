@@ -1,3 +1,6 @@
+remove_definitions(-DTRANSLATION_DOMAIN="okular")
+add_definitions(-DTRANSLATION_DOMAIN="okular_djvu")
+
 include_directories(
    ${DJVULIBRE_INCLUDE_DIR}
    ${CMAKE_CURRENT_SOURCE_DIR}/../..

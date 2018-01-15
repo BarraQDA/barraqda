@@ -29,6 +29,7 @@
 #include <qvalidator.h>
 #include <qapplication.h>
 #include <qdesktopwidget.h>
+#include <QGestureEvent>
 #include <kcursor.h>
 #include <krandom.h>
 #include <qtoolbar.h>
@@ -95,6 +96,7 @@ struct PresentationFrame
         geometry.setRect( ( width - pageWidth ) / 2,
                           ( height - pageHeight ) / 2,
                           pageWidth, pageHeight );
+
         Q_FOREACH ( VideoWidget *vw, videoWidgets )
         {
             const Okular::NormalizedRect r = vw->normGeometry();
@@ -138,14 +140,15 @@ class PresentationToolBar : public QToolBar
 
 
 PresentationWidget::PresentationWidget( QWidget * parent, Okular::Document * doc, DrawingToolActions * drawingToolActions, KActionCollection * collection )
-    : QWidget( 0 /* must be null, to have an independent widget */, Qt::FramelessWindowHint ),
-    m_pressedLink( 0 ), m_handCursor( false ), m_drawingEngine( 0 ),
+    : QWidget( nullptr /* must be null, to have an independent widget */, Qt::FramelessWindowHint ),
+    m_pressedLink( nullptr ), m_handCursor( false ), m_drawingEngine( nullptr ),
     m_screenInhibitCookie(0), m_sleepInhibitCookie(0),
     m_parentWidget( parent ),
-    m_document( doc ), m_frameIndex( -1 ), m_topBar( 0 ), m_pagesEdit( 0 ), m_searchBar( 0 ),
-    m_ac( collection ), m_screenSelect( 0 ), m_isSetup( false ), m_blockNotifications( false ), m_inBlackScreenMode( false ),
+    m_document( doc ), m_frameIndex( -1 ), m_topBar( nullptr ), m_pagesEdit( nullptr ), m_searchBar( nullptr ),
+    m_ac( collection ), m_screenSelect( nullptr ), m_isSetup( false ), m_blockNotifications( false ), m_inBlackScreenMode( false ),
     m_showSummaryView( Okular::Settings::slidesShowSummary() ),
-    m_advanceSlides( Okular::SettingsCore::slidesAdvance() )
+    m_advanceSlides( Okular::SettingsCore::slidesAdvance() ),
+    m_goToNextPageOnRelease( false )
 {
     Q_UNUSED( parent )
     setAttribute( Qt::WA_DeleteOnClose );
@@ -231,6 +234,9 @@ PresentationWidget::PresentationWidget( QWidget * parent, Okular::Document * doc
     p.setColor( QPalette::Active, QPalette::Button, Qt::gray );
     p.setColor( QPalette::Active, QPalette::Background, Qt::darkGray );
     m_topBar->setPalette( p );
+
+    // Grab swipe gestures to change pages
+    grabGesture(Qt::SwipeGesture);
 
     // misc stuff
     setMouseTracking( true );
@@ -418,7 +424,7 @@ void PresentationWidget::notifyCurrentPageChanged( int previousPage, int current
         // perform the additional actions of the page's annotations, if any
         Q_FOREACH ( const Okular::Annotation *annotation, m_document->page( previousPage )->annotations() )
         {
-            Okular::Action *action = 0;
+            Okular::Action *action = nullptr;
 
             if ( annotation->subType() == Okular::Annotation::AScreen )
                 action = static_cast<const Okular::ScreenAnnotation*>( annotation )->additionalAction( Okular::Annotation::PageClosing );
@@ -446,7 +452,7 @@ void PresentationWidget::notifyCurrentPageChanged( int previousPage, int current
 
         // if pixmap not inside the Okular::Page we request it and wait for
         // notifyPixmapChanged call or else we can proceed to pixmap generation
-        if ( !frame->page->hasPixmap( this, pixW, pixH ) )
+        if ( !frame->page->hasPixmap( this, ceil(pixW * qApp->devicePixelRatio()), ceil(pixH * qApp->devicePixelRatio()) ) )
         {
             requestPixmaps();
         }
@@ -463,7 +469,7 @@ void PresentationWidget::notifyCurrentPageChanged( int previousPage, int current
         // perform the additional actions of the page's annotations, if any
         Q_FOREACH ( const Okular::Annotation *annotation, m_document->page( m_frameIndex )->annotations() )
         {
-            Okular::Action *action = 0;
+            Okular::Action *action = nullptr;
 
             if ( annotation->subType() == Okular::Annotation::AScreen )
                 action = static_cast<const Okular::ScreenAnnotation*>( annotation )->additionalAction( Okular::Annotation::PageOpening );
@@ -528,6 +534,9 @@ void PresentationWidget::setPlayPauseIcon()
 // <widget events>
 bool PresentationWidget::event( QEvent * e )
 {
+    if ( e->type() == QEvent::Gesture )
+        return gestureEvent(static_cast<QGestureEvent*>(e));
+
     if ( e->type() == QEvent::ToolTip )
     {
         QHelpEvent * he = (QHelpEvent*)e;
@@ -549,6 +558,33 @@ bool PresentationWidget::event( QEvent * e )
         return QWidget::event( e );
 }
 
+bool PresentationWidget::gestureEvent( QGestureEvent * event )
+{
+    // Swiping left or right on a touch screen will go to the previous or next slide, respectively.
+    // The precise gesture is the standard Qt swipe: with three(!) fingers.
+    if (QGesture *swipe = event->gesture(Qt::SwipeGesture))
+    {
+        QSwipeGesture * swipeEvent = static_cast<QSwipeGesture *>(swipe);
+
+        if (swipeEvent->state() == Qt::GestureFinished)
+        {
+            if (swipeEvent->horizontalDirection() == QSwipeGesture::Left)
+            {
+                slotPrevPage();
+                event->accept();
+                return true;
+            }
+            if (swipeEvent->horizontalDirection() == QSwipeGesture::Right)
+            {
+                slotNextPage();
+                event->accept();
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 void PresentationWidget::keyPressEvent( QKeyEvent * e )
 {
     if ( !m_isSetup )
@@ -665,11 +701,16 @@ void PresentationWidget::mousePressEvent( QMouseEvent * e )
             return;
         }
 
-        // if no other actions, go to next page
+        m_goToNextPageOnRelease = true;
+    }
+    // pressing the "move forward" mouse button: unlike the left button this
+    // always means "show next page", so we unconditionally delegate to that
+    // action on mouse button press
+    else if ( e->button() == Qt::ForwardButton ) {
         slotNextPage();
     }
-    // pressing right button
-    else if ( e->button() == Qt::RightButton )
+    // pressing right or backward button
+    else if ( e->button() == Qt::RightButton || e->button() == Qt::BackButton )
         slotPrevPage();
 }
 
@@ -687,7 +728,12 @@ void PresentationWidget::mouseReleaseEvent( QMouseEvent * e )
         const Okular::Action * link = getLink( e->x(), e->y() );
         if ( link == m_pressedLink )
             m_document->processAction( link );
-        m_pressedLink = 0;
+        m_pressedLink = nullptr;
+    }
+
+    if ( m_goToNextPageOnRelease ) {
+        slotNextPage();
+        m_goToNextPageOnRelease = false;
     }
 }
 
@@ -735,6 +781,8 @@ void PresentationWidget::mouseMoveEvent( QMouseEvent * e )
 
 void PresentationWidget::paintEvent( QPaintEvent * pe )
 {
+    qreal dpr = devicePixelRatioF();
+
     if ( m_inBlackScreenMode )
     {
         QPainter painter( this );
@@ -779,28 +827,32 @@ void PresentationWidget::paintEvent( QPaintEvent * pe )
         if ( !r.isValid() )
             continue;
 #ifdef ENABLE_PROGRESS_OVERLAY
+        const QRect dR(QRectF(r.x() * dpr, r.y() * dpr, r.width() * dpr, r.height() * dpr).toAlignedRect());
         if ( Okular::Settings::slidesShowProgress() && r.intersects( m_overlayGeometry ) )
         {
             // backbuffer the overlay operation
-            QPixmap backPixmap( r.size() );
+            QPixmap backPixmap( dR.size() );
+            backPixmap.setDevicePixelRatio( dpr );
             QPainter pixPainter( &backPixmap );
 
             // first draw the background on the backbuffer
-            pixPainter.drawPixmap( QPoint(0,0), m_lastRenderedPixmap, r );
+            pixPainter.drawPixmap( QPoint(0,0), m_lastRenderedPixmap, dR );
 
             // then blend the overlay (a piece of) over the background
             QRect ovr = m_overlayGeometry.intersected( r );
-            pixPainter.drawPixmap( ovr.left() - r.left(), ovr.top() - r.top(),
-                m_lastRenderedOverlay, ovr.left() - m_overlayGeometry.left(),
-                ovr.top() - m_overlayGeometry.top(), ovr.width(), ovr.height() );
+            pixPainter.drawPixmap( (ovr.left() - r.left()), (ovr.top() - r.top()),
+                m_lastRenderedOverlay, (ovr.left() - m_overlayGeometry.left()) * dpr,
+                (ovr.top() - m_overlayGeometry.top()) * dpr, ovr.width() * dpr, ovr.height() * dpr );
 
             // finally blit the pixmap to the screen
             pixPainter.end();
-            painter.drawPixmap( r.topLeft(), backPixmap, backPixmap.rect() );
+            const QRect backPixmapRect = backPixmap.rect();
+            const QRect dBackPixmapRect(QRectF(backPixmapRect.x() * dpr, backPixmapRect.y() * dpr, backPixmapRect.width() * dpr, backPixmapRect.height() * dpr).toAlignedRect());
+            painter.drawPixmap( r.topLeft(), backPixmap, dBackPixmapRect );
         } else
 #endif
         // copy the rendered pixmap to the screen
-        painter.drawPixmap( r.topLeft(), m_lastRenderedPixmap, r );
+        painter.drawPixmap( r.topLeft(), m_lastRenderedPixmap, dR );
     }
 
     // paint drawings
@@ -857,7 +909,7 @@ const void * PresentationWidget::getObjectRect( Okular::ObjectRect::ObjectType t
     if ( geometry && !geometry->isNull() )
         geometry->setRect( 0, 0, 0, 0 );
     if ( m_frameIndex < 0 || m_frameIndex >= (int)m_frames.size() )
-        return 0;
+        return nullptr;
 
     // get frame, page and geometry
     const PresentationFrame * frame = m_frames[ m_frameIndex ];
@@ -870,13 +922,13 @@ const void * PresentationWidget::getObjectRect( Okular::ObjectRect::ObjectType t
 
     // no links outside the pages
     if ( nx < 0 || nx > 1 || ny < 0 || ny > 1 )
-        return 0;
+        return nullptr;
 
     // check if 1) there is an object and 2) it's a link
     const QRect d = QApplication::desktop()->screenGeometry( m_screen );
     const Okular::ObjectRect * object = page->objectRect( type, nx, ny, d.width(), d.height() );
     if ( !object )
-        return 0;
+        return nullptr;
 
     // compute link geometry if destination rect present
     if ( geometry )
@@ -901,13 +953,13 @@ const Okular::Annotation * PresentationWidget::getAnnotation( int x, int y, QRec
 
 void PresentationWidget::testCursorOnLink( int x, int y )
 {
-    const Okular::Action * link = getLink( x, y, 0 );
-    const Okular::Annotation *annotation = getAnnotation( x, y, 0 );
+    const Okular::Action * link = getLink( x, y, nullptr );
+    const Okular::Annotation *annotation = getAnnotation( x, y, nullptr );
 
-    const bool needsHandCursor = ( ( link != 0 ) ||
-                                 ( ( annotation != 0 ) && ( annotation->subType() == Okular::Annotation::AMovie ) ) ||
-                                 ( ( annotation != 0 ) && ( annotation->subType() == Okular::Annotation::ARichMedia ) ) ||
-                                 ( ( annotation != 0 ) && ( annotation->subType() == Okular::Annotation::AScreen ) && ( GuiUtils::renditionMovieFromScreenAnnotation( static_cast< const Okular::ScreenAnnotation * >( annotation ) ) != 0 ) ) );
+    const bool needsHandCursor = ( ( link != nullptr ) ||
+                                 ( ( annotation != nullptr ) && ( annotation->subType() == Okular::Annotation::AMovie ) ) ||
+                                 ( ( annotation != nullptr ) && ( annotation->subType() == Okular::Annotation::ARichMedia ) ) ||
+                                 ( ( annotation != nullptr ) && ( annotation->subType() == Okular::Annotation::AScreen ) && ( GuiUtils::renditionMovieFromScreenAnnotation( static_cast< const Okular::ScreenAnnotation * >( annotation ) ) != nullptr ) ) );
 
     // only react on changes (in/out from a link)
     if ( ( needsHandCursor && !m_handCursor ) || ( !needsHandCursor && m_handCursor ) )
@@ -956,7 +1008,10 @@ void PresentationWidget::generatePage( bool disableTransition )
 {
     if ( m_lastRenderedPixmap.isNull() )
     {
-        m_lastRenderedPixmap = QPixmap( m_width, m_height );
+        qreal dpr = qApp->devicePixelRatio();
+        m_lastRenderedPixmap = QPixmap( m_width * dpr, m_height * dpr );
+        m_lastRenderedPixmap.setDevicePixelRatio(dpr);
+
         m_previousPagePixmap = QPixmap();
     }
     else
@@ -985,7 +1040,7 @@ void PresentationWidget::generatePage( bool disableTransition )
     if ( !disableTransition && Okular::Settings::slidesTransitionsEnabled() )
     {
         const Okular::PageTransition * transition = m_frameIndex != -1 ?
-            m_frames[ m_frameIndex ]->page->transition() : 0;
+            m_frames[ m_frameIndex ]->page->transition() : nullptr;
         if ( transition )
             initTransition( transition );
         else {
@@ -1009,6 +1064,8 @@ void PresentationWidget::generatePage( bool disableTransition )
 
 void PresentationWidget::generateIntroPage( QPainter & p )
 {
+    qreal dpr = qApp->devicePixelRatio();
+
     // use a vertical gray gradient background
     int blend1 = m_height / 10,
         blend2 = 9 * m_height / 10;
@@ -1024,7 +1081,8 @@ void PresentationWidget::generateIntroPage( QPainter & p )
     }
 
     // draw okular logo in the four corners
-    QPixmap logo = DesktopIcon( QStringLiteral("okular"), 64 );
+    QPixmap logo = DesktopIcon( QStringLiteral("okular"), 64 * dpr );
+    logo.setDevicePixelRatio( dpr );
     if ( !logo.isNull() )
     {
         p.drawPixmap( 5, 5, logo );
@@ -1071,6 +1129,7 @@ void PresentationWidget::generateContentsPage( int pageNum, QPainter & p )
 
     // draw the page using the shared PagePainter class
     int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations | PagePainter::Taggings;
+
     PagePainter::paintPageOnPainter( &p, frame->page, this, flags,
                                      geom.width(), geom.height(), geom );
 
@@ -1092,6 +1151,8 @@ inline int qt_div255(int x) { return (x + (x>>8) + 0x80) >> 8; }
 void PresentationWidget::generateOverlay()
 {
 #ifdef ENABLE_PROGRESS_OVERLAY
+    qreal dpr = qApp->devicePixelRatio();
+
     // calculate overlay geometry and resize pixmap if needed
     int side = m_width / 16;
     m_overlayGeometry.setRect( m_width - side - 4, 4, side, side );
@@ -1100,7 +1161,9 @@ void PresentationWidget::generateOverlay()
     // and the resulting image is smoothly scaled down. So here we open a
     // painter on the double sized pixmap.
     side *= 2;
-    QPixmap doublePixmap( side, side );
+
+    QPixmap doublePixmap( side * dpr, side * dpr );
+    doublePixmap.setDevicePixelRatio( dpr );
     doublePixmap.fill( Qt::black );
     QPainter pixmapPainter( &doublePixmap );
     pixmapPainter.setRenderHints( QPainter::Antialiasing );
@@ -1145,8 +1208,10 @@ void PresentationWidget::generateOverlay()
 
     // end drawing pixmap and halve image
     pixmapPainter.end();
-    QImage image( doublePixmap.toImage().scaled( side / 2, side / 2, Qt::IgnoreAspectRatio, Qt::SmoothTransformation ) );
+    QImage image( doublePixmap.toImage().scaled( (side / 2) * dpr, (side / 2) * dpr, Qt::IgnoreAspectRatio, Qt::SmoothTransformation ) );
+    image.setDevicePixelRatio( dpr );
     image = image.convertToFormat( QImage::Format_ARGB32 );
+    image.setDevicePixelRatio( dpr );
 
     // draw circular shadow using the same technique
     doublePixmap.fill( Qt::black );
@@ -1155,7 +1220,8 @@ void PresentationWidget::generateOverlay()
     pixmapPainter.setBrush( QColor( 0x80 ) );
     pixmapPainter.drawEllipse( 0, 0, side, side );
     pixmapPainter.end();
-    QImage shadow( doublePixmap.toImage().scaled( side / 2, side / 2, Qt::IgnoreAspectRatio, Qt::SmoothTransformation ) );
+    QImage shadow( doublePixmap.toImage().scaled( (side / 2) * dpr, (side / 2) * dpr, Qt::IgnoreAspectRatio, Qt::SmoothTransformation ) );
+    shadow.setDevicePixelRatio( dpr );
 
     // generate a 2 colors pixmap using mixing shadow (made with highlight color)
     // and image (made with highlightedText color)
@@ -1193,6 +1259,7 @@ void PresentationWidget::generateOverlay()
             data[i] = qRgba( cR, cG, cB, cA );
     }
     m_lastRenderedOverlay = QPixmap::fromImage( image );
+    m_lastRenderedOverlay.setDevicePixelRatio( dpr );
 
     // start the autohide timer
     //repaint( m_overlayGeometry ); // toggle with next line
@@ -1474,6 +1541,7 @@ void PresentationWidget::slotTransitionStep()
             QPainter pixmapPainter;
             m_currentPixmapOpacity += 1.0 / m_transitionSteps;
             m_lastRenderedPixmap = QPixmap( m_lastRenderedPixmap.size() );
+            m_lastRenderedPixmap.setDevicePixelRatio( qApp->devicePixelRatio() );
             m_lastRenderedPixmap.fill( Qt::transparent );
             pixmapPainter.begin( &m_lastRenderedPixmap );
             pixmapPainter.setCompositionMode( QPainter::CompositionMode_Source );
@@ -1542,7 +1610,7 @@ void PresentationWidget::slotChangeDrawingToolEngine( const QDomElement &element
     if ( element.isNull() )
     {
         delete m_drawingEngine;
-        m_drawingEngine = 0;
+        m_drawingEngine = nullptr;
         m_drawingRect = QRect();
         setCursor( Qt::ArrowCursor );
     }
@@ -1661,9 +1729,9 @@ void PresentationWidget::inhibitPowerManagement()
         reply.waitForFinished();
         if (reply.isValid()) {
             m_screenInhibitCookie = reply.value();
-            qDebug() << "Screen inhibition cookie" << m_screenInhibitCookie;
+            qCDebug(OkularUiDebug) << "Screen inhibition cookie" << m_screenInhibitCookie;
         } else {
-            qWarning() << "Unable to inhibit screensaver" << reply.error();
+            qCWarning(OkularUiDebug) << "Unable to inhibit screensaver" << reply.error();
         }
     }
 
@@ -1683,7 +1751,7 @@ void PresentationWidget::inhibitPowerManagement()
         if (reply.isValid()) {
             m_sleepInhibitCookie = reply.value().fileDescriptor();
         } else {
-            qWarning() << "Unable to inhibit sleep" << reply.error();
+            qCWarning(OkularUiDebug) << "Unable to inhibit sleep" << reply.error();
         }
     }
 #endif
