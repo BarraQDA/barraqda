@@ -13,7 +13,7 @@
 #ifndef _OKULAR_DOCUMENT_COMMANDS_P_H_
 #define _OKULAR_DOCUMENT_COMMANDS_P_H_
 
-#include <QtWidgets/OkularUndoCommand>
+#include <QtWidgets/QUndoCommand>
 #include <QDomNode>
 
 #include "area.h"
@@ -29,7 +29,7 @@ class FormFieldChoice;
 class Tagging;
 class Page;
 
-class OkularUndoCommand : public OkularUndoCommand
+class OkularUndoCommand : public QUndoCommand
 {
     public:
         virtual bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) = 0;
@@ -105,7 +105,7 @@ class TranslateAnnotationCommand : public OkularUndoCommand
         void undo() override;
         void redo() override;
         int id() const override;
-        bool mergeWith(const OkularUndoCommand *uc) override;
+        bool mergeWith(const QUndoCommand *uc) override;
         Okular::NormalizedPoint minusDelta();
         Okular::NormalizedRect translateBoundingRectangle( const Okular::NormalizedPoint & delta );
 
@@ -126,9 +126,10 @@ class AddTaggingCommand : public OkularUndoCommand
 
         virtual ~AddTaggingCommand();
 
-        virtual void undo();
+        void undo() override;
+        void redo() override;
 
-        virtual void redo();
+        bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 
     private:
         Okular::DocumentPrivate * m_docPriv;
@@ -142,8 +143,10 @@ class RemoveTaggingCommand : public OkularUndoCommand
     public:
         RemoveTaggingCommand(Okular::DocumentPrivate * doc,  Okular::Tagging* tagging, int pageNumber);
         virtual ~RemoveTaggingCommand();
-        virtual void undo();
-        virtual void redo();
+        virtual void undo() override;
+        virtual void redo() override;
+
+        bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 
     private:
         Okular::DocumentPrivate * m_docPriv;
@@ -160,8 +163,11 @@ class ModifyTaggingPropertiesCommand : public OkularUndoCommand
                                                                   QDomNode oldProperties,
                                                                   QDomNode newProperties );
 
-        virtual void undo();
-        virtual void redo();
+        virtual void undo() override;
+        virtual void redo() override;
+
+        bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
+
 
     private:
         Okular::DocumentPrivate * m_docPriv;
@@ -180,12 +186,14 @@ class TranslateTaggingCommand : public OkularUndoCommand
                                    const Okular::NormalizedPoint & delta,
                                    bool completeDrag
                                   );
-        virtual void undo();
-        virtual void redo();
-        virtual int id() const;
-        virtual bool mergeWith(const OkularUndoCommand *uc);
+        virtual void undo() override;
+        virtual void redo() override;
+        virtual int id() const override;
+        virtual bool mergeWith(const QUndoCommand *uc) override;
         Okular::NormalizedPoint minusDelta();
         Okular::NormalizedRect translateBoundingRectangle( const Okular::NormalizedPoint & delta );
+
+        bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 
     private:
         Okular::DocumentPrivate * m_docPriv;
@@ -208,7 +216,7 @@ class AdjustAnnotationCommand : public OkularUndoCommand
         void undo() override;
         void redo() override;
         int id() const override;
-        bool mergeWith(const OkularUndoCommand * uc) override;
+        bool mergeWith(const QUndoCommand * uc) override;
         Okular::NormalizedRect adjustBoundingRectangle(
                 const Okular::NormalizedPoint & delta1, const Okular::NormalizedPoint & delta2 );
 
@@ -236,7 +244,7 @@ class EditTextCommand : public OkularUndoCommand
         void undo() override = 0;
         void redo() override = 0;
         int id() const override = 0;
-        bool mergeWith(const OkularUndoCommand *uc) override;
+        bool mergeWith(const QUndoCommand *uc) override;
 
     private:
         enum EditType {
@@ -277,7 +285,7 @@ class EditAnnotationContentsCommand : public EditTextCommand
         void undo() override;
         void redo() override;
         int id() const override;
-        bool mergeWith(const OkularUndoCommand *uc) override;
+        bool mergeWith(const QUndoCommand *uc) override;
 
         bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 
@@ -300,10 +308,12 @@ public:
                                   int prevAnchorPos
     );
 
-    virtual void undo();
-    virtual void redo();
-    virtual int id() const;
-    virtual bool mergeWith(const OkularUndoCommand *uc);
+    virtual void undo() override;
+    virtual void redo() override;
+    virtual int id() const override;
+    virtual bool mergeWith(const QUndoCommand *uc) override;
+
+    bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 
 private:
     Okular::DocumentPrivate * m_docPriv;
@@ -325,7 +335,7 @@ class EditFormTextCommand : public EditTextCommand
         void undo() override;
         void redo() override;
         int id() const override;
-        bool mergeWith( const OkularUndoCommand *uc ) override;
+        bool mergeWith( const QUndoCommand *uc ) override;
 
         bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 
@@ -374,7 +384,7 @@ class EditFormComboCommand : public EditTextCommand
         void undo() override;
         void redo() override;
         int id() const override;
-        bool mergeWith( const OkularUndoCommand *uc ) override;
+        bool mergeWith( const QUndoCommand *uc ) override;
 
         bool refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector ) override;
 

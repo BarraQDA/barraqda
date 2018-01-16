@@ -498,18 +498,18 @@ class OKULARCORE_EXPORT TaggingObjectRect : public ObjectRect
          * Returns the bounding rect of the tagging object rectangle for the
          * scaling factor @p xScale and @p yScale.
          */
-        virtual QRect boundingRect( double xScale, double yScale ) const;
+        virtual QRect boundingRect( double xScale, double yScale ) const override;
 
         /**
          * Returns whether the tagging object rectangle contains the point @p x, @p y for the
          * scaling factor @p xScale and @p yScale.
          */
-        virtual bool contains( double x, double y, double xScale, double yScale ) const;
+        virtual bool contains( double x, double y, double xScale, double yScale ) const override;
 
         /**
          * Transforms the tagging object rectangle with the operations defined by @p matrix.
          */
-        virtual void transform( const QTransform &matrix );
+        virtual void transform( const QTransform &matrix ) override;
 
     private:
         Tagging * m_tagging;

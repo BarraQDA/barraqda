@@ -36,6 +36,8 @@ class TaggingWindow : public QFrame
 
         void reloadInfo();
 
+        Okular::Tagging * tagging() const;
+
     private:
         tagMovableTitle * m_title;
         KTextEdit *textEdit;

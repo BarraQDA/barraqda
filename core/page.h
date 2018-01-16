@@ -373,9 +373,9 @@ class OKULARCORE_EXPORT Page
         bool removeAnnotation( Annotation * annotation );
 
         /**
-         * Returns the list of taggings of the document.
+         * Returns the annotation with the given unique name.
          */
-        QLinkedList< Tagging* > taggings() const;
+        Tagging * tagging( const QString & uniqueName ) const;
 
         /**
          * Adds a new @p tagging to the document.

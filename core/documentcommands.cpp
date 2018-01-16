@@ -288,6 +288,17 @@ void AddTaggingCommand::redo()
     m_done = true;
 }
 
+bool AddTaggingCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )
+{
+    if ( m_done )
+    {
+        auto a = newPagesVector[m_pageNumber]->tagging( m_tagging->uniqueName() );
+        if (a) m_tagging = a;
+    }
+
+    return true;
+}
+
 
 RemoveTaggingCommand::RemoveTaggingCommand(Okular::DocumentPrivate * doc,  Okular::Tagging* tagging, int pageNumber)
  : m_docPriv( doc ),
@@ -319,6 +330,17 @@ void RemoveTaggingCommand::redo(){
     m_done = true;
 }
 
+bool RemoveTaggingCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )
+{
+    if ( !m_done )
+    {
+        auto a = newPagesVector[m_pageNumber]->tagging( m_tagging->uniqueName() );
+        if (a) m_tagging = a;
+    }
+
+    return true;
+}
+
 
 ModifyTaggingPropertiesCommand::ModifyTaggingPropertiesCommand( DocumentPrivate* docPriv,
                                                                       Tagging* tagging,
@@ -348,6 +370,16 @@ void ModifyTaggingPropertiesCommand::redo()
     m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
 }
 
+bool ModifyTaggingPropertiesCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )
+{
+    // Same reason for not unconditionally updating m_tagging, the tagging pointer can be stored in an add/Remove command
+    auto a = newPagesVector[m_pageNumber]->tagging( m_tagging->uniqueName() );
+    if (a) m_tagging = a;
+
+    return true;
+}
+
+
 TranslateTaggingCommand::TranslateTaggingCommand( DocumentPrivate* docPriv,
                                                         Tagging* tagging,
                                                         int pageNumber,
@@ -376,6 +408,16 @@ void TranslateTaggingCommand::redo()
     m_docPriv->performModifyPageTagging( m_pageNumber,  m_tagging, true );
 }
 
+bool TranslateTaggingCommand::refreshInternalPageReferences( const QVector< Page * > &newPagesVector )
+{
+    // Same reason for not unconditionally updating m_tagging, the tagging pointer can be stored in an add/Remove command
+    auto a = newPagesVector[m_pageNumber]->tagging( m_tagging->uniqueName() );
+    if (a) m_tagging = a;
+
+    return true;
+}
+
+
 int TranslateTaggingCommand::id() const
 {
     return 1;
@@ -392,8 +434,7 @@ bool TranslateTaggingCommand::mergeWith( const QUndoCommand* uc )
     {
         return false;
     }
-    m_delta1 = Okular::NormalizedPoint( tuc->m_delta1.x + m_delta1.x, tuc->m_delta1.y + m_delta1.y );
-    m_delta2 = Okular::NormalizedPoint( tuc->m_delta2.x + m_delta2.x, tuc->m_delta2.y + m_delta2.y );
+    m_delta = Okular::NormalizedPoint( tuc->m_delta.x + m_delta.x, tuc->m_delta.y + m_delta.y );
     m_completeDrag = tuc->m_completeDrag;
     return true;
 }
@@ -663,6 +704,14 @@ void EditTaggingContentsCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( m_tagging->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performSetTaggingContents( m_newContents, m_tagging, m_pageNumber );
     emit m_docPriv->m_parent->taggingContentsChangedByUndoRedo( m_tagging, m_newContents, m_newCursorPos, m_newCursorPos );
+}
+
+bool EditTaggingContentsCommand::refreshInternalPageReferences( const QVector< Page * > &newPagesVector )
+{
+    auto a = newPagesVector[m_pageNumber]->tagging( m_tagging->uniqueName() );
+    if (a) m_tagging = a;
+
+    return true;
 }
 
 int EditTaggingContentsCommand::id() const

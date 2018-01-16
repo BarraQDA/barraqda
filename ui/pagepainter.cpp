@@ -23,9 +23,6 @@
 // system includes
 #include <math.h>
 
-#include <kdebug.h>
-#include "core/debug_p.h"
-
 // local includes
 #include "core/area.h"
 #include "core/page.h"
@@ -822,7 +819,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                     pixmap = QPixmap::fromImage( scaledCroppedImage );
 
                     // draw the scaled and al
-                    mixedPainter->drawImage( annotRect.topLeft(), scaledImage );
+                    mixedPainter->drawPixmap( annotRect.topLeft(), pixmap );
                 }
             }
             // draw GeomAnnotation

@@ -426,7 +426,7 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
         /**
          * Returns the sub type of the text tagging.
          */
-        SubType subType() const;
+        SubType subType() const override;
 
         /**
          * Returns the transformed text area of the textTag tagging.
@@ -441,7 +441,7 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
         /**
          * Stores the tagging as xml in @p document under the given parent @p node.
          */
-        void store( QDomNode &node, QDomDocument &document ) const;
+        void store( QDomNode &node, QDomDocument &document ) const override;
 
     private:
         Q_DECLARE_PRIVATE( TextTagging )
@@ -470,12 +470,12 @@ class OKULARCORE_EXPORT BoxTagging : public Tagging
         /**
          * Returns the sub type of the box tagging.
          */
-        SubType subType() const;
+        SubType subType() const override;
 
         /**
          * Stores the tagging as xml in @p document under the given parent @p node.
          */
-        void store( QDomNode &node, QDomDocument &document ) const;
+        void store( QDomNode &node, QDomDocument &document ) const override;
 
     private:
         Q_DECLARE_PRIVATE( BoxTagging )

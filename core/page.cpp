@@ -73,7 +73,7 @@ static void deleteObjectRects( QLinkedList< ObjectRect * >& rects, const QSet<Ob
 
 PagePrivate::PagePrivate( Page *page, uint n, double w, double h, Rotation o )
     : m_page( page ), m_number( n ), m_orientation( o ),
-      m_width( w ), m_height( h ), m_doc( nullptr ), m_boundingBox( 0, 0, 1, 1 ),
+      m_width( w ), m_height( h ), m_offset( -1 ), m_doc( nullptr ), m_boundingBox( 0, 0, 1, 1 ),
       m_rotation( Rotation0 ),
       m_text( nullptr ), m_transition( nullptr ), m_textSelections( nullptr ),
       m_openingAction( nullptr ), m_closingAction( nullptr ), m_duration( -1 ),
@@ -141,17 +141,6 @@ Page::Page( uint page, double w, double h, Rotation o )
 
 Page::~Page()
 {
-<<<<<<< HEAD
-    deletePixmaps();
-    deleteRects();
-    d->deleteHighlights();
-    deleteAnnotations();
-    d->deleteTextSelections();
-    deleteSourceReferences();
-    deleteTaggings();
-
-    delete d;
-=======
     if (d)
     {
         deletePixmaps();
@@ -160,10 +149,10 @@ Page::~Page()
         deleteAnnotations();
         d->deleteTextSelections();
         deleteSourceReferences();
+        deleteTaggings();
 
         delete d;
     }
->>>>>>> 3676ee995746e8e26f07653508c913b3e49c551b
 }
 
 int Page::number() const
@@ -805,6 +794,17 @@ bool Page::removeAnnotation( Annotation * annotation )
 
     return true;
 }
+
+Tagging * Page::tagging( const QString & uniqueName ) const
+{
+    foreach(Tagging *t, m_taggings)
+    {
+        if ( t->uniqueName() == uniqueName )
+            return t;
+    }
+    return nullptr;
+}
+
 
 void Page::addTagging( Tagging * tagging)
 {

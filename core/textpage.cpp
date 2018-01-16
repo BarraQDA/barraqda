@@ -219,7 +219,7 @@ bool TextReference::isNull() const
 }
 
 TextPagePrivate::TextPagePrivate()
-    : m_page( nullptr )
+    : m_page( nullptr ), m_offset( -1 )
 {
 }
 
@@ -1155,8 +1155,9 @@ uint TextPage::offset()
 {
     if ( d->m_offset == -1 )
     {
-        Document *doc = d->m_page->m_doc->m_parent;
-        uint thisPageNum = d->m_page->m_page->number();
+        PagePrivate *pagePrivate = PagePrivate::get(d->m_page);
+        Document *doc = pagePrivate->m_doc->m_parent;
+        uint thisPageNum = d->m_page->number();
         d->m_offset = 0;
         for ( uint pageIt = 0; pageIt < thisPageNum; ++pageIt )
         {

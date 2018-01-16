@@ -69,6 +69,7 @@
 #include "core/annotations.h"
 #include "core/tagging.h"
 #include "annotwindow.h"
+#include "annotationpopup.h"
 #include "taggingwindow.h"
 #include "annotationpropertiesdialog.h"
 #include "taggingpropertiesdialog.h"
@@ -799,7 +800,7 @@ void PageView::openTaggingWindow( Okular::Tagging * tagging, int pageNumber )
 
     // find the annot window
     TaggingWindow* existWindow = nullptr;
-    foreach(TaggingWindow *tw, d->m_annowindows)
+    foreach(TaggingWindow *tw, d->m_tagwindows)
     {
         if ( tw->tagging() == tagging )
         {
@@ -3436,6 +3437,9 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
 #ifdef HAVE_SPEECH
                         QAction *speakText = nullptr;
 #endif
+                        QList< QAction * > * tagSelections = nullptr;
+                        QAction * newNode = nullptr;
+
                         if ( (page = item->page())->textSelection() )
                         {
                             if ( !menu )
@@ -3470,8 +3474,8 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 }
                             }
 
-                            QMenu * tagMenu = menu.addMenu ( i18n("Tag") );
-                            QList< QAction * > * tagSelections = new QList< QAction * >();
+                            QMenu * tagMenu = menu->addMenu ( i18n("Tag") );
+                            tagSelections = new QList< QAction * >();
                             QList< Okular::QDANode * >::const_iterator nIt = Okular::QDANodeUtils::QDANodes.constBegin(), nEnd = Okular::QDANodeUtils::QDANodes.constEnd();
                             for ( ; nIt != nEnd; ++nIt )
                             {
@@ -3480,7 +3484,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                                 QAction * tagSelection = tagMenu->addAction ( QIcon(pixmap), (*nIt)->name() );
                                 tagSelections->append( tagSelection );
                             }
-                            QAction * newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), i18n("New") );
+                            newNode = tagMenu->addAction ( QIcon::fromTheme(QStringLiteral("document-new")), i18n("New") );
                         }
 
                         if ( menu ) {
@@ -3538,6 +3542,7 @@ void PageView::mouseReleaseEvent( QMouseEvent * e )
                         }
                     }
                 }
+            }
             break;
     }
 

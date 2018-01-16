@@ -68,7 +68,7 @@ set_package_properties(KF5Kirigami2 PROPERTIES
     TYPE RUNTIME
 )
 find_package(Phonon4Qt5 CONFIG REQUIRED)
-find_package(KDEExperimentalPurpose)
+#find_package(KDEExperimentalPurpose)
 set_package_properties(KDEExperimentalPurpose PROPERTIES
     DESCRIPTION "A framework for services and actions integration"
     PURPOSE "Required for enabling the share menu in Okular"

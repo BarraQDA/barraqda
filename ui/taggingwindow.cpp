@@ -238,6 +238,11 @@ TaggingWindow::~TaggingWindow()
     delete m_latexRenderer;
 }
 
+Okular::Tagging * TaggingWindow::tagging() const
+{
+    return m_tagging;
+}
+
 void TaggingWindow::reloadInfo()
 {
     m_title->setAuthor( m_tagging->author() );
