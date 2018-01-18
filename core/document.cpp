@@ -1219,7 +1219,17 @@ void DocumentPrivate::saveDocumentInfo() const
 
     // 2.1. Save page attributes (bookmark state, annotations, ... ) to DOM
     //  -> do this if there are not-yet-migrated annots or forms in docdata/
-    if ( m_docdataMigrationNeeded )
+    // or if there are any taggings.
+    bool hasTagging = false;
+    QVector< Page * >::const_iterator pIt = m_pagesVector.constBegin(), pEnd = m_pagesVector.constEnd();
+    for ( ; pIt != pEnd; ++pIt )
+        if ( (*pIt)->hasTaggings() )
+        {
+            hasTagging = true;
+            break;
+        }
+
+    if ( m_docdataMigrationNeeded || hasTagging )
     {
         QDomElement pageList = doc.createElement( "pageList" );
         root.appendChild( pageList );
@@ -4485,6 +4495,7 @@ bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
     {
         QLinkedList< ObjectRect* > rectsToDelete;
         QLinkedList< Annotation* > annotationsToDelete;
+        QLinkedList< Tagging* > taggingsToDelete;
         QSet< PagePrivate* > pagePrivatesToDelete;
 
         if (result == Generator::SwapBackingFileReloadInternalData)
@@ -4534,6 +4545,7 @@ bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
                 newPage->d = nullptr;
 
                 annotationsToDelete << oldPage->m_annotations;
+                taggingsToDelete << newPage->m_taggings;
                 rectsToDelete << oldPage->m_rects;
                 oldPage->m_annotations = newPage->m_annotations;
                 oldPage->m_rects = newPage->m_rects;
@@ -4559,6 +4571,7 @@ bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
         foreachObserver( notifySetup( d->m_pagesVector, DocumentObserver::UrlChanged ) );
 
         qDeleteAll( annotationsToDelete );
+        qDeleteAll( taggingsToDelete );
         qDeleteAll( rectsToDelete );
         qDeleteAll( pagePrivatesToDelete );
 

@@ -795,6 +795,12 @@ bool Page::removeAnnotation( Annotation * annotation )
     return true;
 }
 
+bool Page::hasTaggings() const
+{
+    return !m_taggings.isEmpty();
+}
+
+
 Tagging * Page::tagging( const QString & uniqueName ) const
 {
     foreach(Tagging *t, m_taggings)
@@ -814,10 +820,10 @@ void Page::addTagging( Tagging * tagging)
         QString uniqueName = "okular-" + QUuid::createUuid().toString();
         tagging->setUniqueName( uniqueName );
     }
-    tagging->d_ptr->m_page = d;
+    tagging->d_ptr->m_page = this;
     m_taggings.append( tagging );
 
-    //  If annotation is head then add it to node's list of annotations
+    //  If tagging is head then add it to node's list of taggings
     if ( tagging == tagging->head() )
     {
         QDANode *node = tagging->node();
@@ -1031,15 +1037,15 @@ bool PagePrivate::restoreLocalContents( const QDomNode & pageNode )
             QTime time;
             time.start();
 #endif
-            // Clone annotationList as root node in restoredLocalAnnotationList
+            // Clone taggingList as root node in restoredLocalTaggingList
             const QDomNode clonedNode = restoredLocalTaggingList.importNode( childElement, true );
             restoredLocalTaggingList.appendChild( clonedNode );
 
-            // iterate over all annotations
+            // iterate over all taggings
             QDomNode taggingNode = childElement.firstChild();
             while( taggingNode.isElement() )
             {
-                // get annotation element and advance to next annot
+                // get tagging element and advance to next annot
                 QDomElement tagElement = taggingNode.toElement();
                 taggingNode = taggingNode.nextSibling();
 
@@ -1051,6 +1057,7 @@ bool PagePrivate::restoreLocalContents( const QDomNode & pageNode )
                 {
                     m_doc->performAddPageTagging(m_number, tag);
                     qCDebug(OkularCoreDebug) << "restored tag:" << tag->uniqueName();
+                    loadedAnything = true;
                 }
                 else
                     qWarning().nospace() << "page (" << m_number << "): can't restore a tagging from XML.";
@@ -1307,6 +1314,7 @@ void PagePrivate::adoptGeneratedContents( PagePrivate *oldPage )
     oldPage->m_textSelections = nullptr;
 
     restoredLocalAnnotationList = oldPage->restoredLocalAnnotationList;
+    restoredLocalTaggingList = oldPage->restoredLocalTaggingList;
     restoredFormFieldList = oldPage->restoredFormFieldList;
 }
 

@@ -277,7 +277,7 @@ QDANode *Tagging::node() const
 const Document * Tagging::document() const
 {
     Q_D( const Tagging );
-    return d->m_page->m_doc->m_parent;
+    return d->m_page->d->m_doc->m_parent;
 }
 
 uint Tagging::pageNum() const
@@ -413,7 +413,7 @@ void Tagging::setBoundingRectangle( const NormalizedRect &rectangle )
     d->resetTransformation();
     if ( d->m_page )
     {
-        d->transform( d->m_page->rotationMatrix() );
+        d->transform( d->m_page->d->rotationMatrix() );
     }
 }
 
@@ -436,7 +436,7 @@ void Tagging::translate( const NormalizedPoint &coord )
     d->resetTransformation();
     if ( d->m_page )
     {
-        d->transform( d->m_page->rotationMatrix() );
+        d->transform( d->m_page->d->rotationMatrix() );
     }
 }
 
@@ -535,7 +535,7 @@ void Tagging::setTaggingProperties( const QDomNode& node )
         d_ptr->m_linkNode->removeTagging( this );
 
     // Save off internal properties that aren't contained in node
-    Okular::PagePrivate         *p             = d_ptr->m_page;
+    Okular::Page                *p             = d_ptr->m_page;
     QVariant                     nativeID      = d_ptr->m_nativeId;
     int                          internalFlags = d_ptr->m_flags;
     Tagging::DisposeDataFunction disposeFunc   = d_ptr->m_disposeFunc;
@@ -555,7 +555,7 @@ void Tagging::setTaggingProperties( const QDomNode& node )
     d_ptr->setTaggingProperties(node);
 
     // Transform tagging to current page rotation
-    d_ptr->transform( d_ptr->m_page->rotationMatrix() );
+    d_ptr->transform( d_ptr->m_page->d->rotationMatrix() );
 
     this->setNext( next );
     d_ptr->m_node->addTagging( this );
@@ -624,7 +624,7 @@ void TaggingPrivate::setTaggingProperties( const QDomNode& node )
     if (! m_doc )
     {
         if ( m_page)
-            m_doc = m_page->m_doc->m_parent;
+            m_doc = m_page->d->m_doc->m_parent;
         else
             //  This should not happen
             return;
@@ -889,7 +889,7 @@ void TextTagging::store( QDomNode & node, QDomDocument & document ) const
         QDomElement e = document.createElement( "textref" );
         node.appendChild( e );
 
-        e.setAttribute( QStringLiteral("o"), d->m_ref.offset + d->m_page->m_page->textOffset() );
+        e.setAttribute( QStringLiteral("o"), d->m_ref.offset + d->m_page->textOffset() );
         e.setAttribute( QStringLiteral("l"), d->m_ref.length );
 
         tagIt = tagIt->next();
@@ -1007,8 +1007,8 @@ void BoxTagging::store( QDomNode & node, QDomDocument & document ) const
 
         e.setAttribute( QStringLiteral("l"), QString::number(d->m_boundary.left ) );
         e.setAttribute( QStringLiteral("r"), QString::number(d->m_boundary.right ) );
-        e.setAttribute( QStringLiteral("t"), QString::number(d->m_boundary.top + d->m_page->m_page->verticalOffset() ) );
-        e.setAttribute( QStringLiteral("b"), QString::number(d->m_boundary.bottom + d->m_page->m_page->verticalOffset() ) );
+        e.setAttribute( QStringLiteral("t"), QString::number(d->m_boundary.top + d->m_page->verticalOffset() ) );
+        e.setAttribute( QStringLiteral("b"), QString::number(d->m_boundary.bottom + d->m_page->verticalOffset() ) );
 
         tagIt = tagIt->next();
     }

@@ -16,7 +16,7 @@
 
 namespace Okular {
 
-class PagePrivate;
+class Page;
 
 class TaggingPrivate
 {
@@ -45,7 +45,7 @@ class TaggingPrivate
          */
         virtual double distanceSqr( double x, double y, double xScale, double yScale );
 
-        PagePrivate * m_page;
+        Page * m_page;
 
         QString m_author;
         QString m_contents;

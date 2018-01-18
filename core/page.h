@@ -373,6 +373,11 @@ class OKULARCORE_EXPORT Page
         bool removeAnnotation( Annotation * annotation );
 
         /**
+         * Does the page have any taggings?
+         */
+        bool hasTaggings() const;
+
+        /**
          * Returns the annotation with the given unique name.
          */
         Tagging * tagging( const QString & uniqueName ) const;
@@ -462,6 +467,9 @@ class OKULARCORE_EXPORT Page
          * member variables directly.
          */
         friend class ::PagePainter;
+
+        friend class Tagging;
+        friend class TaggingPrivate;
         /// @endcond
 
         const QPixmap * _o_nearestPixmap( DocumentObserver *, int, int ) const;
