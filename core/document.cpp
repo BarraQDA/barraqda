@@ -4546,9 +4546,21 @@ bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
 
                 annotationsToDelete << oldPage->m_annotations;
                 taggingsToDelete << newPage->m_taggings;
-                rectsToDelete << oldPage->m_rects;
                 oldPage->m_annotations = newPage->m_annotations;
-                oldPage->m_rects = newPage->m_rects;
+
+                QLinkedList< ObjectRect* >::iterator it=oldPage->m_rects.begin(), end=oldPage->m_rects.end();
+                while ( it != end )
+                {
+                    ObjectRect::ObjectType type = (*it)->objectType();
+                    if ( type != ObjectRect::OTagging )
+                    {
+                        rectsToDelete << *it;
+                        it = oldPage->m_rects.erase(it);
+                    }
+                    else
+                        ++it;
+                }
+                oldPage->m_rects << newPage->m_rects;
             }
             qDeleteAll( newPagesVector );
         }
