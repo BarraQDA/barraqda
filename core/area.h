@@ -12,11 +12,11 @@
 
 #include <math.h>
 
-#include <QtCore/QList>
-#include <QtGui/QColor>
-#include <QtGui/QPainterPath>
-#include <QtGui/QTransform>
-#include <QtCore/QDebug>
+#include <QList>
+#include <QColor>
+#include <QPainterPath>
+#include <QTransform>
+#include <QDebug>
 
 #include "global.h"
 #include "okularcore_export.h"
@@ -301,6 +301,18 @@ class OKULARCORE_EXPORT NormalizedRect
             return pow( distX * xScale, 2 ) + pow( distY * yScale, 2 );
         }
 
+        /// @since 1.4
+        double width() const
+        {
+            return right - left;
+        }
+
+        /// @since 1.4
+        double height() const
+        {
+            return bottom - top;
+        }
+
         /**
          * The normalized left coordinate.
          */
@@ -439,7 +451,7 @@ class OKULARCORE_EXPORT AnnotationObjectRect : public ObjectRect
          * Creates a new annotation object rectangle with the
          * given @p annotation.
          */
-        AnnotationObjectRect( Annotation *annotation );
+        explicit AnnotationObjectRect( Annotation *annotation );
 
         /**
          * Destroys the annotation object rectangle.
@@ -703,7 +715,7 @@ template <class NormalizedShape, class Shape>
 bool RegularArea<NormalizedShape, Shape>::isNull() const
 {
     if ( this->isEmpty() )
-        return false;
+        return true;
 
     typename QList<NormalizedShape>::const_iterator it = this->begin(), itEnd = this->end();
     for ( ; it != itEnd; ++it )
@@ -905,7 +917,7 @@ class HighlightAreaRect : public RegularAreaRect
          * Creates a new highlight area rect with the coordinates of
          * the given @p area.
          */
-        HighlightAreaRect( const RegularAreaRect *area = nullptr );
+        explicit HighlightAreaRect( const RegularAreaRect *area = nullptr );
 
         /**
          * The search ID of the highlight owner.

@@ -13,8 +13,8 @@
 #include "global.h"
 #include "okularcore_export.h"
 
-#include <QtCore/QString>
-#include <QtCore/QVariant>
+#include <QString>
+#include <QVariant>
 
 namespace Okular {
 
@@ -96,6 +96,21 @@ class OKULARCORE_EXPORT Action
          * @since 0.15 (KDE 4.9)
          */
         QVariant nativeId() const;
+
+        /**
+         * Returns the next actions to be executed after.
+         *
+         * @since 1.5
+         */
+        QVector< Action * > nextActions() const;
+
+        /**
+         * Sets the next actions.
+         *
+         * Takes ownership of the objects in the actions vector.
+         * @since 1.5
+         */
+        void setNextActions( const QVector< Action * > &actions );
 
     protected:
         /// @cond PRIVATE
@@ -222,7 +237,7 @@ class OKULARCORE_EXPORT ExecuteAction : public Action
 
 /**
  * The Browse action browses an url by opening a web browser or
- * email client, depedning on the url protocol (e.g. http, mailto, etc.).
+ * email client, depending on the url protocol (e.g. http, mailto, etc.).
  */
 class OKULARCORE_EXPORT BrowseAction : public Action
 {
@@ -232,7 +247,7 @@ class OKULARCORE_EXPORT BrowseAction : public Action
          *
          * @param url The url to browse.
          */
-        BrowseAction( const QUrl &url );
+        explicit BrowseAction( const QUrl &url );
 
         /**
          * Destroys the browse action.
@@ -391,6 +406,7 @@ class OKULARCORE_EXPORT ScriptAction : public Action
         /**
          * Creates a new Script action.
          *
+         * @param type The type of the script (for now, only JavaScript = 0 is implemented).
          * @param script The code to execute.
          */
         ScriptAction( enum ScriptType type, const QString &script );
@@ -446,7 +462,7 @@ class OKULARCORE_EXPORT MovieAction : public Action
         /**
          * Creates a new movie action.
          */
-        MovieAction( OperationType operation );
+        explicit MovieAction( OperationType operation );
 
         /**
          * Destroys the movie action.

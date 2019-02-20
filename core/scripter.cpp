@@ -9,7 +9,8 @@
 
 #include "scripter.h"
 
-#include <QtCore/QDebug>
+#include <QDebug>
+#include <QFile>
 
 #include "debug_p.h"
 #include "script/executor_kjs_p.h"
@@ -20,17 +21,19 @@ class Okular::ScripterPrivate
 {
     public:
         ScripterPrivate( DocumentPrivate *doc )
-            : m_doc( doc ), m_kjs( nullptr )
+            : m_doc( doc )
+#ifdef WITH_KJS
+            , m_kjs( nullptr )
+#endif
+            , m_event( nullptr )
         {
-        }
-
-        ~ScripterPrivate()
-        {
-            delete m_kjs;
         }
 
         DocumentPrivate *m_doc;
-        ExecutorKJS *m_kjs;
+#ifdef WITH_KJS
+        QScopedPointer<ExecutorKJS> m_kjs;
+#endif
+        Event *m_event;
 };
 
 Scripter::Scripter( DocumentPrivate *doc )
@@ -46,21 +49,48 @@ Scripter::~Scripter()
 QString Scripter::execute( ScriptType type, const QString &script )
 {
     qCDebug(OkularCoreDebug) << "executing the script:";
+#ifdef WITH_KJS
 #if 0
     if ( script.length() < 1000 )
         qDebug() << script;
     else
         qDebug() << script.left( 1000 ) << "[...]";
 #endif
+    static QString builtInScript;
+    if ( builtInScript.isNull() )
+    {
+        QFile builtInResource ( ":/script/builtin.js" );
+        if (!builtInResource.open( QIODevice::ReadOnly ))
+        {
+            qCDebug(OkularCoreDebug) << "failed to load builtin script";
+        }
+        else
+        {
+            builtInScript = QString::fromUtf8( builtInResource.readAll() );
+            builtInResource.close();
+        }
+    }
+
     switch ( type )
     {
         case JavaScript:
             if ( !d->m_kjs )
             {
-                d->m_kjs = new ExecutorKJS( d->m_doc );
+                d->m_kjs.reset(new ExecutorKJS( d->m_doc ));
             }
-            d->m_kjs->execute( script );
+            d->m_kjs->execute( builtInScript + script, d->m_event );
             break;
     }
+#endif
     return QString();
+}
+
+void Scripter::setEvent( Event *event )
+{
+    d->m_event = event;
+}
+
+Event *Scripter::event() const
+{
+    return d->m_event;
 }

@@ -1,3 +1,12 @@
+/***************************************************************************
+ *   Copyright (C) 2012 by Fabio D'Urso <fabiodurso@hotmail.it>            *
+ *   Copyright (C) 2015 by Laurent Montel <montel@kde.org>                 *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ ***************************************************************************/
 
 #include "editannottooldialog.h"
 
@@ -15,12 +24,10 @@
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QStackedWidget>
-#include <QtXml/QDomDocument>
-#include <QtXml/QDomElement>
+#include <QDomDocument>
+#include <QDomElement>
 #include <KConfigGroup>
 #include <QDialogButtonBox>
-#include <QPushButton>
-#include <QVBoxLayout>
 
 #include "core/annotations.h"
 #include "ui/annotationwidgets.h"
@@ -85,6 +92,7 @@ EditAnnotToolDialog::EditAnnotToolDialog( QWidget *parent, const QDomElement &in
     m_type->addItem( i18n("Text markup"), qVariantFromValue( ToolTextMarkup ) );
     m_type->addItem( i18n("Geometrical shape"), qVariantFromValue( ToolGeometricalShape ) );
     m_type->addItem( i18n("Stamp"), qVariantFromValue( ToolStamp ) );
+    m_type->addItem( i18n("Typewriter"), qVariantFromValue( ToolTypewriter ) );
 
     createStubAnnotation();
 
@@ -124,7 +132,8 @@ QDomDocument EditAnnotToolDialog::toolXml() const
     toolElement.appendChild( engineElement );
     engineElement.appendChild( annotationElement );
 
-    const QString color = m_stubann->style().color().name();
+    const QString color = m_stubann->style().color().name( QColor::HexArgb );
+    const QString textColor = static_cast< Okular::TextAnnotation * >( m_stubann )->textColor().name();
     const QString opacity = QString::number( m_stubann->style().opacity() );
     const QString width = QString::number( m_stubann->style().width() );
 
@@ -258,6 +267,19 @@ QDomDocument EditAnnotToolDialog::toolXml() const
         annotationElement.setAttribute( QStringLiteral("type"), QStringLiteral("Stamp") );
         annotationElement.setAttribute( QStringLiteral("icon"), sa->stampIconName() );
     }
+    else if ( toolType == ToolTypewriter )
+    {
+        Okular::TextAnnotation * ta = static_cast<Okular::TextAnnotation*>( m_stubann );
+        toolElement.setAttribute( QStringLiteral("type"), QStringLiteral("typewriter") );
+        engineElement.setAttribute( QStringLiteral("type"), QStringLiteral("PickPoint") );
+        engineElement.setAttribute( QStringLiteral("block"), QStringLiteral("true") );
+        annotationElement.setAttribute( QStringLiteral("type"), QStringLiteral("Typewriter") );
+        annotationElement.setAttribute( QStringLiteral("color"), color );
+        annotationElement.setAttribute( QStringLiteral("textColor"), textColor );
+        annotationElement.setAttribute( QStringLiteral("width"), width );
+        if ( ta->textFont() != QApplication::font() )
+            annotationElement.setAttribute( QStringLiteral("font"), ta->textFont().toString() );
+    }
 
     if ( opacity != QStringLiteral("1") )
         annotationElement.setAttribute( QStringLiteral("opacity"), opacity );
@@ -333,6 +355,16 @@ void EditAnnotToolDialog::createStubAnnotation()
         Okular::StampAnnotation * sa = new Okular::StampAnnotation();
         sa->setStampIconName( QStringLiteral("okular") );
         m_stubann = sa;
+    }
+    else if ( toolType == ToolTypewriter )
+    {
+        Okular::TextAnnotation * ta = new Okular::TextAnnotation();
+        ta->setTextType( Okular::TextAnnotation::InPlace );
+        ta->setInplaceIntent( Okular::TextAnnotation::TypeWriter );
+        ta->style().setWidth( 0.0 );
+        ta->style().setColor( QColor(255,255,255,0) );
+        ta->setTextColor( Qt::black );
+        m_stubann = ta;
     }
 }
 
@@ -463,6 +495,19 @@ void EditAnnotToolDialog::loadTool( const QDomElement &toolElement )
         setToolType( ToolTextMarkup );
         Okular::HighlightAnnotation * ha = static_cast<Okular::HighlightAnnotation*>( m_stubann );
         ha->setHighlightType( Okular::HighlightAnnotation::Underline );
+    }
+    else if ( annotType == QLatin1String("typewriter") )
+    {
+        setToolType( ToolTypewriter );
+        Okular::TextAnnotation * ta = static_cast<Okular::TextAnnotation*>( m_stubann );
+        if ( annotationElement.hasAttribute( QStringLiteral("font") ) )
+        {
+            QFont f;
+            f.fromString( annotationElement.attribute( QStringLiteral("font") ) );
+            ta->setTextFont( f );
+        }
+        if ( annotationElement.hasAttribute( QStringLiteral("textColor") ) )
+            ta->setTextColor( QColor( annotationElement.attribute( QStringLiteral("textColor") ) ) );
     }
 
     // Common properties

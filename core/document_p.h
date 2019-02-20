@@ -16,12 +16,13 @@
 #include "synctex/synctex_parser.h"
 
 // qt/kde/system includes
-#include <QtCore/QHash>
-#include <QtCore/QLinkedList>
-#include <QtCore/QMap>
-#include <QtCore/QMutex>
-#include <QtCore/QPointer>
+#include <QHash>
+#include <QLinkedList>
+#include <QMap>
+#include <QMutex>
+#include <QPointer>
 #include <QUrl>
+#include <KConfigDialog>
 #include <KPluginMetaData>
 
 // local includes
@@ -64,6 +65,20 @@ struct GeneratorInfo
 
 namespace Okular {
 
+class BackendConfigDialog : public KConfigDialog
+{
+public:
+    BackendConfigDialog(QWidget *parent, const QString &name, KCoreConfigSkeleton *config)
+     : KConfigDialog(parent, name, config)
+    {
+    }
+
+    KPageWidget *thePageWidget()
+    {
+        return pageWidget();
+    }
+};
+
 class FontExtractionThread;
 
 struct DoContinueDirectionMatchSearchStruct
@@ -86,7 +101,7 @@ Q_DECLARE_FLAGS(LoadDocumentInfoFlags, LoadDocumentInfoFlag)
 class DocumentPrivate
 {
     public:
-        DocumentPrivate( Document *parent )
+        explicit DocumentPrivate( Document *parent )
           : m_parent( parent ),
             m_tempFile( nullptr ),
             m_docSize( -1 ),
@@ -155,6 +170,7 @@ class DocumentPrivate
         bool canRemoveExternalTaggings() const;
         void warnLimitedAnnotSupport();
         OKULARCORE_EXPORT static QString docDataFileName(const QUrl &url, qint64 document_size);
+        bool cancelRenderingBecauseOf( PixmapRequest *executingRequest, PixmapRequest *newRequest );
 
         // Methods that implement functionality needed by undo commands
         void performAddPageAnnotation( int page, Annotation *annotation );
@@ -210,6 +226,8 @@ class DocumentPrivate
 
         // For sync files
         void loadSyncFile( const QString & filePath );
+
+        void clearAndWaitForRequests();
 
         // member variables
         Document *m_parent;

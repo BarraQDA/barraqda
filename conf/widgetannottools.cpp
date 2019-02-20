@@ -14,12 +14,12 @@
 #include <klocalizedstring.h>
 
 
-#include <QtWidgets/QApplication>
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QListWidgetItem>
-#include <QtXml/QDomDocument>
-#include <QtXml/QDomElement>
+#include <QDomDocument>
+#include <QDomElement>
 #include <KConfigGroup>
 #include <QDialogButtonBox>
 #include <QPushButton>

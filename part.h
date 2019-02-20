@@ -23,7 +23,7 @@
 #include <QList>
 #include <QPointer>
 #include <QProcess>
-#include <QtDBus>
+#include <QtDBus> // krazy:exclude=includes
 #include <QUrl>
 
 #include <KCompressionDevice>
@@ -163,8 +163,11 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         Q_SCRIPTABLE void slotGotoFirst();
         Q_SCRIPTABLE void slotGotoLast();
         Q_SCRIPTABLE void slotTogglePresentation();
+        Q_SCRIPTABLE void slotToggleChangeColors();
+        Q_SCRIPTABLE void slotSetChangeColors(bool active);
         Q_SCRIPTABLE Q_NOREPLY void reload();
         Q_SCRIPTABLE Q_NOREPLY void enableStartWithPrint();
+        Q_SCRIPTABLE Q_NOREPLY void enableExitAfterPrint();
 
     Q_SIGNALS:
         void enablePrintAction(bool enable);
@@ -251,7 +254,7 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
 
     private:
         bool aboutToShowContextMenu(QMenu *menu, QAction *action, QMenu *contextMenu);
-        void showMenu(const Okular::Page *page, const QPoint &point, const QString &bookmarkTitle = QString(), const Okular::DocumentViewport &vp = DocumentViewport());
+        void showMenu(const Okular::Page *page, const QPoint &point, const QString &bookmarkTitle = QString(), const Okular::DocumentViewport &vp = DocumentViewport(), bool showTOCActions = false);
         bool eventFilter(QObject * watched, QEvent * event) override;
         Document::OpenResult doOpenFile(const QMimeType &mime, const QString &fileNameToOpen, bool *isCompressedFile);
         bool openUrl( const QUrl &url, bool swapInsteadOfOpening );
@@ -261,7 +264,7 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         void setupActions();
 
         void setupPrint( QPrinter &printer );
-        void doPrint( QPrinter &printer );
+        bool doPrint( QPrinter &printer );
         bool handleCompressed(QString &destpath, const QString &path, KCompressionDevice::CompressionType compressionType );
         void rebuildBookmarkMenu( bool unplugActions = true );
         void updateAboutBackendAction();
@@ -388,6 +391,7 @@ class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::Docu
         QList<QAction*> m_bookmarkActions;
         bool m_cliPresentation;
         bool m_cliPrint;
+        bool m_cliPrintAndExit;
         QString m_addBookmarkText;
         QIcon m_addBookmarkIcon;
 

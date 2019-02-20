@@ -1,5 +1,6 @@
 /***************************************************************************
  *   Copyright (C) 2007 by Pino Toscano <pino@kde.org>                     *
+ *   Copyright (C) 2018 by Intevation GmbH <intevation@intevation.de>      *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -15,7 +16,18 @@
 
 #include <config-okular-poppler.h>
 
-extern Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink);
+extern Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink, bool deletePopplerLink = true);
+#ifdef HAVE_POPPLER_0_65
+# define SET_ANNOT_ACTIONS \
+    setAdditionalAction( Okular::Annotation::CursorEntering, createLinkFromPopplerLink( field->additionalAction( Poppler::Annotation::CursorEnteringAction ) ) ); \
+    setAdditionalAction( Okular::Annotation::CursorLeaving, createLinkFromPopplerLink( field->additionalAction( Poppler::Annotation::CursorLeavingAction ) ) ); \
+    setAdditionalAction( Okular::Annotation::MousePressed, createLinkFromPopplerLink( field->additionalAction( Poppler::Annotation::MousePressedAction ) ) ); \
+    setAdditionalAction( Okular::Annotation::MouseReleased, createLinkFromPopplerLink( field->additionalAction( Poppler::Annotation::MouseReleasedAction ) ) ); \
+    setAdditionalAction( Okular::Annotation::FocusIn, createLinkFromPopplerLink( field->additionalAction( Poppler::Annotation::FocusInAction ) ) ); \
+    setAdditionalAction( Okular::Annotation::FocusOut, createLinkFromPopplerLink( field->additionalAction( Poppler::Annotation::FocusOutAction ) ) );
+#else
+# define SET_ANNOT_ACTIONS
+#endif
 
 #ifdef HAVE_POPPLER_0_53
 #define SET_ACTIONS \
@@ -23,7 +35,8 @@ extern Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLin
     setAdditionalAction( Okular::FormField::FieldModified, createLinkFromPopplerLink( field->additionalAction( Poppler::FormField::FieldModified ) ) ); \
     setAdditionalAction( Okular::FormField::FormatField, createLinkFromPopplerLink( field->additionalAction( Poppler::FormField::FormatField ) ) ); \
     setAdditionalAction( Okular::FormField::ValidateField, createLinkFromPopplerLink( field->additionalAction( Poppler::FormField::ValidateField ) ) ); \
-    setAdditionalAction( Okular::FormField::CalculateField, createLinkFromPopplerLink( field->additionalAction( Poppler::FormField::CalculateField ) ) );
+    setAdditionalAction( Okular::FormField::CalculateField, createLinkFromPopplerLink( field->additionalAction( Poppler::FormField::CalculateField ) ) ); \
+    SET_ANNOT_ACTIONS
 #else
 #define SET_ACTIONS \
     setActivationAction( createLinkFromPopplerLink( field->activationAction() ) );
@@ -33,6 +46,7 @@ PopplerFormFieldButton::PopplerFormFieldButton( Poppler::FormFieldButton * field
     : Okular::FormFieldButton(), m_field( field )
 {
     m_rect = Okular::NormalizedRect::fromQRectF( m_field->rect() );
+    m_id = m_field->id();
     SET_ACTIONS
 }
 
@@ -48,7 +62,7 @@ Okular::NormalizedRect PopplerFormFieldButton::rect() const
 
 int PopplerFormFieldButton::id() const
 {
-    return m_field->id();
+    return m_id;
 }
 
 QString PopplerFormFieldButton::name() const
@@ -66,9 +80,27 @@ bool PopplerFormFieldButton::isReadOnly() const
     return m_field->isReadOnly();
 }
 
+void PopplerFormFieldButton::setReadOnly( bool value )
+{
+#ifdef HAVE_POPPLER_0_64
+    m_field->setReadOnly( value );
+#else
+    Q_UNUSED( value );
+#endif
+}
+
 bool PopplerFormFieldButton::isVisible() const
 {
     return m_field->isVisible();
+}
+
+void PopplerFormFieldButton::setVisible( bool value )
+{
+#ifdef HAVE_POPPLER_0_64
+    m_field->setVisible( value );
+#else
+    Q_UNUSED( value );
+#endif
 }
 
 Okular::FormFieldButton::ButtonType PopplerFormFieldButton::buttonType() const
@@ -110,6 +142,7 @@ PopplerFormFieldText::PopplerFormFieldText( Poppler::FormFieldText * field )
     : Okular::FormFieldText(), m_field( field )
 {
     m_rect = Okular::NormalizedRect::fromQRectF( m_field->rect() );
+    m_id = m_field->id();
     SET_ACTIONS
 }
 
@@ -125,7 +158,7 @@ Okular::NormalizedRect PopplerFormFieldText::rect() const
 
 int PopplerFormFieldText::id() const
 {
-    return m_field->id();
+    return m_id;
 }
 
 QString PopplerFormFieldText::name() const
@@ -143,9 +176,27 @@ bool PopplerFormFieldText::isReadOnly() const
     return m_field->isReadOnly();
 }
 
+void PopplerFormFieldText::setReadOnly( bool value )
+{
+#ifdef HAVE_POPPLER_0_64
+    m_field->setReadOnly( value );
+#else
+    Q_UNUSED( value );
+#endif
+}
+
 bool PopplerFormFieldText::isVisible() const
 {
     return m_field->isVisible();
+}
+
+void PopplerFormFieldText::setVisible( bool value )
+{
+#ifdef HAVE_POPPLER_0_64
+    m_field->setVisible( value );
+#else
+    Q_UNUSED( value );
+#endif
 }
 
 Okular::FormFieldText::TextType PopplerFormFieldText::textType() const
@@ -202,6 +253,7 @@ PopplerFormFieldChoice::PopplerFormFieldChoice( Poppler::FormFieldChoice * field
     : Okular::FormFieldChoice(), m_field( field )
 {
     m_rect = Okular::NormalizedRect::fromQRectF( m_field->rect() );
+    m_id = m_field->id();
     SET_ACTIONS
 }
 
@@ -217,7 +269,7 @@ Okular::NormalizedRect PopplerFormFieldChoice::rect() const
 
 int PopplerFormFieldChoice::id() const
 {
-    return m_field->id();
+    return m_id;
 }
 
 QString PopplerFormFieldChoice::name() const
@@ -235,9 +287,27 @@ bool PopplerFormFieldChoice::isReadOnly() const
     return m_field->isReadOnly();
 }
 
+void PopplerFormFieldChoice::setReadOnly( bool value )
+{
+#ifdef HAVE_POPPLER_0_64
+    m_field->setReadOnly( value );
+#else
+    Q_UNUSED( value );
+#endif
+}
+
 bool PopplerFormFieldChoice::isVisible() const
 {
     return m_field->isVisible();
+}
+
+void PopplerFormFieldChoice::setVisible( bool value )
+{
+#ifdef HAVE_POPPLER_0_64
+    m_field->setVisible( value );
+#else
+    Q_UNUSED( value );
+#endif
 }
 
 Okular::FormFieldChoice::ChoiceType PopplerFormFieldChoice::choiceType() const

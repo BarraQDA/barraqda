@@ -23,7 +23,7 @@ class TextDocumentSettingsWidgetPrivate
          * @note the private class won't take ownership of the ui, so you
          *       must delete it yourself
          */
-        TextDocumentSettingsWidgetPrivate(Ui_TextDocumentSettings *ui)
+        explicit TextDocumentSettingsWidgetPrivate(Ui_TextDocumentSettings *ui)
             : mUi(ui)
         {}
 
@@ -33,8 +33,10 @@ class TextDocumentSettingsWidgetPrivate
 
 class TextDocumentSettingsPrivate : public QObject
 {
+    Q_OBJECT
+
     public:
-        TextDocumentSettingsPrivate(QObject *parent)
+        explicit TextDocumentSettingsPrivate(QObject *parent)
             : QObject(parent)
         {}
 

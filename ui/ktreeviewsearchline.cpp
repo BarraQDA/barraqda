@@ -21,19 +21,19 @@
 
 #include "ktreeviewsearchline.h"
 
-#include <QtCore/QList>
-#include <QtCore/QTimer>
-#include <QtCore/QRegExp>
-#include <QtWidgets/QApplication>
-#include <QtGui/QContextMenuEvent>
-#include <QtWidgets/QHBoxLayout>
-#include <QtWidgets/QHeaderView>
-#include <QtWidgets/QLabel>
-#include <QtWidgets/QMenu>
-#include <QtWidgets/QToolButton>
-#include <QtWidgets/QTreeView>
+#include <QList>
+#include <QTimer>
+#include <QRegExp>
+#include <QApplication>
+#include <QContextMenuEvent>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QMenu>
+#include <QToolButton>
+#include <QTreeView>
 
-#include <QtCore/QDebug>
+#include <QDebug>
 #include <kiconloader.h>
 #include <KLocalizedString>
 #include <ktoolbar.h>
@@ -159,7 +159,7 @@ KTreeViewSearchLine::KTreeViewSearchLine( QWidget *parent, QTreeView *treeView )
 {
   connect(this, &KTreeViewSearchLine::textChanged, this, &KTreeViewSearchLine::queueSearch);
 
-  setClearButtonShown( true );
+  setClearButtonEnabled( true );
   setTreeView( treeView );
 
   if ( !treeView ) {

@@ -16,7 +16,7 @@
 #include <qpixmap.h>
 #include <qvarlengtharray.h>
 #include <kiconloader.h>
-#include <QtCore/QDebug>
+#include <QDebug>
 #include <QApplication>
 #include <QIcon>
 
@@ -429,6 +429,11 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                 QPainter painter(&backImage);
                 painter.setCompositionMode(QPainter::CompositionMode_Multiply);
                 painter.fillRect(highlightRect, highlightColor);
+
+                auto frameColor = highlightColor.darker(150);
+                const QRect frameRect = r.geometry( scaledWidth, scaledHeight ).translated( -scaledCrop.topLeft() ).translated( -limits.left(), -limits.top() );
+                painter.setPen(frameColor);
+                painter.drawRect(frameRect);
             }
         }
 
@@ -717,7 +722,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
             Okular::Annotation * a = *aIt;
 
             // honor opacity settings on supported types
-            unsigned int opacity = (unsigned int)( 255.0 * a->style().opacity() );
+            unsigned int opacity = (unsigned int)( a->style().color().alpha() * a->style().opacity() );
             // skip the annotation drawing if all the annotation is fully
             // transparent, but not with text annotations
             if ( opacity <= 0 && a->subType() != Okular::Annotation::AText )
@@ -747,6 +752,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                     image.fill( acolor.rgba() );
                     QPainter painter( &image );
                     painter.setFont( text->textFont() );
+                    painter.setPen( text->textColor() );
                     Qt::AlignmentFlag halign = ( text->inplaceAlignment() == 1 ? Qt::AlignHCenter : ( text->inplaceAlignment() == 2 ? Qt::AlignRight : Qt::AlignLeft ) );
                     const double invXScale = (double)page->width() / scaledWidth;
                     const double invYScale = (double)page->height() / scaledHeight;
@@ -755,7 +761,7 @@ void PagePainter::paintCroppedPageOnPainter( QPainter * destPainter, const Okula
                     painter.drawText( borderWidth * invXScale, borderWidth * invYScale,
                                       (image.width() - 2 * borderWidth) * invXScale,
                                       (image.height() - 2 * borderWidth) * invYScale,
-                                      Qt::AlignTop | halign | Qt::TextWrapAnywhere,
+                                      Qt::AlignTop | halign | Qt::TextWordWrap,
                                       text->contents() );
                     painter.resetTransform();
                     //Required as asking for a zero width pen results

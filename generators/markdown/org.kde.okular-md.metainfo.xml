@@ -12,7 +12,10 @@
   <name xml:lang="el">Markdown</name>
   <name xml:lang="en-GB">Markdown</name>
   <name xml:lang="es">Markdown</name>
+  <name xml:lang="eu">Markdown</name>
+  <name xml:lang="fi">Markdown</name>
   <name xml:lang="fr">Markdown</name>
+  <name xml:lang="gl">Markdown</name>
   <name xml:lang="ia">Markdown</name>
   <name xml:lang="it">Markdown</name>
   <name xml:lang="ko">Markdown</name>
@@ -23,6 +26,7 @@
   <name xml:lang="pt-BR">Markdown</name>
   <name xml:lang="ru">Markdown</name>
   <name xml:lang="sk">Zrážka</name>
+  <name xml:lang="sl">Markdown</name>
   <name xml:lang="sr">Маркдаун</name>
   <name xml:lang="sr-Latn">Markdown</name>
   <name xml:lang="sr-ijekavian">Маркдаун</name>
@@ -31,6 +35,7 @@
   <name xml:lang="uk">Markdown</name>
   <name xml:lang="x-test">xxMarkdownxx</name>
   <name xml:lang="zh-CN">Markdown</name>
+  <name xml:lang="zh-TW">Markdown</name>
   <summary>Adds support for reading Markdown documents</summary>
   <summary xml:lang="ca">Afegeix la implementació per a llegir documents de Markdown</summary>
   <summary xml:lang="ca-valencia">Afig la implementació per a llegir documents de Markdown</summary>
@@ -39,7 +44,10 @@
   <summary xml:lang="el">Προσθέτει υποστήριξη για ανάγνωση Markdown εγγράφων</summary>
   <summary xml:lang="en-GB">Adds support for reading Markdown documents</summary>
   <summary xml:lang="es">Permite la lectura de documentos Markdown</summary>
+  <summary xml:lang="eu">Markdown dokumentuak irakurtzeko euskarria gehitzen du</summary>
+  <summary xml:lang="fi">Lisää Markdown-tiedostojen lukutuen</summary>
   <summary xml:lang="fr">Permet la lecture des documents Markdown</summary>
+  <summary xml:lang="gl">Engade a posibilidade de ler documentos Markdown</summary>
   <summary xml:lang="ia">Adde supporto per leger documentos Markdown</summary>
   <summary xml:lang="it">Aggiunge il supporto per la lettura di documenti Markdown</summary>
   <summary xml:lang="ko">Markdown 문서 읽기 지원 추가</summary>
@@ -47,9 +55,10 @@
   <summary xml:lang="nn">Legg til støtte for å lesa Markdown-dokument</summary>
   <summary xml:lang="pl">Dodaje obsługę odczytu dokumentów Markdown</summary>
   <summary xml:lang="pt">Adiciona o suporte para a leitura de documentos em Markdown</summary>
-  <summary xml:lang="pt-BR">Adiciona suporte para ler documentos Markdown</summary>
+  <summary xml:lang="pt-BR">Adiciona o suporte para leitura de documentos em Markdown</summary>
   <summary xml:lang="ru">Поддержка чтения документов Markdown</summary>
   <summary xml:lang="sk">Pridá podporu pre čítanie dokumentov Markdown</summary>
+  <summary xml:lang="sl">Doda podporo za branje dokumentov Markdown</summary>
   <summary xml:lang="sr">Подршка за читање маркдаун докумената</summary>
   <summary xml:lang="sr-Latn">Podrška za čitanje Markdown dokumenata</summary>
   <summary xml:lang="sr-ijekavian">Подршка за читање маркдаун докумената</summary>
@@ -58,6 +67,7 @@
   <summary xml:lang="uk">Додає підтримку читання документів Markdown</summary>
   <summary xml:lang="x-test">xxAdds support for reading Markdown documentsxx</summary>
   <summary xml:lang="zh-CN">添加阅读 Markdown 文档的支持</summary>
+  <summary xml:lang="zh-TW">增加讀取 Markdown 文件的支援</summary>
   <mimetypes>
     <mimetype>text/markdown</mimetype>
   </mimetypes>

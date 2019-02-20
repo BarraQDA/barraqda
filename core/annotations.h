@@ -10,13 +10,13 @@
 #ifndef _OKULAR_ANNOTATIONS_H_
 #define _OKULAR_ANNOTATIONS_H_
 
-#include <QtCore/QString>
-#include <QtCore/QDateTime>
-#include <QtCore/QLinkedList>
-#include <QtCore/QRect>
-#include <QtGui/QFont>
-#include <QtXml/QDomDocument>
-#include <QtXml/QDomElement>
+#include <QString>
+#include <QDateTime>
+#include <QLinkedList>
+#include <QRect>
+#include <QFont>
+#include <QDomDocument>
+#include <QDomElement>
 
 #include "okularcore_export.h"
 #include "area.h"
@@ -191,8 +191,14 @@ class OKULARCORE_EXPORT Annotation
          */
         enum AdditionalActionType
         {
-            PageOpening, ///< Performed when the page containing the annotation is opened.
-            PageClosing  ///< Performed when the page containing the annotation is closed.
+            PageOpening,    ///< Performed when the page containing the annotation is opened.
+            PageClosing,    ///< Performed when the page containing the annotation is closed.
+            CursorEntering, ///< Performed when the cursor enters the annotation's active area @since 1.5
+            CursorLeaving,  ///< Performed when the cursor exists the annotation's active area @since 1.5
+            MousePressed,   ///< Performed when the mouse button is pressed inside the annotation's active area @since 1.5
+            MouseReleased,  ///< Performed when the mouse button is released inside the annotation's active area @since 1.5
+            FocusIn,        ///< Performed when the annotation receives the input focus @since 1.5
+            FocusOut,       ///< Performed when the annotation loses the input focus @since 1.5
         };
 
         /**
@@ -775,7 +781,7 @@ class OKULARCORE_EXPORT TextAnnotation : public Annotation
         /**
          * Creates a new text annotation from the xml @p description
          */
-        TextAnnotation( const QDomNode &description );
+        explicit TextAnnotation( const QDomNode &description );
 
         /**
          * Destroys the text annotation.
@@ -812,6 +818,20 @@ class OKULARCORE_EXPORT TextAnnotation : public Annotation
          * Returns the font of the text annotation.
          */
         QFont textFont() const;
+
+        /**
+         * Sets the @p color of inplace text.
+         *
+         * @since 1.6
+         */
+        void setTextColor( const QColor &color );
+
+        /**
+         * Returns the color of inplace text.
+         *
+         * @since 1.6
+         */
+        QColor textColor() const;
 
         /**
          * Sets the inplace @p alignment of the text annotation.
@@ -1048,7 +1068,7 @@ class OKULARCORE_EXPORT GeomAnnotation : public Annotation
         /**
          * Creates a new geometrical annotation from the xml @p description
          */
-        GeomAnnotation( const QDomNode &description );
+        explicit GeomAnnotation( const QDomNode &description );
 
         /**
          * Destroys the geometrical annotation.
@@ -1290,7 +1310,7 @@ class OKULARCORE_EXPORT InkAnnotation : public Annotation
         /**
          * Creates a new ink annotation from the xml @p description
          */
-        InkAnnotation( const QDomNode &description );
+        explicit InkAnnotation( const QDomNode &description );
 
         /**
          * Destroys the ink annotation.
@@ -1452,7 +1472,7 @@ class OKULARCORE_EXPORT SoundAnnotation : public Annotation
         /**
          * Creates a new sound annotation from the xml @p description
          */
-        SoundAnnotation( const QDomNode &description );
+        explicit SoundAnnotation( const QDomNode &description );
         /**
          * Destroys the sound annotation.
          */
@@ -1512,7 +1532,7 @@ class OKULARCORE_EXPORT MovieAnnotation : public Annotation
         /**
          * Creates a new movie annotation from the xml @p description
          */
-        MovieAnnotation( const QDomNode &description );
+        explicit MovieAnnotation( const QDomNode &description );
         /**
          * Destroys the movie annotation.
          */
@@ -1559,7 +1579,7 @@ class OKULARCORE_EXPORT ScreenAnnotation : public Annotation
         /**
          * Creates a new screen annotation from the xml @p description
          */
-        ScreenAnnotation( const QDomNode &description );
+        explicit ScreenAnnotation( const QDomNode &description );
 
         /**
          * Destroys the screen annotation.
@@ -1628,7 +1648,7 @@ class OKULARCORE_EXPORT WidgetAnnotation : public Annotation
         /**
          * Creates a new widget annotation from the xml @p description
          */
-        WidgetAnnotation( const QDomNode &description );
+        explicit WidgetAnnotation( const QDomNode &description );
 
         /**
          * Destroys the widget annotation.
@@ -1683,7 +1703,7 @@ class OKULARCORE_EXPORT RichMediaAnnotation : public Annotation
         /**
          * Creates a new rich media annotation from the xml @p description
          */
-        RichMediaAnnotation( const QDomNode &description );
+        explicit RichMediaAnnotation( const QDomNode &description );
 
         /**
          * Destroys the rich media annotation.

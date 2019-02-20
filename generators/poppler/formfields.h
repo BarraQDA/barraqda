@@ -16,7 +16,7 @@
 class PopplerFormFieldButton : public Okular::FormFieldButton
 {
     public:
-        PopplerFormFieldButton( Poppler::FormFieldButton * field );
+        explicit PopplerFormFieldButton( Poppler::FormFieldButton * field );
         virtual ~PopplerFormFieldButton();
 
         // inherited from Okular::FormField
@@ -25,7 +25,9 @@ class PopplerFormFieldButton : public Okular::FormFieldButton
         QString name() const override;
         QString uiName() const override;
         bool isReadOnly() const override;
+        void setReadOnly( bool value ) override;
         bool isVisible() const override;
+        void setVisible( bool value ) override;
 
         // inherited from Okular::FormFieldButton
         ButtonType buttonType() const override;
@@ -37,13 +39,14 @@ class PopplerFormFieldButton : public Okular::FormFieldButton
     private:
         Poppler::FormFieldButton * m_field;
         Okular::NormalizedRect m_rect;
+        int m_id;
 
 };
 
 class PopplerFormFieldText : public Okular::FormFieldText
 {
     public:
-        PopplerFormFieldText( Poppler::FormFieldText * field );
+        explicit PopplerFormFieldText( Poppler::FormFieldText * field );
         virtual ~PopplerFormFieldText();
 
         // inherited from Okular::FormField
@@ -52,7 +55,9 @@ class PopplerFormFieldText : public Okular::FormFieldText
         QString name() const override;
         QString uiName() const override;
         bool isReadOnly() const override;
+        void setReadOnly( bool value ) override;
         bool isVisible() const override;
+        void setVisible( bool value ) override;
 
         // inherited from Okular::FormFieldText
         Okular::FormFieldText::TextType textType() const override;
@@ -67,13 +72,14 @@ class PopplerFormFieldText : public Okular::FormFieldText
     private:
         Poppler::FormFieldText * m_field;
         Okular::NormalizedRect m_rect;
+        int m_id;
 
 };
 
 class PopplerFormFieldChoice : public Okular::FormFieldChoice
 {
     public:
-        PopplerFormFieldChoice( Poppler::FormFieldChoice * field );
+        explicit PopplerFormFieldChoice( Poppler::FormFieldChoice * field );
         virtual ~PopplerFormFieldChoice();
 
         // inherited from Okular::FormField
@@ -82,7 +88,9 @@ class PopplerFormFieldChoice : public Okular::FormFieldChoice
         QString name() const override;
         QString uiName() const override;
         bool isReadOnly() const override;
+        void setReadOnly( bool value ) override;
         bool isVisible() const override;
+        void setVisible( bool value ) override;
 
         // inherited from Okular::FormFieldChoice
         ChoiceType choiceType() const override;
@@ -99,6 +107,7 @@ class PopplerFormFieldChoice : public Okular::FormFieldChoice
     private:
         Poppler::FormFieldChoice * m_field;
         Okular::NormalizedRect m_rect;
+        int m_id;
 
 };
 

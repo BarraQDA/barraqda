@@ -11,15 +11,16 @@
 #define _SIDEBAR_H_
 
 #include <qwidget.h>
+#include "okularpart_export.h"
 
 class QIcon;
 class QListWidgetItem;
 
-class Sidebar : public QWidget
+class OKULARPART_EXPORT Sidebar : public QWidget
 {
     Q_OBJECT
     public:
-        Sidebar( QWidget *parent = nullptr );
+        explicit Sidebar( QWidget *parent = nullptr );
         ~Sidebar();
 
         int addItem( QWidget *widget, const QIcon &icon, const QString &text );

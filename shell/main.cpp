@@ -15,11 +15,12 @@
 #include "shell.h"
 
 #include <KLocalizedString>
-#include <QtDBus/qdbusinterface.h>
+#include <QDBusInterface>
 #include <QTextStream>
 #include <kwindowsystem.h>
 #include <QApplication>
 #include <KAboutData>
+#include <KCrash>
 #include <KMessageBox>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
@@ -39,16 +40,17 @@ int main(int argc, char** argv)
     // set icon for shells which do not use desktop file metadata
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("okular")));
 
+    KCrash::initialize();
+
     QCommandLineParser parser;
     // The KDE4 version accepted flags such as -unique with a single dash -> preserve compatibility
     parser.setSingleDashWordOptionMode(QCommandLineParser::ParseAsLongOptions);
-    parser.addVersionOption();
-    parser.addHelpOption();
     aboutData.setupCommandLine(&parser);
 
     parser.addOption(QCommandLineOption(QStringList() << QStringLiteral("p") << QStringLiteral("page"), i18n("Page of the document to be shown"), QStringLiteral("number")));
     parser.addOption(QCommandLineOption(QStringList() << QStringLiteral("presentation"), i18n("Start the document in presentation mode")));
     parser.addOption(QCommandLineOption(QStringList() << QStringLiteral("print"), i18n("Start with print dialog")));
+    parser.addOption(QCommandLineOption(QStringList() << QStringLiteral("print-and-exit"), i18n("Start with print dialog and exit after printing")));
     parser.addOption(QCommandLineOption(QStringList() << QStringLiteral("unique"), i18n("\"Unique instance\" control")));
     parser.addOption(QCommandLineOption(QStringList() << QStringLiteral("noraise"), i18n("Not raise window")));
     parser.addPositionalArgument(QStringLiteral("urls"), i18n("Documents to open. Specify '-' to read from stdin."));

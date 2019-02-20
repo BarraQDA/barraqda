@@ -1,14 +1,13 @@
+set(CMAKE_AUTORCC ON)
+add_executable(okularkirigami main.cpp app.qrc)
+target_link_libraries(okularkirigami Qt5::Widgets Qt5::Qml KF5::I18n)
+if (ANDROID)
+    find_package(Qt5 COMPONENTS AndroidExtras)
+    target_sources(okularkirigami PRIVATE android.cpp)
+    target_link_libraries(okularkirigami Qt5::AndroidExtras)
+endif()
 
-include_directories(  ${QT_INCLUDES} )
+install(TARGETS okularkirigami ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
-#add_subdirectory(src)
-
-# QML-only thing
-#install(DIRECTORY package/ DESTINATION ${KDE_INSTALL_DATADIR}/plasma/packages/org.kde.active.documentviewer)
-
-install(DIRECTORY package/ DESTINATION ${KDE_INSTALL_DATADIR}/kpackage/genericqml/org.kde.mobile.okular)
-install(FILES package/metadata.desktop DESTINATION ${XDG_APPS_INSTALL_DIR} RENAME org.kde.mobile.okular.desktop)
-
-
-#install(FILES active-documentviewer.desktop DESTINATION ${KDE_INSTALL_APPDIR})
-
+install(FILES package/metadata.desktop DESTINATION ${XDG_APPS_INSTALL_DIR} RENAME org.kde.okular.kirigami.desktop)
+install( FILES org.kde.okular.kirigami.appdata.xml DESTINATION  ${KDE_INSTALL_METAINFODIR} )

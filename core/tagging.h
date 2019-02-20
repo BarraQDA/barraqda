@@ -10,13 +10,13 @@
 #ifndef _OKULAR_TAGGING_H_
 #define _OKULAR_TAGGING_H_
 
-#include <QtCore/QString>
-#include <QtCore/QDateTime>
-#include <QtCore/QLinkedList>
-#include <QtCore/QRect>
-#include <QtGui/QFont>
-#include <QtXml/QDomDocument>
-#include <QtXml/QDomElement>
+#include <QString>
+#include <QDateTime>
+#include <QLinkedList>
+#include <QRect>
+#include <QFont>
+#include <QDomDocument>
+#include <QDomElement>
 
 #include "okularcore_export.h"
 #include "area.h"
@@ -101,8 +101,14 @@ class OKULARCORE_EXPORT Tagging
          */
         enum AdditionalActionType
         {
-            PageOpening, ///< Performed when the page containing the tagging is opened.
-            PageClosing  ///< Performed when the page containing the tagging is closed.
+            PageOpening,    ///< Performed when the page containing the annotation is opened.
+            PageClosing,    ///< Performed when the page containing the annotation is closed.
+            CursorEntering, ///< Performed when the cursor enters the annotation's active area @since 1.5
+            CursorLeaving,  ///< Performed when the cursor exists the annotation's active area @since 1.5
+            MousePressed,   ///< Performed when the mouse button is pressed inside the annotation's active area @since 1.5
+            MouseReleased,  ///< Performed when the mouse button is released inside the annotation's active area @since 1.5
+            FocusIn,        ///< Performed when the annotation receives the input focus @since 1.5
+            FocusOut,       ///< Performed when the annotation loses the input focus @since 1.5
         };
 
         /**
@@ -410,13 +416,13 @@ class OKULARCORE_EXPORT TextTagging : public Tagging
         /**
          * Creates a new text tagging from the xml @p tagElement
          */
-        TextTagging( Document *doc, const QDomElement & tagElement );
+        explicit TextTagging( Document *doc, const QDomElement & tagElement );
 
         /**
          * Creates a new text tagging from a text reference.
          */
-        TextTagging( Tagging * head, const Page * page, TextReference ref );
-        TextTagging(                 const Page * page, TextReference ref );
+        explicit TextTagging( Tagging * head, const Page * page, TextReference ref );
+        explicit TextTagging(                 const Page * page, TextReference ref );
 
         /**
          * Destroys the text tagging.
@@ -454,13 +460,13 @@ class OKULARCORE_EXPORT BoxTagging : public Tagging
         /**
          * Creates a new box tagging from the xml @p tagElement
          */
-        BoxTagging( Document *doc, const QDomElement & tagElement );
+        explicit BoxTagging( Document *doc, const QDomElement & tagElement );
 
         /**
          * Creates a new box tagging from a rectangle.
          */
-        BoxTagging( Tagging * head, const Page * page, const NormalizedRect *rect );
-        BoxTagging(                 const Page * page, const NormalizedRect *rect );
+        explicit BoxTagging( Tagging * head, const Page * page, const NormalizedRect *rect );
+        explicit BoxTagging(                 const Page * page, const NormalizedRect *rect );
 
         /**
          * Destroys the text tagging.

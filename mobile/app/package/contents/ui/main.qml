@@ -17,38 +17,64 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import QtQuick 2.1
-import QtQuick.Controls 1.3
+import QtQuick 2.7
+import QtQuick.Dialogs 1.3 as QQD
 import org.kde.okular 2.0 as Okular
 import org.kde.kirigami 2.0 as Kirigami
+import org.kde.okular.app 2.0
 
 Kirigami.AbstractApplicationWindow {
     id: fileBrowserRoot
-    objectName: "fileBrowserRoot"
     visible: true
 
-    /*TODO: port ResourceInstance
-    PlasmaExtras.ResourceInstance {
-        id: resourceInstance
-        uri: documentItem.path
-    }*/
-
     header: null
-    globalDrawer: Kirigami.OverlayDrawer {
-        edge: Qt.LeftEdge
-        contentItem: Documents {
-            implicitWidth: Kirigami.Units.gridUnit * 20
-        }
-    }
-    contextDrawer: OkularDrawer {
-        drawerOpen: false
-    }
+    globalDrawer: Kirigami.GlobalDrawer {
+        title: i18n("Okular")
+        titleIcon: "okular"
 
+        QQD.FileDialog {
+            id: fileDialog
+            nameFilters: Okular.Okular.nameFilters
+            folder: "file://" + userPaths.documents
+            onAccepted: {
+                documentItem.url = fileDialog.fileUrl
+            }
+        }
+
+        actions: [
+            Kirigami.Action {
+                text: i18n("Open...")
+                icon.name: "document-open"
+                visible: Qt.platform.os !== "android"
+                onTriggered: {
+                    fileDialog.open()
+                }
+            },
+            Kirigami.Action {
+                text: i18n("Open...")
+                icon.name: "document-open"
+                visible: p0.enabled
+                readonly property var p0: Connections {
+                    target: AndroidInstance
+                    enabled: AndroidInstance.hasOwnProperty("openFile")
+                    onOpenUri: {
+                        console.log("open uri!", uri)
+                        documentItem.url = uri
+                    }
+                }
+                onTriggered: {
+//                     var mimetypes = Okular.Okular.mimeTypes.join(",")
+                    AndroidInstance.openFile(i18n("Document to open..."), "*/*")
+                }
+            }
+        ]
+    }
+    contextDrawer: OkularDrawer {}
+
+    title: documentItem.windowTitleForDocument
     Okular.DocumentItem {
         id: documentItem
-        onWindowTitleForDocumentChanged: {
-            fileBrowserRoot.title = windowTitleForDocument
-        }
+        onUrlChanged: { currentPage = 0 }
     }
 
     MainView {
@@ -62,11 +88,9 @@ Kirigami.AbstractApplicationWindow {
         interval: 100
         running: true
         onTriggered: {
-            if (commandlineArguments.length > 0) {
-                documentItem.path = commandlineArguments[0]
-            }
-
-            if (commandlineArguments.length == 0) {
+            if (uri) {
+                documentItem.url = uri
+            } else {
                 globalDrawer.open();
             }
         }

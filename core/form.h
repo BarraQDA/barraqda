@@ -12,8 +12,9 @@
 
 #include "okularcore_export.h"
 #include "area.h"
+#include "annotations.h"
 
-#include <QtCore/QStringList>
+#include <QStringList>
 
 namespace Okular {
 
@@ -87,9 +88,23 @@ class OKULARCORE_EXPORT FormField
         virtual bool isReadOnly() const;
 
         /**
+         * Whether the field is read-only.
+         *
+         * @since 1.4
+         */
+        virtual void setReadOnly( bool value );
+
+        /**
          * Whether this form field is visible.
          */
         virtual bool isVisible() const;
+
+        /**
+         * Whether the field is visible.
+         *
+         * @since 1.5
+         */
+        virtual void setVisible( bool value );
 
         Action* activationAction() const;
 
@@ -113,6 +128,14 @@ class OKULARCORE_EXPORT FormField
         */
         Action* additionalAction( AdditionalActionType type ) const;
 
+        /* Returns the additional action of the given @p type or @c nullptr if no action has been defined.
+         *
+         * This is for actions of annotation widgets associated with the FormField
+         *
+         * @since 1.5
+        */
+        Action* additionalAction( Annotation::AdditionalActionType type ) const;
+
     protected:
         /// @cond PRIVATE
         FormField( FormFieldPrivate &dd );
@@ -122,6 +145,7 @@ class OKULARCORE_EXPORT FormField
 
         void setActivationAction( Action *action );
         void setAdditionalAction( AdditionalActionType type, Action *action );
+        void setAdditionalAction( Annotation::AdditionalActionType type, Action *action );
 
     private:
         Q_DISABLE_COPY( FormField )

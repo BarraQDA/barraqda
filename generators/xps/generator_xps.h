@@ -31,7 +31,7 @@
 #include <QXmlDefaultHandler>
 #include <QStack>
 #include <QVariant>
-#include <QtCore/qloggingcategory.h>
+#include <QLoggingCategory>
 
 #include <kzip.h>
 
@@ -110,7 +110,7 @@ class XpsFile;
 class XpsHandler: public QXmlDefaultHandler
 {
 public:
-    XpsHandler( XpsPage *page );
+    explicit XpsHandler( XpsPage *page );
     ~XpsHandler();
 
     bool startElement( const QString & nameSpace,
@@ -159,6 +159,7 @@ public:
     Okular::TextPage* textPage();
 
     QImage loadImageFromFile( const QString &filename );
+    QString fileName() const { return m_fileName; }
 
 private:
     XpsFile *m_file;
@@ -319,7 +320,7 @@ class XpsGenerator : public Okular::Generator
     protected:
         bool doCloseDocument() override;
         QImage image( Okular::PixmapRequest *page ) override;
-        Okular::TextPage* textPage( Okular::Page * page ) override;
+        Okular::TextPage* textPage( Okular::TextRequest * request ) override;
 
     private:
         XpsFile *m_xpsFile;

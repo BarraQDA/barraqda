@@ -10,17 +10,17 @@
 #ifndef FICTIONBOOK_DOCUMENT_H
 #define FICTIONBOOK_DOCUMENT_H
 
-#include <QtCore/QByteArray>
-#include <QtCore/QMap>
-#include <QtCore/QString>
-#include <QtXml/QDomDocument>
+#include <QByteArray>
+#include <QMap>
+#include <QString>
+#include <QDomDocument>
 
 namespace FictionBook {
 
 class Document
 {
     public:
-        Document( const QString &fileName );
+        explicit Document( const QString &fileName );
 
         bool open();
 

@@ -1,7 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2004-2005 by Enrico Ros <eros.kde@email.it>             *
  *   Copyright (C) 2004-2008 by Albert Astals Cid <aacid@kde.org>          *
- *   Copyright (C) 2017 Klarälvdalens Datakonsult AB, a KDAB Group         *
+ *   Copyright (C) 2017, 2018 Klarälvdalens Datakonsult AB, a KDAB Group         *
  *                      company, info@kdab.com. Work sponsored by the      *
  *                      LiMux project of the city of Munich                *
  *                                                                         *
@@ -16,6 +16,7 @@
 #include "documentcommands_p.h"
 
 #include <limits.h>
+#include <memory>
 #ifdef Q_OS_WIN
 #define _WIN32_WINNT 0x0500
 #include <windows.h>
@@ -26,18 +27,18 @@
 #endif
 
 // qt/kde/system includes
-#include <QtCore/QtAlgorithms>
-#include <QtCore/QDir>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QMap>
-#include <QtCore/qtemporaryfile.h>
-#include <QtCore/QTextStream>
-#include <QtCore/QTimer>
-#include <QtWidgets/QApplication>
-#include <QtWidgets/QLabel>
-#include <QtPrintSupport/QPrinter>
-#include <QtPrintSupport/QPrintDialog>
+#include <QtAlgorithms>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QMap>
+#include <qtemporaryfile.h>
+#include <QTextStream>
+#include <QTimer>
+#include <QApplication>
+#include <QLabel>
+#include <QPrinter>
+#include <QPrintDialog>
 #include <QStack>
 #include <QUndoCommand>
 #include <QMimeDatabase>
@@ -80,6 +81,7 @@
 #include "page_p.h"
 #include "pagecontroller_p.h"
 #include "scripter.h"
+#include "script/event_p.h"
 #include "settings_core.h"
 #include "sourcereference.h"
 #include "sourcereference_p.h"
@@ -94,9 +96,11 @@
 #include "form.h"
 #include "utils.h"
 
-#include <memory>
-
 #include <config-okular.h>
+
+#if HAVE_MALLOC_TRIM
+#include "malloc.h"
+#endif
 
 using namespace Okular;
 
@@ -176,9 +180,9 @@ QString DocumentPrivate::namePaperSize(double inchesWidth, double inchesHeight) 
     const QString paperName = QPageSize::name(paperSize);
 
     if (orientation == QPrinter::Portrait) {
-        return i18nc("paper type and orientation (eg: Portrait A4)", "Portrait %0").arg(paperName);
+        return i18nc("paper type and orientation (eg: Portrait A4)", "Portrait %1", paperName);
     } else {
-        return i18nc("paper type and orientation (eg: Portrait A4)", "Landscape %0").arg(paperName);
+        return i18nc("paper type and orientation (eg: Portrait A4)", "Landscape %1", paperName);
     }
 }
 
@@ -561,7 +565,6 @@ bool DocumentPrivate::loadDocumentInfo( QFile &infoFile, LoadDocumentInfoFlags l
     if ( root.tagName() != QLatin1String("documentInfo") )
         return false;
 
-    QUrl documentUrl( root.attribute( "url" ) );
     bool loadedAnything = false; // set if something gets actually loaded
 
     // Parse the DOM tree
@@ -1172,19 +1175,50 @@ void DocumentPrivate::recalculateForms()
             const Page *p = m_parent->page( pageIdx );
             if (p)
             {
+                bool pageNeedsRefresh = false;
                 foreach( FormField *form, p->formFields() )
                 {
                     if ( form->id() == formId ) {
                         Action *action = form->additionalAction( FormField::CalculateField );
                         if (action)
                         {
+                            FormFieldText *fft = dynamic_cast< FormFieldText * >( form );
+                            std::shared_ptr<Event> event;
+                            QString oldVal;
+                            if ( fft )
+                            {
+                                // Pepare text calculate event
+                                event = Event::createFormCalculateEvent( fft, m_pagesVector[pageIdx] );
+                                if ( !m_scripter )
+                                    m_scripter = new Scripter( this );
+                                m_scripter->setEvent( event.get() );
+                                // The value maybe changed in javascript so save it first.
+                                oldVal = fft->text();
+                            }
+
                             m_parent->processAction( action );
+                            if ( event && fft )
+                            {
+                                // Update text field from calculate
+                                m_scripter->setEvent( nullptr );
+                                const QString newVal = event->value().toString();
+                                if ( newVal != oldVal )
+                                {
+                                    fft->setText( newVal );
+                                    emit m_parent->refreshFormWidget( fft );
+                                    pageNeedsRefresh = true;
+                                }
+                            }
                         }
                         else
                         {
                             qWarning() << "Form that is part of calculate order doesn't have a calculate action";
                         }
                     }
+                }
+                if ( pageNeedsRefresh )
+                {
+                    refreshPixmaps( p->number() );
                 }
             }
         }
@@ -1346,7 +1380,6 @@ void DocumentPrivate::sendGeneratorPixmapRequest()
             delete r;
         }
         // request only if page isn't already present and request has valid id
-        // request only if page isn't already present and request has valid id
         else if ( ( !r->d->mForce && r->page()->hasPixmap( r->observer(), r->width(), r->height(), r->normalizedRect() ) ) || !m_observers.contains(r->observer()) )
         {
             m_pixmapRequestsStack.pop_back();
@@ -1376,7 +1409,7 @@ void DocumentPrivate::sendGeneratorPixmapRequest()
             if ( pixmap )
             {
                 tilesManager = new TilesManager( r->pageNumber(), pixmap->width(), pixmap->height(), r->page()->rotation() );
-                tilesManager->setPixmap( pixmap, NormalizedRect( 0, 0, 1, 1 ) );
+                tilesManager->setPixmap( pixmap, NormalizedRect( 0, 0, 1, 1 ), true /*isPartialPixmap*/ );
                 tilesManager->setSize( r->width(), r->height() );
             }
             else
@@ -1485,7 +1518,11 @@ void DocumentPrivate::sendGeneratorPixmapRequest()
             request->setNormalizedRect( TilesManager::fromRotatedRect(
                         request->normalizedRect(), m_rotation ) );
 
-        request->setPartialUpdatesWanted( request->asynchronous() && !request->page()->hasPixmap( request->observer() ) );
+        // If set elsewhere we already know we want it to be partial
+        if ( !request->partialUpdatesWanted() )
+        {
+            request->setPartialUpdatesWanted( request->asynchronous() && !request->page()->hasPixmap( request->observer() ) );
+        }
 
         // we always have to unlock _before_ the generatePixmap() because
         // a sync generation would end with requestDone() -> deadlock, and
@@ -1581,26 +1618,35 @@ void DocumentPrivate::refreshPixmaps( int pageNumber )
     if ( !page )
         return;
 
-    QLinkedList< Okular::PixmapRequest * > requestedPixmaps;
     QMap< DocumentObserver*, PagePrivate::PixmapObject >::ConstIterator it = page->d->m_pixmaps.constBegin(), itEnd = page->d->m_pixmaps.constEnd();
+    QVector< Okular::PixmapRequest * > pixmapsToRequest;
     for ( ; it != itEnd; ++it )
     {
-        QSize size = (*it).m_pixmap->size();
+        const QSize size = (*it).m_pixmap->size();
         PixmapRequest * p = new PixmapRequest( it.key(), pageNumber, size.width() / qApp->devicePixelRatio(), size.height() / qApp->devicePixelRatio(), 1, PixmapRequest::Asynchronous );
         p->d->mForce = true;
-        requestedPixmaps.push_back( p );
+        pixmapsToRequest << p;
+    }
+
+    // Need to do this ↑↓ in two steps since requestPixmaps can end up calling cancelRenderingBecauseOf
+    // which changes m_pixmaps and thus breaks the loop above
+    for ( PixmapRequest *pr : qAsConst( pixmapsToRequest ) )
+    {
+        QLinkedList< Okular::PixmapRequest * > requestedPixmaps;
+        requestedPixmaps.push_back( pr );
+        m_parent->requestPixmaps( requestedPixmaps, Okular::Document::NoOption );
     }
 
     foreach (DocumentObserver *observer, m_observers)
     {
+        QLinkedList< Okular::PixmapRequest * > requestedPixmaps;
+
         TilesManager *tilesManager = page->d->tilesManager( observer );
         if ( tilesManager )
         {
             tilesManager->markDirty();
 
             PixmapRequest * p = new PixmapRequest( observer, pageNumber, tilesManager->width() / qApp->devicePixelRatio(), tilesManager->height() / qApp->devicePixelRatio(), 1, PixmapRequest::Asynchronous );
-
-            NormalizedRect tilesRect;
 
             // Get the visible page rect
             NormalizedRect visibleRect;
@@ -1626,10 +1672,10 @@ void DocumentPrivate::refreshPixmaps( int pageNumber )
                 delete p;
             }
         }
+
+        m_parent->requestPixmaps( requestedPixmaps, Okular::Document::NoOption );
     }
 
-    if ( !requestedPixmaps.isEmpty() )
-        m_parent->requestPixmaps( requestedPixmaps, Okular::Document::NoOption );
 }
 
 void DocumentPrivate::_o_configChanged()
@@ -2187,6 +2233,43 @@ void DocumentPrivate::loadSyncFile( const QString & filePath )
             m_pagesVector[i]->setSourceReferences( refRects.at(i) );
 }
 
+void DocumentPrivate::clearAndWaitForRequests()
+{
+    m_pixmapRequestsMutex.lock();
+    QLinkedList< PixmapRequest * >::const_iterator sIt = m_pixmapRequestsStack.constBegin();
+    QLinkedList< PixmapRequest * >::const_iterator sEnd = m_pixmapRequestsStack.constEnd();
+    for ( ; sIt != sEnd; ++sIt )
+        delete *sIt;
+    m_pixmapRequestsStack.clear();
+    m_pixmapRequestsMutex.unlock();
+
+    QEventLoop loop;
+    bool startEventLoop = false;
+    do
+    {
+        m_pixmapRequestsMutex.lock();
+        startEventLoop = !m_executingPixmapRequests.isEmpty();
+
+        if ( m_generator->hasFeature( Generator::SupportsCancelling ) )
+        {
+            for ( PixmapRequest *executingRequest : qAsConst( m_executingPixmapRequests ) )
+                executingRequest->d->mShouldAbortRender = 1;
+
+            if ( m_generator->d_ptr->mTextPageGenerationThread )
+                m_generator->d_ptr->mTextPageGenerationThread->abortExtraction();
+        }
+
+        m_pixmapRequestsMutex.unlock();
+        if ( startEventLoop )
+        {
+            m_closingLoop = &loop;
+            loop.exec();
+            m_closingLoop = nullptr;
+        }
+    }
+    while ( startEventLoop );
+}
+
 Document::Document( QWidget *widget )
     : QObject( nullptr ), d( new DocumentPrivate( this ) )
 {
@@ -2347,9 +2430,22 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     QMimeDatabase db;
     QMimeType mime = _mime;
     QByteArray filedata;
-    bool isstdin = url.fileName() == QLatin1String( "-" );
+    int fd = -1;
+    if (url.scheme() == QLatin1String("fd"))
+    {
+        bool ok;
+        fd = url.path().mid(1).toInt(&ok);
+        if (!ok)
+        {
+            return OpenError;
+        }
+    }
+    else if (url.fileName() == QLatin1String( "-" ))
+    {
+        fd = 0;
+    }
     bool triedMimeFromFileContent = false;
-    if ( !isstdin )
+    if ( fd < 0 )
     {
         if ( !mime.isValid() )
             return OpenError;
@@ -2363,7 +2459,12 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     else
     {
         QFile qstdin;
-        qstdin.open( stdin, QIODevice::ReadOnly );
+        const bool ret = qstdin.open( fd, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle );
+        if (!ret) {
+            qWarning() << "failed to read" << url << filedata;
+            return OpenError;
+        }
+
         filedata = qstdin.readAll();
         mime = db.mimeTypeForData( filedata );
         if ( !mime.isValid() || mime.isDefault() )
@@ -2372,12 +2473,14 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
         triedMimeFromFileContent = true;
     }
 
+    const bool fromFileDescriptor = fd >= 0;
+
     // 0. load Generator
     // request only valid non-disabled plugins suitable for the mimetype
     KPluginMetaData offer = DocumentPrivate::generatorForMimeType(mime, d->m_widget);
     if ( !offer.isValid() && !triedMimeFromFileContent )
     {
-        QMimeType newmime = db.mimeTypeForFile(docFile, QMimeDatabase::MatchExtension);
+        QMimeType newmime = db.mimeTypeForFile(docFile, QMimeDatabase::MatchContent);
         triedMimeFromFileContent = true;
         if ( newmime != mime )
         {
@@ -2406,7 +2509,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     }
 
     // 1. load Document
-    OpenResult openResult = d->openDocumentInternal( offer, isstdin, docFile, filedata, password );
+    OpenResult openResult = d->openDocumentInternal( offer, fromFileDescriptor, docFile, filedata, password );
     if ( openResult == OpenError )
     {
         QVector<KPluginMetaData> triedOffers;
@@ -2415,7 +2518,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
 
         while ( offer.isValid() )
         {
-            openResult = d->openDocumentInternal( offer, isstdin, docFile, filedata, password );
+            openResult = d->openDocumentInternal( offer, fromFileDescriptor, docFile, filedata, password );
 
             if ( openResult == OpenError )
             {
@@ -2427,7 +2530,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
 
         if (openResult == OpenError && !triedMimeFromFileContent )
         {
-            QMimeType newmime = db.mimeTypeForFile(docFile, QMimeDatabase::MatchExtension);
+            QMimeType newmime = db.mimeTypeForFile(docFile, QMimeDatabase::MatchContent);
             triedMimeFromFileContent = true;
             if ( newmime != mime )
             {
@@ -2435,7 +2538,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
                 offer = DocumentPrivate::generatorForMimeType(mime, d->m_widget, triedOffers);
                 while ( offer.isValid() )
                 {
-                    openResult = d->openDocumentInternal( offer, isstdin, docFile, filedata, password );
+                    openResult = d->openDocumentInternal( offer, fromFileDescriptor, docFile, filedata, password );
 
                     if ( openResult == OpenError )
                     {
@@ -2483,6 +2586,8 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
     // 2. load Additional Data (bookmarks, local annotations and metadata) about the document
     if ( d->m_archiveData )
     {
+        // QTemporaryFile is weird and will return false in exists if fileName wasn't called before
+        d->m_archiveData->metadataFile.fileName();
         d->loadDocumentInfo( d->m_archiveData->metadataFile, LoadPageInfo );
         d->loadDocumentInfo( LoadGeneralInfo );
     }
@@ -2535,7 +2640,7 @@ Document::OpenResult Document::openDocument(const QString & docFile, const QUrl 
         d->m_nextDocumentDestination = QString();
     }
 
-    AudioPlayer::instance()->d->m_currentDocument = isstdin ? QUrl() : d->m_url;
+    AudioPlayer::instance()->d->m_currentDocument = fromFileDescriptor ? QUrl() : d->m_url;
 
     const QStringList docScripts = d->m_generator->metaData( QStringLiteral("DocumentScripts"), QStringLiteral ( "JavaScript" ) ).toStringList();
     if ( !docScripts.isEmpty() )
@@ -2593,6 +2698,8 @@ void Document::closeDocument()
     if ( !d->m_generator )
         return;
 
+    emit aboutToClose();
+
     delete d->m_pageController;
     d->m_pageController = nullptr;
 
@@ -2600,29 +2707,7 @@ void Document::closeDocument()
     d->m_scripter = nullptr;
 
      // remove requests left in queue
-    d->m_pixmapRequestsMutex.lock();
-    QLinkedList< PixmapRequest * >::const_iterator sIt = d->m_pixmapRequestsStack.constBegin();
-    QLinkedList< PixmapRequest * >::const_iterator sEnd = d->m_pixmapRequestsStack.constEnd();
-    for ( ; sIt != sEnd; ++sIt )
-        delete *sIt;
-    d->m_pixmapRequestsStack.clear();
-    d->m_pixmapRequestsMutex.unlock();
-
-    QEventLoop loop;
-    bool startEventLoop = false;
-    do
-    {
-        d->m_pixmapRequestsMutex.lock();
-        startEventLoop = !d->m_executingPixmapRequests.isEmpty();
-        d->m_pixmapRequestsMutex.unlock();
-        if ( startEventLoop )
-        {
-            d->m_closingLoop = &loop;
-            loop.exec();
-            d->m_closingLoop = nullptr;
-        }
-    }
-    while ( startEventLoop );
+    d->clearAndWaitForRequests();
 
     if ( d->m_fontThread )
     {
@@ -2728,6 +2813,13 @@ void Document::closeDocument()
 
     d->m_undoStack->clear();
     d->m_docdataMigrationNeeded = false;
+
+#if HAVE_MALLOC_TRIM
+    // trim unused memory, glibc should do this but it seems it does not
+    // this can greatly decrease the [perceived] memory consumption of okular
+    // see: https://sourceware.org/bugzilla/show_bug.cgi?id=14827
+    malloc_trim(0);
+#endif
 }
 
 void Document::addObserver( DocumentObserver * pObserver )
@@ -2745,7 +2837,7 @@ void Document::addObserver( DocumentObserver * pObserver )
 
 void Document::removeObserver( DocumentObserver * pObserver )
 {
-    // remove observer from the map. it won't receive notifications anymore
+    // remove observer from the set. it won't receive notifications anymore
     if ( d->m_observers.contains( pObserver ) )
     {
         // free observer's pixmap data
@@ -2768,7 +2860,14 @@ void Document::removeObserver( DocumentObserver * pObserver )
                 ++aIt;
         }
 
-        // delete observer entry from the map
+        for ( PixmapRequest *executingRequest : qAsConst( d->m_executingPixmapRequests ) )
+        {
+            if ( executingRequest->observer() == pObserver ) {
+                d->cancelRenderingBecauseOf( executingRequest, nullptr );
+            }
+        }
+
+        // remove observer entry from the set
         d->m_observers.remove( pObserver );
     }
 }
@@ -2932,7 +3031,7 @@ const QList<EmbeddedFile*> *Document::embeddedFiles() const
 
 const Page * Document::page( int n ) const
 {
-    return ( n < d->m_pagesVector.count() ) ? d->m_pagesVector.at(n) : 0;
+    return ( n >= 0 && n < d->m_pagesVector.count() ) ? d->m_pagesVector.at(n) : nullptr;
 }
 
 const DocumentViewport & Document::viewport() const
@@ -3162,6 +3261,82 @@ QString Document::pageSizeString(int page) const
     return QString();
 }
 
+static bool shouldCancelRenderingBecauseOf( const PixmapRequest & executingRequest, const PixmapRequest & otherRequest )
+{
+    // New request has higher priority -> cancel
+    if ( executingRequest.priority() > otherRequest.priority() )
+        return true;
+
+    // New request has lower priority -> don't cancel
+    if ( executingRequest.priority() < otherRequest.priority() )
+        return false;
+
+    // New request has same priority and is from a different observer -> don't cancel
+    // AFAIK this never happens since all observers have different priorities
+    if ( executingRequest.observer() != otherRequest.observer() )
+        return false;
+
+    // Same priority and observer, different page number -> don't cancel
+    // may still end up cancelled later in the parent caller if none of the requests
+    // is of the executingRequest page and RemoveAllPrevious is specified
+    if ( executingRequest.pageNumber() != otherRequest.pageNumber() )
+        return false;
+
+    // Same priority, observer, page, different size -> cancel
+    if ( executingRequest.width() != otherRequest.width() )
+        return true;
+
+    // Same priority, observer, page, different size -> cancel
+    if ( executingRequest.height() != otherRequest.height() )
+        return true;
+
+    // Same priority, observer, page, different tiling -> cancel
+    if ( executingRequest.isTile() != otherRequest.isTile() )
+        return true;
+
+    // Same priority, observer, page, different tiling -> cancel
+    if ( executingRequest.isTile() )
+    {
+        const NormalizedRect bothRequestsRect = executingRequest.normalizedRect() | otherRequest.normalizedRect();
+        if ( !( bothRequestsRect == executingRequest.normalizedRect() ) )
+            return true;
+    }
+
+    return false;
+}
+
+bool DocumentPrivate::cancelRenderingBecauseOf( PixmapRequest *executingRequest, PixmapRequest *newRequest )
+{
+    // No point in aborting the rendering already finished, let it go through
+    if ( !executingRequest->d->mResultImage.isNull() )
+        return false;
+
+    if ( newRequest && newRequest->asynchronous() && executingRequest->partialUpdatesWanted() ) {
+        newRequest->setPartialUpdatesWanted( true );
+    }
+
+    TilesManager *tm = executingRequest->d->tilesManager();
+    if ( tm )
+    {
+        tm->setPixmap( nullptr, executingRequest->normalizedRect(), true /*isPartialPixmap*/ );
+        tm->setRequest( NormalizedRect(), 0, 0 );
+    }
+    PagePrivate::PixmapObject object = executingRequest->page()->d->m_pixmaps.take( executingRequest->observer() );
+    delete object.m_pixmap;
+
+    if ( executingRequest->d->mShouldAbortRender != 0)
+        return false;
+
+    executingRequest->d->mShouldAbortRender = 1;
+
+    if ( m_generator->d_ptr->mTextPageGenerationThread && m_generator->d_ptr->mTextPageGenerationThread->page() == executingRequest->page() )
+    {
+        m_generator->d_ptr->mTextPageGenerationThread->abortExtraction();
+    }
+
+    return true;
+}
+
 void Document::requestPixmaps( const QLinkedList< PixmapRequest * > & requests )
 {
     requestPixmaps( requests, RemoveAllPrevious );
@@ -3182,14 +3357,18 @@ void Document::requestPixmaps( const QLinkedList< PixmapRequest * > & requests, 
         return;
     }
 
+    QSet< DocumentObserver * > observersPixmapCleared;
+
     // 1. [CLEAN STACK] remove previous requests of requesterID
-    // FIXME This assumes all requests come from the same observer, that is true atm but not enforced anywhere
     DocumentObserver *requesterObserver = requests.first()->observer();
     QSet< int > requestedPages;
     {
         QLinkedList< PixmapRequest * >::const_iterator rIt = requests.constBegin(), rEnd = requests.constEnd();
         for ( ; rIt != rEnd; ++rIt )
+        {
+            Q_ASSERT( (*rIt)->observer() == requesterObserver );
             requestedPages.insert( (*rIt)->pageNumber() );
+        }
     }
     const bool removeAllPrevious = reqOptions & RemoveAllPrevious;
     d->m_pixmapRequestsMutex.lock();
@@ -3207,12 +3386,10 @@ void Document::requestPixmaps( const QLinkedList< PixmapRequest * > & requests, 
             ++sIt;
     }
 
-    // 2. [ADD TO STACK] add requests to stack
-    QLinkedList< PixmapRequest * >::const_iterator rIt = requests.constBegin(), rEnd = requests.constEnd();
-    for ( ; rIt != rEnd; ++rIt )
+    // 1.B [PREPROCESS REQUESTS] tweak some values of the requests
+    for ( PixmapRequest *request : requests )
     {
         // set the 'page field' (see PixmapRequest) and check if it is valid
-        PixmapRequest * request = *rIt;
         qCDebug(OkularCoreDebug).nospace() << "request observer=" << request->observer() << " " <<request->width() << "x" << request->height() << "@" << request->pageNumber();
         if ( d->m_pagesVector.value( request->pageNumber() ) == 0 )
         {
@@ -3249,7 +3426,44 @@ void Document::requestPixmaps( const QLinkedList< PixmapRequest * > & requests, 
 
         if ( !request->asynchronous() )
             request->d->mPriority = 0;
+    }
 
+    // 1.C [CANCEL REQUESTS] cancel those requests that are running and should be cancelled because of the new requests coming in
+    if ( d->m_generator->hasFeature( Generator::SupportsCancelling ) )
+    {
+        for ( PixmapRequest *executingRequest : qAsConst( d->m_executingPixmapRequests ) )
+        {
+            bool newRequestsContainExecutingRequestPage = false;
+            bool requestCancelled = false;
+            for ( PixmapRequest *newRequest : requests )
+            {
+                if ( newRequest->pageNumber() == executingRequest->pageNumber() && requesterObserver == executingRequest->observer())
+                {
+                    newRequestsContainExecutingRequestPage = true;
+                }
+
+                if ( shouldCancelRenderingBecauseOf( *executingRequest, *newRequest ) )
+                {
+                    requestCancelled = d->cancelRenderingBecauseOf( executingRequest, newRequest );
+                }
+            }
+
+            // If we were told to remove all the previous requests and the executing request page is not part of the new requests, cancel it
+            if ( !requestCancelled && removeAllPrevious && requesterObserver == executingRequest->observer() && !newRequestsContainExecutingRequestPage )
+            {
+                requestCancelled = d->cancelRenderingBecauseOf( executingRequest, nullptr );
+            }
+
+            if ( requestCancelled )
+            {
+                observersPixmapCleared << executingRequest->observer();
+            }
+        }
+    }
+
+    // 2. [ADD TO STACK] add requests to stack
+    for ( PixmapRequest *request : requests )
+    {
         // add request to the 'stack' at the right place
         if ( !request->priority() )
             // add priority zero requests to the top of the stack
@@ -3272,6 +3486,9 @@ void Document::requestPixmaps( const QLinkedList< PixmapRequest * > & requests, 
     // all handling of requests put into sendGeneratorPixmapRequest
     //    if ( generator->canRequestPixmap() )
         d->sendGeneratorPixmapRequest();
+
+    for ( DocumentObserver *o : qAsConst( observersPixmapCleared ) )
+        o->notifyContentsCleared( Okular::DocumentObserver::Pixmap );
 }
 
 void Document::requestTextPage( uint page )
@@ -3292,6 +3509,7 @@ void DocumentPrivate::notifyAnnotationChanges( int page )
 
 void DocumentPrivate::notifyFormChanges( int /*page*/ )
 {
+    recalculateForms();
 }
 
 void Document::addPageAnnotation( int page, Annotation * annotation )
@@ -3872,8 +4090,6 @@ void Document::editFormText( int pageNumber,
 {
     QUndoCommand *uc = new EditFormTextCommand( this->d, form, pageNumber, newContents, newCursorPos, form->text(), prevCursorPos, prevAnchorPos );
     d->m_undoStack->push( uc );
-
-    d->recalculateForms();
 }
 
 void Document::editFormList( int pageNumber,
@@ -3883,8 +4099,6 @@ void Document::editFormList( int pageNumber,
     const QList< int > prevChoices = form->currentChoices();
     QUndoCommand *uc = new EditFormListCommand( this->d, form, pageNumber, newChoices, prevChoices );
     d->m_undoStack->push( uc );
-
-    d->recalculateForms();
 }
 
 void Document::editFormCombo( int pageNumber,
@@ -3907,8 +4121,6 @@ void Document::editFormCombo( int pageNumber,
 
     QUndoCommand *uc = new EditFormComboCommand( this->d, form, pageNumber, newText, newCursorPos, prevText, prevCursorPos, prevAnchorPos );
     d->m_undoStack->push( uc );
-
-    d->recalculateForms();
 }
 
 void Document::editFormButtons( int pageNumber, const QList< FormFieldButton* >& formButtons, const QList< bool >& newButtonStates )
@@ -3998,6 +4210,10 @@ void Document::processAction( const Action * action )
     if ( !action )
         return;
 
+    // Don't execute next actions if the action itself caused the closing of the document
+    bool executeNextActions = true;
+    auto connectionId = connect( this, &Document::aboutToClose, [&executeNextActions] { executeNextActions = false; } );
+
     switch( action->actionType() )
     {
         case Action::Goto: {
@@ -4017,14 +4233,14 @@ void Document::processAction( const Action * action )
             if ( go->isExternal() && !d->openRelativeFile( go->fileName() ) )
             {
                 qCWarning(OkularCoreDebug).nospace() << "Action: Error opening '" << go->fileName() << "'.";
-                return;
+                break;
             }
             else
             {
                 const DocumentViewport nextViewport = d->nextDocumentViewport();
                 // skip local links that point to nowhere (broken ones)
                 if ( !nextViewport.isValid() )
-                    return;
+                    break;
 
                 setViewport( nextViewport, nullptr, true );
                 d->m_nextDocumentViewport = DocumentViewport();
@@ -4039,7 +4255,7 @@ void Document::processAction( const Action * action )
             if ( fileName.endsWith( QLatin1String(".pdf"), Qt::CaseInsensitive ) )
             {
                 d->openRelativeFile( fileName );
-                return;
+                break;
             }
 
             // Albert: the only pdf i have that has that kind of link don't define
@@ -4061,7 +4277,7 @@ void Document::processAction( const Action * action )
                         // this case is a link pointing to an executable with a parameter
                         // that also is an executable, possibly a hand-crafted pdf
                         KMessageBox::information( d->m_widget, i18n("The document is trying to execute an external application and, for your safety, Okular does not allow that.") );
-                        return;
+                        break;
                     }
                 }
                 else
@@ -4069,7 +4285,7 @@ void Document::processAction( const Action * action )
                     // this case is a link pointing to an executable with no parameters
                     // core developers find unacceptable executing it even after asking the user
                     KMessageBox::information( d->m_widget, i18n("The document is trying to execute an external application and, for your safety, Okular does not allow that.") );
-                    return;
+                    break;
                 }
             }
 
@@ -4151,7 +4367,7 @@ void Document::processAction( const Action * action )
                 if ((url.scheme() == "http") && url.host().isEmpty() && url.fileName().endsWith("pdf"))
                 {
                     d->openRelativeFile(url.fileName());
-                    return;
+                    break;
                 }
 
                 // handle documents with relative path
@@ -4194,6 +4410,16 @@ void Document::processAction( const Action * action )
             d->m_generator->opaqueAction( static_cast< const BackendOpaqueAction * >( action ) );
             } break;
 
+    }
+
+    disconnect( connectionId );
+
+    if ( executeNextActions )
+    {
+        for ( const Action *a : action->nextActions() )
+        {
+            processAction( a );
+        }
     }
 }
 
@@ -4373,20 +4599,43 @@ void Document::fillConfigDialog( KConfigDialog * dialog )
     if ( !dialog )
         return;
 
+    // We know it's a BackendConfigDialog, but check anyway
+    BackendConfigDialog *bcd = dynamic_cast<BackendConfigDialog*>( dialog );
+    if ( !bcd )
+        return;
+
     // ensure that we have all the generators with settings loaded
     QVector<KPluginMetaData> offers = DocumentPrivate::configurableGenerators();
     d->loadServiceList( offers );
 
-    bool pagesAdded = false;
+    // We want the generators to be sorted by name so let's fill in a QMap
+    // this sorts by internal id which is not awesome, but at least the sorting
+    // is stable between runs that before it wasn't
+    QMap<QString, GeneratorInfo> sortedGenerators;
     QHash< QString, GeneratorInfo >::iterator it = d->m_loadedGenerators.begin();
     QHash< QString, GeneratorInfo >::iterator itEnd = d->m_loadedGenerators.end();
     for ( ; it != itEnd; ++it )
     {
-        Okular::ConfigInterface * iface = d->generatorConfig( it.value() );
+        sortedGenerators.insert(it.key(), it.value());
+    }
+
+    bool pagesAdded = false;
+    QMap< QString, GeneratorInfo >::iterator sit = sortedGenerators.begin();
+    QMap< QString, GeneratorInfo >::iterator sitEnd = sortedGenerators.end();
+    for ( ; sit != sitEnd; ++sit )
+    {
+        Okular::ConfigInterface * iface = d->generatorConfig( sit.value() );
         if ( iface )
         {
             iface->addPages( dialog );
             pagesAdded = true;
+
+            if ( sit.value().generator == d->m_generator )
+            {
+                const int rowCount = bcd->thePageWidget()->model()->rowCount();
+                KPageView *view = bcd->thePageWidget();
+                view->setCurrentPage( view->model()->index( rowCount - 1, 0 ) );
+            }
         }
     }
     if ( pagesAdded )
@@ -4465,32 +4714,26 @@ bool Document::canSwapBackingFile() const
 {
     if ( !d->m_generator )
         return false;
-    Q_ASSERT( !d->m_generatorName.isEmpty() );
 
-    QHash< QString, GeneratorInfo >::iterator genIt = d->m_loadedGenerators.find( d->m_generatorName );
-    Q_ASSERT( genIt != d->m_loadedGenerators.end() );
-
-    return genIt->generator->hasFeature( Generator::SwapBackingFile );
+    return d->m_generator->hasFeature( Generator::SwapBackingFile );
 }
 
 bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
 {
     if ( !d->m_generator )
         return false;
-    Q_ASSERT( !d->m_generatorName.isEmpty() );
 
-    QHash< QString, GeneratorInfo >::iterator genIt = d->m_loadedGenerators.find( d->m_generatorName );
-    Q_ASSERT( genIt != d->m_loadedGenerators.end() );
-
-    if ( !genIt->generator->hasFeature( Generator::SwapBackingFile ) )
+    if ( !d->m_generator->hasFeature( Generator::SwapBackingFile ) )
         return false;
 
     // Save metadata about the file we're about to close
     d->saveDocumentInfo();
 
+    d->clearAndWaitForRequests();
+
     qCDebug(OkularCoreDebug) << "Swapping backing file to" << newFileName;
     QVector< Page * > newPagesVector;
-    Generator::SwapBackingFileResult result = genIt->generator->swapBackingFile( newFileName, newPagesVector );
+    Generator::SwapBackingFileResult result = d->m_generator->swapBackingFile( newFileName, newPagesVector );
     if (result != Generator::SwapBackingFileError)
     {
         QLinkedList< ObjectRect* > rectsToDelete;
@@ -4569,6 +4812,8 @@ bool Document::swapBackingFile( const QString &newFileName, const QUrl &url )
         d->m_docFileName = newFileName;
         d->updateMetadataXmlNameAndDocSize();
         d->m_bookmarkManager->setUrl( d->m_url );
+        d->m_documentInfo = DocumentInfo();
+        d->m_documentInfoAskedKeys.clear();
 
         if ( d->m_synctex_scanner )
         {
@@ -4620,16 +4865,8 @@ void Document::setHistoryClean( bool clean )
 {
     if ( clean )
         d->m_undoStack->setClean();
-    // Since we only use the resetClean
-    // in some cases and we're past the dependency freeze
-    // if you happen to compile with an old Qt you will miss
-    // some extra nicety when saving an okular file with annotations to png file
-    // it's quite corner case compared to how important the whole save feature
-    // is so you'll have to live without it
-#if QT_VERSION > QT_VERSION_CHECK(5, 8, 0)
     else
         d->m_undoStack->resetClean();
-#endif
 }
 
 bool Document::canSaveChanges() const
@@ -4741,6 +4978,18 @@ ArchiveData *DocumentPrivate::unpackDocumentArchive( const QString &archivePath 
         return nullptr;
 
     const KArchiveDirectory * mainDir = okularArchive.directory();
+
+    // Check the archive doesn't have folders, we don't create them when saving the archive
+    // and folders mean paths and paths mean path traversal issues
+    for ( const QString &entry : mainDir->entries() )
+    {
+        if ( mainDir->entry( entry )->isDirectory() )
+        {
+            qWarning() << "Warning: Found a directory inside" << archivePath << " - Okular does not create files like that so it is most probably forged.";
+            return nullptr;
+        }
+    }
+
     const KArchiveEntry * mainEntry = mainDir->entry( QStringLiteral("content.xml") );
     if ( !mainEntry || !mainEntry->isFile() )
         return nullptr;
@@ -4817,7 +5066,7 @@ Document::OpenResult Document::openDocumentArchive( const QString & docFile, con
 
     const QString tempFileName = d->m_archiveData->document.fileName();
     QMimeDatabase db;
-    const QMimeType docMime = db.mimeTypeForFile( tempFileName, QMimeDatabase::MatchContent );
+    const QMimeType docMime = db.mimeTypeForFile( tempFileName, QMimeDatabase::MatchExtension );
     const OpenResult ret = openDocument( tempFileName, url, docMime, password );
 
     if ( ret != OpenSuccess )
@@ -4883,12 +5132,14 @@ bool Document::saveDocumentArchive( const QString &fileName )
         if ( !modifiedFile.open() )
             return false;
 
+        const QString modifiedFileName = modifiedFile.fileName();
+
         modifiedFile.close(); // We're only interested in the file name
 
         QString errorText;
-        if ( saveChanges( modifiedFile.fileName(), &errorText ) )
+        if ( saveChanges( modifiedFileName, &errorText ) )
         {
-            docPath = modifiedFile.fileName(); // Save this instead of the original file
+            docPath = modifiedFileName; // Save this instead of the original file
             annotationsSavedNatively = d->canAddAnnotationsNatively();
             formsSavedNatively = canSaveChanges( SaveFormsCapability );
         }
@@ -5012,41 +5263,44 @@ void DocumentPrivate::requestDone( PixmapRequest * req )
         qCDebug(OkularCoreDebug) << "requestDone with generator not in READY state.";
 #endif
 
-    // [MEM] 1.1 find and remove a previous entry for the same page and id
-    QLinkedList< AllocatedPixmap * >::iterator aIt = m_allocatedPixmaps.begin();
-    QLinkedList< AllocatedPixmap * >::iterator aEnd = m_allocatedPixmaps.end();
-    for ( ; aIt != aEnd; ++aIt )
-        if ( (*aIt)->page == req->pageNumber() && (*aIt)->observer == req->observer() )
-        {
-            AllocatedPixmap * p = *aIt;
-            m_allocatedPixmaps.erase( aIt );
-            m_allocatedPixmapsTotalMemory -= p->memory;
-            delete p;
-            break;
-        }
-
-    DocumentObserver *observer = req->observer();
-    if ( m_observers.contains(observer) )
+    if ( !req->shouldAbortRender() )
     {
-        // [MEM] 1.2 append memory allocation descriptor to the FIFO
-        qulonglong memoryBytes = 0;
-        const TilesManager *tm = req->d->tilesManager();
-        if ( tm )
-            memoryBytes = tm->totalMemory();
-        else
-            memoryBytes = 4 * req->width() * req->height();
+        // [MEM] 1.1 find and remove a previous entry for the same page and id
+        QLinkedList< AllocatedPixmap * >::iterator aIt = m_allocatedPixmaps.begin();
+        QLinkedList< AllocatedPixmap * >::iterator aEnd = m_allocatedPixmaps.end();
+        for ( ; aIt != aEnd; ++aIt )
+            if ( (*aIt)->page == req->pageNumber() && (*aIt)->observer == req->observer() )
+            {
+                AllocatedPixmap * p = *aIt;
+                m_allocatedPixmaps.erase( aIt );
+                m_allocatedPixmapsTotalMemory -= p->memory;
+                delete p;
+                break;
+            }
 
-        AllocatedPixmap * memoryPage = new AllocatedPixmap( req->observer(), req->pageNumber(), memoryBytes );
-        m_allocatedPixmaps.append( memoryPage );
-        m_allocatedPixmapsTotalMemory += memoryBytes;
+        DocumentObserver *observer = req->observer();
+        if ( m_observers.contains(observer) )
+        {
+            // [MEM] 1.2 append memory allocation descriptor to the FIFO
+            qulonglong memoryBytes = 0;
+            const TilesManager *tm = req->d->tilesManager();
+            if ( tm )
+                memoryBytes = tm->totalMemory();
+            else
+                memoryBytes = 4 * req->width() * req->height();
 
-        // 2. notify an observer that its pixmap changed
-        observer->notifyPageChanged( req->pageNumber(), DocumentObserver::Pixmap );
-    }
+            AllocatedPixmap * memoryPage = new AllocatedPixmap( req->observer(), req->pageNumber(), memoryBytes );
+            m_allocatedPixmaps.append( memoryPage );
+            m_allocatedPixmapsTotalMemory += memoryBytes;
+
+            // 2. notify an observer that its pixmap changed
+            observer->notifyPageChanged( req->pageNumber(), DocumentObserver::Pixmap );
+        }
 #ifndef NDEBUG
-    else
-        qCWarning(OkularCoreDebug) << "Receiving a done request for the defunct observer" << observer;
+        else
+            qCWarning(OkularCoreDebug) << "Receiving a done request for the defunct observer" << observer;
 #endif
+    }
 
     // 3. delete request
     m_pixmapRequestsMutex.lock();

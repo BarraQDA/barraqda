@@ -28,7 +28,7 @@
 #include <qtoolbutton.h>
 #include <KLocalizedString>
 #include <ktextedit.h>
-#include <QtCore/QDebug>
+#include <QDebug>
 #include <qaction.h>
 #include <kstandardaction.h>
 #include <qmenu.h>
@@ -55,6 +55,7 @@ public:
         setIcon( style()->standardIcon( QStyle::SP_DockWidgetCloseButton ) );
         setIconSize( size );
         setToolTip( i18n( "Close this note" ) );
+        setCursor( Qt::ArrowCursor );
     }
 };
 
@@ -140,6 +141,7 @@ public:
             case QEvent::MouseButtonPress:
                 me = (QMouseEvent*)e;
                 mousePressPos = me->pos();
+                parentWidget()->raise();
                 break;
             case QEvent::MouseButtonRelease:
                 mousePressPos = QPoint();
@@ -196,6 +198,7 @@ AnnotWindow::AnnotWindow( QWidget * parent, Okular::Annotation * annot, Okular::
     setAutoFillBackground( true );
     setFrameStyle( Panel | Raised );
     setAttribute( Qt::WA_DeleteOnClose );
+    setObjectName("AnnotWindow");
 
     const bool canEditAnnotation = m_document->canModifyPageAnnotation( annot );
 
@@ -256,7 +259,15 @@ void AnnotWindow::updateAnnotation( Okular::Annotation * a )
 
 void AnnotWindow::reloadInfo()
 {
-    const QColor newcolor = m_annot->style().color().isValid() ? m_annot->style().color() : Qt::yellow;
+    QColor newcolor;
+    if ( m_annot->subType() == Okular::Annotation::AText )
+    {
+        Okular::TextAnnotation * textAnn = static_cast< Okular::TextAnnotation * >( m_annot );
+        if ( textAnn->textType() == Okular::TextAnnotation::InPlace && textAnn->inplaceIntent() == Okular::TextAnnotation::TypeWriter )
+            newcolor = QColor("#fdfd96");
+    }
+    if ( !newcolor.isValid() )
+        newcolor = m_annot->style().color().isValid() ? QColor(m_annot->style().color().red(), m_annot->style().color().green(), m_annot->style().color().blue(), 255) : Qt::yellow;
     if ( newcolor != m_color )
     {
         m_color = newcolor;
@@ -306,6 +317,10 @@ bool AnnotWindow::eventFilter(QObject *, QEvent *e)
             m_document->redo();
             return true;
         }
+    }
+    else if (e->type() == QEvent::FocusIn)
+    {
+        raise();
     }
     return false;
 }

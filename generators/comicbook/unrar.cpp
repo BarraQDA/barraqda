@@ -9,20 +9,19 @@
 
 #include "unrar.h"
 
-#include <QtCore/QEventLoop>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QRegExp>
-#include <QtCore/QGlobalStatic>
+#include <QEventLoop>
+#include <QFile>
+#include <QFileInfo>
+#include <QRegExp>
+#include <QGlobalStatic>
 #include <QTemporaryDir>
 
-#include <QtCore/qloggingcategory.h>
-#if !defined(Q_OS_WIN)
+#include <QLoggingCategory>
+#if defined(WITH_KPTY)
 #include <KPty/kptyprocess.h>
 #include <KPty/kptydevice.h>
 #endif
 
-#include "unrarflavours.h"
 #include "debug_comicbook.h"
 
 #include <memory>
@@ -35,6 +34,7 @@ struct UnrarHelper
 
     UnrarFlavour *kind;
     QString unrarPath;
+    QString lsarPath;
 };
 
 Q_GLOBAL_STATIC( UnrarHelper, helper )
@@ -55,6 +55,8 @@ static UnrarFlavour* detectUnrar( const QString &unrarPath, const QString &versi
             kind = new NonFreeUnrarFlavour();
         else if ( lines.first().startsWith( QLatin1String("unrar ") ) )
             kind = new FreeUnrarFlavour();
+        else if ( lines.first().startsWith( QLatin1String("v") ) )
+            kind = new UnarFlavour();
     }
     return kind;
 }
@@ -62,11 +64,21 @@ static UnrarFlavour* detectUnrar( const QString &unrarPath, const QString &versi
 UnrarHelper::UnrarHelper()
    : kind( nullptr )
 {
-    QString path = QStandardPaths::findExecutable( QStringLiteral("unrar-nonfree") );
+    QString path = QStandardPaths::findExecutable( QStringLiteral("lsar") );
+
+    if ( !path.isEmpty() )
+    {
+        lsarPath = path;
+    }
+
+    path = QStandardPaths::findExecutable( QStringLiteral("unrar-nonfree") );
+
     if ( path.isEmpty() )
         path = QStandardPaths::findExecutable( QStringLiteral("unrar") );
     if ( path.isEmpty() )
         path = QStandardPaths::findExecutable( QStringLiteral("rar") );
+    if ( path.isEmpty() )
+        path = QStandardPaths::findExecutable( QStringLiteral("unar") );
 
     if ( !path.isEmpty() )
         kind = detectUnrar( path, QStringLiteral("--version") );
@@ -77,7 +89,7 @@ UnrarHelper::UnrarHelper()
     if ( !kind )
     {
         // no luck, print that
-        qWarning() << "No unrar detected.";
+        qWarning() << "Neither unrar nor unarchiver were found.";
     }
     else
     {
@@ -118,7 +130,7 @@ bool Unrar::open( const QString &fileName )
     mStdOutData.clear();
     mStdErrData.clear();
 
-    int ret = startSyncProcess( QStringList() << QStringLiteral("e") << mFileName << mTempDir->path() +  QLatin1Char('/') );
+    const int ret = startSyncProcess( helper->kind->processOpenArchiveArgs( mFileName, mTempDir->path() ) );
     bool ok = ret == 0;
 
     return ok;
@@ -132,16 +144,25 @@ QStringList Unrar::list()
     if ( !isSuitableVersionAvailable() )
         return QStringList();
 
-    startSyncProcess( QStringList() << QStringLiteral("lb") << mFileName );
+    startSyncProcess( helper->kind->processListArgs( mFileName ) );
 
-    const QStringList listFiles = helper->kind->processListing( QString::fromLocal8Bit( mStdOutData ).split( QLatin1Char('\n'), QString::SkipEmptyParts ) );
+    QStringList listFiles = helper->kind->processListing( QString::fromLocal8Bit( mStdOutData ).split( QLatin1Char('\n'), QString::SkipEmptyParts ) );
+
+    QString subDir;
+
+    if ( listFiles.last().endsWith( QLatin1Char('/') ) && helper->kind->name() == QLatin1String("unar") ) {
+        // Subfolder detected. The unarchiver is unable to extract all files into a single folder
+        subDir = listFiles.last();
+        listFiles.removeLast();
+    }
+
     QStringList newList;
     Q_FOREACH ( const QString &f, listFiles ) {
         // Extract all the files to mTempDir regardless of their path inside the archive
         // This will break if ever an arvhice with two files with the same name in different subfolders
         QFileInfo fi( f );
-        if ( QFile::exists( mTempDir->path() + QLatin1Char('/') + fi.fileName() ) ) {
-            newList.append( fi.fileName() );
+        if ( QFile::exists( mTempDir->path() + QLatin1Char('/') + subDir + fi.fileName() ) ) {
+            newList.append( subDir + fi.fileName() );
         }
     }
     return newList;
@@ -181,7 +202,10 @@ bool Unrar::isSuitableVersionAvailable()
     if ( !isAvailable() )
         return false;
 
-    return dynamic_cast< NonFreeUnrarFlavour * >( helper->kind );
+    if (dynamic_cast< NonFreeUnrarFlavour * >( helper->kind ) || dynamic_cast< UnarFlavour * >( helper->kind ))
+        return true;
+    else
+        return false;
 }
 
 void Unrar::readFromStdout()
@@ -214,11 +238,11 @@ void Unrar::finished( int exitCode, QProcess::ExitStatus exitStatus )
     }
 }
 
-int Unrar::startSyncProcess( const QStringList &args )
+int Unrar::startSyncProcess( const ProcessArgs &args )
 {
     int ret = 0;
 
-#if defined(Q_OS_WIN)
+#if !defined(WITH_KPTY)
     mProcess = new QProcess( this );    
     connect(mProcess, &QProcess::readyReadStandardOutput, this, &Unrar::readFromStdout);
     connect(mProcess, &QProcess::readyReadStandardError, this, &Unrar::readFromStderr);
@@ -233,11 +257,27 @@ int Unrar::startSyncProcess( const QStringList &args )
 
 #endif
 
-#if defined(Q_OS_WIN)
-    mProcess->start( helper->unrarPath, args, QIODevice::ReadWrite | QIODevice::Unbuffered );
+#if !defined(WITH_KPTY)
+    if ( helper->kind->name() == QLatin1String( "unar" ) && args.useLsar )
+    {
+        mProcess->start( helper->lsarPath, args.appArgs, QIODevice::ReadWrite | QIODevice::Unbuffered );
+    }
+    else
+    {
+        mProcess->start( helper->unrarPath, args.appArgs, QIODevice::ReadWrite | QIODevice::Unbuffered );
+    }
+
     ret = mProcess->waitForFinished( -1 ) ? 0 : 1;
 #else
-    mProcess->setProgram( helper->unrarPath, args );
+    if ( helper->kind->name() == QLatin1String( "unar" ) && args.useLsar )
+    {
+        mProcess->setProgram( helper->lsarPath, args.appArgs );
+    }
+    else
+    {
+        mProcess->setProgram( helper->unrarPath, args.appArgs );
+    }
+
     mProcess->setNextOpenMode( QIODevice::ReadWrite | QIODevice::Unbuffered );
     mProcess->start();
     QEventLoop loop;
@@ -257,7 +297,7 @@ void Unrar::writeToProcess( const QByteArray &data )
     if ( !mProcess || data.isNull() )
         return;
 
-#if defined(Q_OS_WIN)
+#if !defined(WITH_KPTY)
     mProcess->write( data );
 #else
     mProcess->pty()->write( data );

@@ -115,12 +115,12 @@ class PagePrivate
         void deleteTextSelections();
 
         /**
-         * Get the tiles manager for the tiled @observer
+         * Get the tiles manager for the tiled @p observer
          */
         TilesManager *tilesManager( const DocumentObserver *observer ) const;
 
         /**
-         * Set the tiles manager for the tiled @observer
+         * Set the tiles manager for the tiled @p observer
          */
         void setTilesManager( const DocumentObserver *observer, TilesManager *tm );
 
@@ -135,10 +135,12 @@ class PagePrivate
          */
         OKULARCORE_EXPORT static FormField *findEquivalentForm( const Page *p, FormField *oldField );
 
+        void setPixmap( DocumentObserver *observer, QPixmap *pixmap, const NormalizedRect &rect, bool isPartialPixmap );
+
         class PixmapObject
         {
             public:
-                QPixmap *m_pixmap;
+                QPixmap *m_pixmap = nullptr;
                 Rotation m_rotation;
         };
         QMap< DocumentObserver*, PixmapObject > m_pixmaps;

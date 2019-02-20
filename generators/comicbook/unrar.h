@@ -10,13 +10,18 @@
 #ifndef UNRAR_H
 #define UNRAR_H
 
-#include <QtCore/QObject>
-#include <QtCore/QProcess>
-#include <QtCore/QStringList>
+#include <QObject>
+#include <QProcess>
+#include <QStringList>
+
+#include <unrarflavours.h>
 
 class QEventLoop;
 class QTemporaryDir;
+
+#if defined(WITH_KPTY)
 class KPtyProcess;
+#endif
 
 class Unrar : public QObject
 {
@@ -62,13 +67,13 @@ class Unrar : public QObject
         void finished( int exitCode, QProcess::ExitStatus exitStatus );
 
     private:
-        int startSyncProcess( const QStringList &args );
+        int startSyncProcess( const ProcessArgs &args );
         void writeToProcess( const QByteArray &data );
 
-#if defined(Q_OS_WIN)
-        QProcess *mProcess;
-#else
+#if defined(WITH_KPTY)
         KPtyProcess *mProcess;
+#else
+        QProcess *mProcess;
 #endif
         QEventLoop *mLoop;
         QString mFileName;

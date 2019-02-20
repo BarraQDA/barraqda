@@ -28,7 +28,7 @@ class TextDocumentSettingsPrivate;
  * Here is example of how you can add custom settings per-backend:
  *
  * In .h header:
- * {code}
+ * \code
  * class KIntSpinBox;
  * ...
  *
@@ -44,10 +44,10 @@ class TextDocumentSettingsPrivate;
  *     KIntSpinBox *customArgumentWidget;
  * ...
  * }
- * {/code}
+ * \endcode
  *
  * In .cpp module:
- * {code}
+ * \code
  * #include <KIntSpinBox>
  * ...
  * bool YourGenerator::reparseConfig()
@@ -67,7 +67,7 @@ class TextDocumentSettingsPrivate;
  *
  *     dlg->addPage( widget, settings, ... );
  * }
- * {/code}
+ * \endcode
  */
 
 /**
@@ -84,7 +84,7 @@ class OKULARCORE_EXPORT TextDocumentSettingsWidget : public QWidget
     Q_OBJECT
 
     public:
-        TextDocumentSettingsWidget( QWidget *parent = nullptr );
+        explicit TextDocumentSettingsWidget( QWidget *parent = nullptr );
         virtual ~TextDocumentSettingsWidget();
 
         void addRow( const QString& labelText, QWidget *widget );

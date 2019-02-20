@@ -8,8 +8,8 @@
  *   (at your option) any later version.                                   *
  ***************************************************************************/
 
-#ifndef _OKULAR_CHMGENERATOR_H_
-#define _OKULAR_CHMGENERATOR_H_ 
+#ifndef _OKULAR_GENERATOR_CHM_H_
+#define _OKULAR_GENERATOR_CHM_H_
 
 #include <core/document.h>
 #include <core/generator.h>
@@ -50,7 +50,7 @@ class CHMGenerator : public Okular::Generator
 
     protected:
         bool doCloseDocument() override;
-        Okular::TextPage* textPage( Okular::Page *page ) override;
+        Okular::TextPage* textPage( Okular::TextRequest *request ) override;
 
     private:
         void additionalRequestData();

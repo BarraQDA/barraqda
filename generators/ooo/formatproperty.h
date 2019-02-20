@@ -10,8 +10,8 @@
 #ifndef OOO_FORMATPROPERTY_H
 #define OOO_FORMATPROPERTY_H
 
-#include <QtCore/QVector>
-#include <QtGui/QColor>
+#include <QVector>
+#include <QColor>
 
 class QTextBlockFormat;
 class QTextCharFormat;
@@ -76,7 +76,7 @@ class TextFormatProperty
 {
   public:
     TextFormatProperty();
-    TextFormatProperty( const StyleInformation *information );
+    explicit TextFormatProperty( const StyleInformation *information );
 
     void apply( QTextCharFormat *format ) const;
 
@@ -155,7 +155,7 @@ class ListFormatProperty
     };
 
     ListFormatProperty();
-    ListFormatProperty( Type type );
+    explicit ListFormatProperty( Type type );
 
     void apply( QTextListFormat *format, int level ) const;
 
@@ -202,7 +202,7 @@ class StyleFormatProperty
 {
   public:
     StyleFormatProperty();
-    StyleFormatProperty( const StyleInformation *information );
+    explicit StyleFormatProperty( const StyleInformation *information );
 
     void applyBlock( QTextBlockFormat *format ) const;
     void applyText( QTextCharFormat *format ) const;

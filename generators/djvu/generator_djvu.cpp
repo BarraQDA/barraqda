@@ -18,17 +18,17 @@
 #include <core/utils.h>
 #include <core/fileprinter.h>
 
-#include <qdom.h>
-#include <qmutex.h>
-#include <qpixmap.h>
-#include <qstring.h>
-#include <quuid.h>
+#include <QDomDocument>
+#include <QMutex>
+#include <QPixmap>
+#include <QString>
+#include <QUuid>
 #include <QPrinter>
 
 #include <KAboutData>
-#include <QtCore/QDebug>
+#include <QDebug>
 #include <KLocalizedString>
-#include <qtemporaryfile.h>
+#include <QTemporaryFile>
 #include <QDir>
 
 static void recurseCreateTOC( QDomDocument &maindoc, const QDomNode &parent, QDomNode &parentDestination, KDjVu *djvu )
@@ -175,6 +175,7 @@ bool DjVuGenerator::print( QPrinter& printer )
     QTemporaryFile tf(QDir::tempPath() + QLatin1String("/okular_XXXXXX.ps"));
     if ( !tf.open() )
         return false;
+    const QString fileName = tf.fileName();
 
     QMutexLocker locker( userMutex() );
     QList<int> pageList = Okular::FilePrinter::pageList( printer, m_djvu->pages().count(),
@@ -184,7 +185,6 @@ bool DjVuGenerator::print( QPrinter& printer )
     if ( m_djvu->exportAsPostScript( &tf, pageList ) )
     {
         tf.setAutoRemove( false );
-        const QString fileName = tf.fileName();
         tf.close();
         int ret = Okular::FilePrinter::printFile( printer, fileName, document()->orientation(),
                                                   Okular::FilePrinter::SystemDeletesFiles,
@@ -206,9 +206,10 @@ QVariant DjVuGenerator::metaData( const QString &key, const QVariant &option ) c
     return QVariant();
 }
 
-Okular::TextPage* DjVuGenerator::textPage( Okular::Page *page )
+Okular::TextPage* DjVuGenerator::textPage( Okular::TextRequest *request )
 {
     userMutex()->lock();
+    const Okular::Page *page = request->page();
     QList<KDjVu::TextEntity> te;
 #if 0
     m_djvu->textEntities( page->number(), "char" );
@@ -291,7 +292,6 @@ void DjVuGenerator::loadPages( QVector<Okular::Page*> & pagesVector, int rotatio
 
 Okular::ObjectRect* DjVuGenerator::convertKDjVuLink( int page, KDjVu::Link * link ) const
 {
-    int newpage = -1;
     Okular::Action *newlink = nullptr;
     Okular::ObjectRect *newrect = nullptr;
     switch ( link->type() )
@@ -308,10 +308,7 @@ Okular::ObjectRect* DjVuGenerator::convertKDjVuLink( int page, KDjVu::Link * lin
             {
                 Okular::DocumentViewport vp;
                 if ( !target.isEmpty() )
-                {
                     vp.pageNumber = ( target.at(0) == QLatin1Char( '+' ) || target.at(0) == QLatin1Char( '-' ) ) ? page + tmppage : tmppage - 1;
-                    newpage = vp.pageNumber;
-                }
                 newlink = new Okular::GotoAction( QString(), vp );
             }
             break;
@@ -326,9 +323,7 @@ Okular::ObjectRect* DjVuGenerator::convertKDjVuLink( int page, KDjVu::Link * lin
     }
     if ( newlink )
     {
-        const KDjVu::Page* p = m_djvu->pages().value( newpage == -1 ? page : newpage );
-        if ( !p )
-            p = m_djvu->pages().at( page );
+        const KDjVu::Page* p = m_djvu->pages().at( page );
         int width = p->width();
         int height = p->height();
         bool scape_orientation = false; // hack by tokoe, should always create default page

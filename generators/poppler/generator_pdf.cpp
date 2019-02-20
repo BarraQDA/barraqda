@@ -29,7 +29,7 @@
 #include <QPrinter>
 #include <QPainter>
 #include <QTimer>
-#include <QtCore/QDebug>
+#include <QDebug>
 
 #include <KAboutData>
 #include <kconfigdialog.h>
@@ -311,7 +311,7 @@ QPair<Okular::Movie*, Okular::EmbeddedFile*> createMovieFromPopplerRichMedia( co
 /**
  * Note: the function will take ownership of the popplerLink object.
  */
-Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink)
+Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink, bool deletePopplerLink = true)
 {
     if (!popplerLink)
         return nullptr;
@@ -326,8 +326,6 @@ Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink)
     const Poppler::LinkMovie *popplerLinkMovie;
     const Poppler::LinkRendition *popplerLinkRendition;
     Okular::DocumentViewport viewport;
-
-    bool deletePopplerLink = true;
 
     switch(popplerLink->linkType())
     {
@@ -384,6 +382,17 @@ Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink)
 
         case Poppler::Link::Rendition:
         {
+            if (!deletePopplerLink)
+            {
+                // If links should not be deleted it probably means that they
+                // are part of a nextActions chain. There is no support
+                // to resolveMediaLinkReferences on nextActions. It would also
+                // be necessary to ensure that resolveMediaLinkReferences does
+                // not delete the Links which are part of a nextActions list
+                // to avoid a double deletion.
+                qCDebug(OkularPdfDebug) << "parsing rendition link without deletion is not supported. Action chain might be broken.";
+                break;
+            }
             deletePopplerLink = false; // we'll delete it inside resolveMediaLinkReferences() after we have resolved all references
 
             popplerLinkRendition = static_cast<const Poppler::LinkRendition *>( popplerLink );
@@ -420,6 +429,12 @@ Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink)
 
         case Poppler::Link::Movie:
         {
+            if (!deletePopplerLink)
+            {
+                // See comment above in Link::Rendition
+                qCDebug(OkularPdfDebug) << "parsing movie link without deletion is not supported. Action chain might be broken.";
+                break;
+            }
             deletePopplerLink = false; // we'll delete it inside resolveMediaLinkReferences() after we have resolved all references
 
             popplerLinkMovie = static_cast<const Poppler::LinkMovie *>( popplerLink );
@@ -446,7 +461,33 @@ Okular::Action* createLinkFromPopplerLink(const Poppler::Link *popplerLink)
             link = movieAction;
         }
         break;
+
+#ifdef HAVE_POPPLER_0_64
+        case Poppler::Link::Hide:
+        {
+            const Poppler::LinkHide * l = static_cast<const Poppler::LinkHide *>( popplerLink );
+            QStringList scripts;
+            for ( const QString &target: l->targets() )
+            {
+                scripts << QStringLiteral( "getField(\"%1\").hidden = %2;" ).arg( target ).arg( l->isShowAction() ? QLatin1String( "false" ) : QLatin1String( "true" ) );
+            }
+            link = new Okular::ScriptAction( Okular::JavaScript, scripts.join( QLatin1Char( '\n' ) ) );
+        }
+        break;
+#endif
     }
+
+#ifdef HAVE_POPPLER_0_64
+    if (link)
+    {
+        QVector< Okular::Action * > nextActions;
+        for ( const Poppler::Link *nl : popplerLink->nextLinks() )
+        {
+            nextActions << createLinkFromPopplerLink( nl, false );
+        }
+        link->setNextActions( nextActions );
+    }
+#endif
 
     if ( deletePopplerLink )
         delete popplerLink;
@@ -517,6 +558,9 @@ PDFGenerator::PDFGenerator( QObject *parent, const QVariantList &args )
     setFeature( ReadRawData );
     setFeature( TiledRendering );
     setFeature( SwapBackingFile );
+#ifdef HAVE_POPPLER_0_63
+    setFeature( SupportsCancelling );
+#endif
 
     // You only need to do it once not for each of the documents but it is cheap enough
     // so doing it all the time won't hurt either
@@ -599,10 +643,29 @@ Okular::Document::OpenResult PDFGenerator::init(QVector<Okular::Page*> & pagesVe
 
 PDFGenerator::SwapBackingFileResult PDFGenerator::swapBackingFile( QString const &newFileName, QVector<Okular::Page*> & newPagesVector )
 {
+    const QBitArray oldRectsGenerated = rectsGenerated;
+
     doCloseDocument();
     auto openResult = loadDocumentWithPassword(newFileName, newPagesVector, QString());
     if (openResult != Okular::Document::OpenSuccess)
         return SwapBackingFileError;
+
+    // Recreate links if needed since they are done on image() and image() is not called when swapping the file
+    // since the page is already rendered
+    if (oldRectsGenerated.count() == rectsGenerated.count()) {
+        for (int i = 0; i < oldRectsGenerated.count(); ++i) {
+            if (oldRectsGenerated[i]) {
+                Okular::Page *page = newPagesVector[i];
+                Poppler::Page *pp = pdfdoc->page( i );
+                if (pp) {
+                    page->setObjectRects(generateLinks(pp->links()));
+                    rectsGenerated[i] = true;
+                    resolveMediaLinkReferences(page);
+                    delete pp;
+                }
+            }
+        }
+    }
 
     return SwapBackingFileReloadInternalData;
 }
@@ -910,9 +973,9 @@ bool PDFGenerator::isAllowed( Okular::Permission permission ) const
 }
 
 #ifdef HAVE_POPPLER_0_62
-struct PartialUpdatePayload
+struct RenderImagePayload
 {
-    PartialUpdatePayload(PDFGenerator *g, Okular::PixmapRequest *r) :
+    RenderImagePayload(PDFGenerator *g, Okular::PixmapRequest *r) :
         generator(g), request(r)
     {
         // Don't report partial updates for the first 500 ms
@@ -925,11 +988,11 @@ struct PartialUpdatePayload
     Okular::PixmapRequest *request;
     QTimer timer;
 };
-Q_DECLARE_METATYPE(PartialUpdatePayload*)
+Q_DECLARE_METATYPE(RenderImagePayload*)
 
 static bool shouldDoPartialUpdateCallback(const QVariant &vPayload)
 {
-    auto payload = vPayload.value<PartialUpdatePayload *>();
+    auto payload = vPayload.value<RenderImagePayload *>();
 
     // Since the timer lives in a thread without an event loop we need to stop it ourselves
     // when the remaining time has reached 0
@@ -942,8 +1005,16 @@ static bool shouldDoPartialUpdateCallback(const QVariant &vPayload)
 
 static void partialUpdateCallback(const QImage &image, const QVariant &vPayload)
 {
-    auto payload = vPayload.value<PartialUpdatePayload *>();
+    auto payload = vPayload.value<RenderImagePayload *>();
     QMetaObject::invokeMethod(payload->generator, "signalPartialPixmapRequest", Qt::QueuedConnection, Q_ARG(Okular::PixmapRequest*, payload->request), Q_ARG(QImage, image));
+}
+#endif
+
+#ifdef HAVE_POPPLER_0_63
+static bool shouldAbortRenderCallback(const QVariant &vPayload)
+{
+    auto payload = vPayload.value<RenderImagePayload *>();
+    return payload->request->shouldAbortRender();
 }
 #endif
 
@@ -970,6 +1041,12 @@ QImage PDFGenerator::image( Okular::PixmapRequest * request )
     // 0. LOCK [waits for the thread end]
     userMutex()->lock();
 
+    if ( request->shouldAbortRender() )
+    {
+        userMutex()->unlock();
+        return QImage();
+    }
+
     // 1. Set OutputDev parameters and Generate contents
     // note: thread safety is set on 'false' for the GUI (this) thread
     Poppler::Page *p = pdfdoc->page(page->number());
@@ -978,37 +1055,79 @@ QImage PDFGenerator::image( Okular::PixmapRequest * request )
     QImage img;
     if (p)
     {
+#ifdef HAVE_POPPLER_0_63
         if ( request->isTile() )
         {
-            QRect rect = request->normalizedRect().geometry( request->width(), request->height() );
-#ifdef HAVE_POPPLER_0_62
+            const QRect rect = request->normalizedRect().geometry( request->width(), request->height() );
             if ( request->partialUpdatesWanted() )
             {
-                PartialUpdatePayload payload( this, request );
+                RenderImagePayload payload( this, request );
+                img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0,
+                                        partialUpdateCallback, shouldDoPartialUpdateCallback, shouldAbortRenderCallback, QVariant::fromValue( &payload ) );
+            }
+            else
+            {
+                RenderImagePayload payload( this, request );
+                img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0,
+                                        nullptr, nullptr, shouldAbortRenderCallback, QVariant::fromValue( &payload ) );
+            }
+        }
+        else
+        {
+            if ( request->partialUpdatesWanted() )
+            {
+                RenderImagePayload payload( this, request );
+                img = p->renderToImage( fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0,
+                                        partialUpdateCallback, shouldDoPartialUpdateCallback, shouldAbortRenderCallback, QVariant::fromValue( &payload ) );
+            }
+            else
+            {
+                RenderImagePayload payload( this, request );
+                img = p->renderToImage( fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0,
+                                        nullptr, nullptr, shouldAbortRenderCallback, QVariant::fromValue( &payload ) );
+            }
+
+        }
+#elif defined(HAVE_POPPLER_0_62)
+        if ( request->isTile() )
+        {
+            const QRect rect = request->normalizedRect().geometry( request->width(), request->height() );
+            if ( request->partialUpdatesWanted() )
+            {
+                RenderImagePayload payload( this, request );
                 img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0,
                                         partialUpdateCallback, shouldDoPartialUpdateCallback, QVariant::fromValue( &payload ) );
             }
             else
-#endif
             {
                 img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0 );
             }
         }
         else
         {
-#ifdef HAVE_POPPLER_0_62
             if ( request->partialUpdatesWanted() )
             {
-                PartialUpdatePayload payload(this, request);
+                RenderImagePayload payload( this, request );
                 img = p->renderToImage( fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0,
                                         partialUpdateCallback, shouldDoPartialUpdateCallback, QVariant::fromValue( &payload ) );
             }
             else
-#endif
             {
-                img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0 );
+                img = p->renderToImage( fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0 );
             }
+
         }
+#else
+        if ( request->isTile() )
+        {
+            const QRect rect = request->normalizedRect().geometry( request->width(), request->height() );
+            img = p->renderToImage( fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0 );
+        }
+        else
+        {
+            img = p->renderToImage( fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0 );
+        }
+#endif
     }
     else
     {
@@ -1100,32 +1219,58 @@ void PDFGenerator::resolveMediaLinkReferences( Okular::Page *page )
         resolveMediaLinkReference( field->activationAction() );
 }
 
-Okular::TextPage* PDFGenerator::textPage( Okular::Page *page )
+#ifdef HAVE_POPPLER_0_63
+struct TextExtractionPayload
 {
+    TextExtractionPayload(Okular::TextRequest *r) :
+        request(r)
+    {
+    }
+
+    Okular::TextRequest *request;
+};
+Q_DECLARE_METATYPE(TextExtractionPayload*)
+
+static bool shouldAbortTextExtractionCallback(const QVariant &vPayload)
+{
+    auto payload = vPayload.value<TextExtractionPayload *>();
+    return payload->request->shouldAbortExtraction();
+}
+#endif
+
+Okular::TextPage* PDFGenerator::textPage( Okular::TextRequest *request )
+{
+    const Okular::Page *page = request->page();
 #ifdef PDFGENERATOR_DEBUG
     qCDebug(OkularPdfDebug) << "page" << page->number();
 #endif
     // build a TextList...
     QList<Poppler::TextBox*> textList;
     double pageWidth, pageHeight;
+    userMutex()->lock();
     Poppler::Page *pp = pdfdoc->page( page->number() );
     if (pp)
     {
-        userMutex()->lock();
+#ifdef HAVE_POPPLER_0_63
+        TextExtractionPayload payload(request);
+        textList = pp->textList( Poppler::Page::Rotate0, shouldAbortTextExtractionCallback, QVariant::fromValue( &payload ) );
+#else
         textList = pp->textList();
-        userMutex()->unlock();
-
-        QSizeF s = pp->pageSizeF();
+#endif
+        const QSizeF s = pp->pageSizeF();
         pageWidth = s.width();
         pageHeight = s.height();
-
-        delete pp;
     }
     else
     {
         pageWidth = defaultPageWidth;
         pageHeight = defaultPageHeight;
     }
+    delete pp;
+    userMutex()->unlock();
+
+    if ( textList.isEmpty() && request->shouldAbortExtraction() )
+        return nullptr;
 
     Okular::TextPage *tp = abstractTextPage(textList, pageHeight, pageWidth, (Poppler::Page::Rotation)page->orientation());
     qDeleteAll(textList);

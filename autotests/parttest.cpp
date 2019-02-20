@@ -17,15 +17,21 @@
 #include "../core/page.h"
 #include "../part.h"
 #include "../ui/toc.h"
+#include "../ui/sidebar.h"
 #include "../ui/pageview.h"
 
+#include "../generators/poppler/config-okular-poppler.h"
+
+#include <KActionCollection>
 #include <KConfigDialog>
+#include <KParts/OpenUrlArguments>
 
 #include <QClipboard>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTemporaryDir>
+#include <QTextEdit>
 #include <QTreeView>
 #include <QUrl>
 #include <QDesktopServices>
@@ -86,8 +92,14 @@ class PartTest
         void testGeneratorPreferences();
         void testSelectText();
         void testClickInternalLink();
+        void testOpenUrlArguments();
+        void test388288();
         void testSaveAs();
         void testSaveAs_data();
+        void testSaveAsToNonExistingPath();
+        void testSaveAsToSymlink();
+        void testSaveIsSymlink();
+        void testSidebarItemAfterSaving();
         void testSaveAsUndoStackAnnotations();
         void testSaveAsUndoStackAnnotations_data();
         void testSaveAsUndoStackForms();
@@ -102,6 +114,11 @@ class PartTest
         void testRClickOnSelectionModeShoulShowFollowTheLinkMenu();
         void testClickAnywhereAfterSelectionShouldUnselect();
         void testeRectSelectionStartingOnLinks();
+        void testCheckBoxReadOnly();
+        void testCrashTextEditDestroy();
+        void testAnnotWindow();
+        void testAdditionalActionTriggers();
+        void testJumpToPage();
 
     private:
         void simulateMouseSelection(double startX, double startY, double endX, double endY, QWidget *target);
@@ -197,7 +214,12 @@ void PartTest::testForwardPDF()
     QVERIFY(f.copy(texDestination));
     QProcess process;
     process.setWorkingDirectory(workDir.path());
-    process.start(QStringLiteral("pdflatex"), QStringList() << QStringLiteral("-synctex=1") << QStringLiteral("-interaction=nonstopmode") << texDestination);
+
+    const QString pdflatexPath(QStandardPaths::findExecutable("pdflatex"));
+    if (pdflatexPath.isEmpty()) {
+        QFAIL("pdflatex executable not found, but needed for the test. Try installing the respective TeXLive packages.");
+    }
+    process.start(pdflatexPath, QStringList() << QStringLiteral("-synctex=1") << QStringLiteral("-interaction=nonstopmode") << texDestination);
     bool started = process.waitForStarted();
     if (!started) {
         qDebug() << "start error:" << process.error();
@@ -214,14 +236,14 @@ void PartTest::testForwardPDF()
     }
 
     const QString pdfResult = workDir.path() + QStringLiteral("/synctextest.pdf");
-    
+
     QVERIFY(QFile::exists(pdfResult));
-    
+
     QVERIFY( openDocument(&part, pdfResult) );
     part.m_document->setViewportPage(0);
     QCOMPARE(part.m_document->currentPage(), 0u);
     part.closeUrl();
-    
+
     QUrl u(QUrl::fromLocalFile(pdfResult));
     u.setFragment(QStringLiteral("src:100") + texDestination);
     part.openUrl(u);
@@ -260,7 +282,7 @@ void PartTest::testSelectText()
     Okular::Part part(nullptr, nullptr, dummyArgs);
     QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file2.pdf")));
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -292,7 +314,7 @@ void PartTest::testClickInternalLink()
     Okular::Part part(nullptr, nullptr, dummyArgs);
     QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file2.pdf")));
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -321,7 +343,7 @@ void PartTest::testMouseMoveOverLinkWhileInSelectionMode()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -352,7 +374,7 @@ void PartTest::testClickUrlLinkWhileInSelectionMode()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -404,7 +426,7 @@ void PartTest::testeTextSelectionOverAndAcrossLinks()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -444,7 +466,7 @@ void PartTest::testClickUrlLinkWhileLinkTextIsSelected()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -491,7 +513,7 @@ void PartTest::testRClickWhileLinkTextIsSelected()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -515,7 +537,8 @@ void PartTest::testRClickWhileLinkTextIsSelected()
     // Need to do this because the pop-menu will have his own mainloop and will block tests until
     // the menu disappear
     PageView *view = part.m_pageView;
-    QTimer::singleShot(2000, [view]() {
+    bool menuClosed = false;
+    QTimer::singleShot(2000, [view, &menuClosed]() {
         // check if popup menu is active and visible
         QMenu *menu = qobject_cast<QMenu*>(view->findChild<QMenu*>("PopupMenu"));
         QVERIFY(menu);
@@ -535,6 +558,7 @@ void PartTest::testRClickWhileLinkTextIsSelected()
 
         // close menu to continue test
         menu->close();
+        menuClosed = true;
     });
 
     // click on url
@@ -545,6 +569,7 @@ void PartTest::testRClickWhileLinkTextIsSelected()
     QTest::mouseClick(part.m_pageView->viewport(), Qt::RightButton, Qt::NoModifier, QPoint(mouseClickX, mouseClickY), 1000);
 
     // will continue after pop-menu get closed
+    QTRY_VERIFY(menuClosed);
 }
 
 
@@ -557,7 +582,7 @@ void PartTest::testRClickOverLinkWhileLinkTextIsSelected()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -581,7 +606,8 @@ void PartTest::testRClickOverLinkWhileLinkTextIsSelected()
     // Need to do this because the pop-menu will have his own mainloop and will block tests until
     // the menu disappear
     PageView *view = part.m_pageView;
-    QTimer::singleShot(2000, [view]() {
+    bool menuClosed = false;
+    QTimer::singleShot(2000, [view, &menuClosed]() {
         // check if popup menu is active and visible
         QMenu *menu = qobject_cast<QMenu*>(view->findChild<QMenu*>("PopupMenu"));
         QVERIFY(menu);
@@ -597,6 +623,7 @@ void PartTest::testRClickOverLinkWhileLinkTextIsSelected()
 
         // close menu to continue test
         menu->close();
+        menuClosed = true;
     });
 
     // click on url
@@ -607,6 +634,7 @@ void PartTest::testRClickOverLinkWhileLinkTextIsSelected()
     QTest::mouseClick(part.m_pageView->viewport(), Qt::RightButton, Qt::NoModifier, QPoint(mouseClickX, mouseClickY), 1000);
 
     // will continue after pop-menu get closed
+    QTRY_VERIFY(menuClosed);
 }
 
 void PartTest::testRClickOnSelectionModeShoulShowFollowTheLinkMenu()
@@ -617,7 +645,7 @@ void PartTest::testRClickOnSelectionModeShoulShowFollowTheLinkMenu()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -635,7 +663,8 @@ void PartTest::testRClickOnSelectionModeShoulShowFollowTheLinkMenu()
     // Need to do this because the pop-menu will have his own mainloop and will block tests until
     // the menu disappear
     PageView *view = part.m_pageView;
-    QTimer::singleShot(2000, [view]() {
+    bool menuClosed = false;
+    QTimer::singleShot(2000, [view, &menuClosed]() {
         // check if popup menu is active and visible
         QMenu *menu = qobject_cast<QMenu*>(view->findChild<QMenu*>("PopupMenu"));
         QVERIFY(menu);
@@ -651,6 +680,7 @@ void PartTest::testRClickOnSelectionModeShoulShowFollowTheLinkMenu()
 
         // close menu to continue test
         menu->close();
+        menuClosed = true;
     });
 
     // r-click on url
@@ -659,9 +689,9 @@ void PartTest::testRClickOnSelectionModeShoulShowFollowTheLinkMenu()
 
     QTest::mouseMove(part.m_pageView->viewport(), QPoint(mouseClickX, mouseClickY));
     QTest::mouseClick(part.m_pageView->viewport(), Qt::RightButton, Qt::NoModifier, QPoint(mouseClickX, mouseClickY), 1000);
-    QTest::qWait(3000);
 
     // will continue after pop-menu get closed
+    QTRY_VERIFY(menuClosed);
 }
 
 void PartTest::testClickAnywhereAfterSelectionShouldUnselect()
@@ -672,7 +702,7 @@ void PartTest::testClickAnywhereAfterSelectionShouldUnselect()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -714,7 +744,7 @@ void PartTest::testeRectSelectionStartingOnLinks()
     // resize window to avoid problem with selection areas
     part.widget()->resize(800, 600);
     part.widget()->show();
-    QTest::qWaitForWindowExposed(part.widget());
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
 
     const int width = part.m_pageView->horizontalScrollBar()->maximum() +
                       part.m_pageView->viewport()->width();
@@ -737,7 +767,8 @@ void PartTest::testeRectSelectionStartingOnLinks()
     // Need to do this because the pop-menu will have his own mainloop and will block tests until
     // the menu disappear
     PageView *view = part.m_pageView;
-    QTimer::singleShot(2000, [view]() {
+    bool menuClosed = false;
+    QTimer::singleShot(2000, [view, &menuClosed]() {
         QApplication::clipboard()->clear();
 
         // check if popup menu is active and visible
@@ -750,26 +781,122 @@ void PartTest::testeRectSelectionStartingOnLinks()
         QVERIFY(copyAct);
 
         menu->close();
+        menuClosed = true;
     });
 
     simulateMouseSelection(mouseStartX, mouseStartY, mouseEndX, mouseEndY, part.m_pageView->viewport());
 
     // wait menu get closed
+    QTRY_VERIFY(menuClosed);
 }
 
 
 void PartTest::simulateMouseSelection(double startX, double startY, double endX, double endY, QWidget *target)
 {
+    const int steps = 5;
+    const double diffX = endX - startX;
+    const double diffY = endY - startY;
+    const double diffXStep = diffX / steps;
+    const double diffYStep = diffY / steps;
+
     QTestEventList events;
     events.addMouseMove(QPoint(startX, startY));
     events.addMousePress(Qt::LeftButton, Qt::NoModifier, QPoint(startX, startY));
+    for (int i = 0; i < steps - 1; ++i) {
+        events.addMouseMove(QPoint(startX + i * diffXStep, startY + i * diffYStep));
+        events.addDelay(100);
+    }
     events.addMouseMove(QPoint(endX, endY));
-    // without this wait the test fails. 100ms were enough on my local system, but when running under valgrind
-    // or on the CI server we need to wait longer.
-    events.addDelay(1000);
+    events.addDelay(100);
     events.addMouseRelease(Qt::LeftButton, Qt::NoModifier, QPoint(endX, endY));
 
     events.simulate(target);
+}
+
+void PartTest::testSaveAsToNonExistingPath()
+{
+    Okular::Part part(nullptr, nullptr, QVariantList());
+    part.openDocument( KDESRCDIR "data/file1.pdf" );
+
+    QString saveFilePath;
+    {
+        QTemporaryFile saveFile( QString( "%1/okrXXXXXX.pdf" ).arg( QDir::tempPath() ) );
+        saveFile.open();
+        saveFilePath = saveFile.fileName();
+        // QTemporaryFile is destroyed and the file it created is gone, this is a TOCTOU but who cares
+    }
+
+    QVERIFY( !QFileInfo::exists( saveFilePath ) );
+
+    QVERIFY( part.saveAs( QUrl::fromLocalFile( saveFilePath ), Part::NoSaveAsFlags ) );
+
+    QFile::remove( saveFilePath );
+}
+
+void PartTest::testSaveAsToSymlink()
+{
+#ifdef Q_OS_UNIX
+    Okular::Part part(nullptr, nullptr, QVariantList());
+    part.openDocument( KDESRCDIR "data/file1.pdf" );
+
+    QTemporaryFile newFile( QString( "%1/okrXXXXXX.pdf" ).arg( QDir::tempPath() ) );
+    newFile.open();
+
+    QString linkFilePath;
+    {
+        QTemporaryFile linkFile( QString( "%1/okrXXXXXX.pdf" ).arg( QDir::tempPath() ) );
+        linkFile.open();
+        linkFilePath = linkFile.fileName();
+        // QTemporaryFile is destroyed and the file it created is gone, this is a TOCTOU but who cares
+    }
+
+    QFile::link( newFile.fileName(), linkFilePath );
+
+    QVERIFY( QFileInfo( linkFilePath ).isSymLink() );
+
+    QVERIFY( part.saveAs( QUrl::fromLocalFile( linkFilePath ), Part::NoSaveAsFlags ) );
+
+    QVERIFY( QFileInfo( linkFilePath ).isSymLink() );
+
+    QFile::remove( linkFilePath );
+#endif
+}
+
+void PartTest::testSaveIsSymlink()
+{
+#ifdef Q_OS_UNIX
+    Okular::Part part(nullptr, nullptr, QVariantList());
+
+    QString newFilePath;
+    {
+        QTemporaryFile newFile( QString( "%1/okrXXXXXX.pdf" ).arg( QDir::tempPath() ) );
+        newFile.open();
+        newFilePath = newFile.fileName();
+        // QTemporaryFile is destroyed and the file it created is gone, this is a TOCTOU but who cares
+    }
+
+    QFile::copy( KDESRCDIR "data/file1.pdf", newFilePath );
+
+    QString linkFilePath;
+    {
+        QTemporaryFile linkFile( QString( "%1/okrXXXXXX.pdf" ).arg( QDir::tempPath() ) );
+        linkFile.open();
+        linkFilePath = linkFile.fileName();
+        // QTemporaryFile is destroyed and the file it created is gone, this is a TOCTOU but who cares
+    }
+
+    QFile::link( newFilePath, linkFilePath );
+
+    QVERIFY( QFileInfo( linkFilePath ).isSymLink() );
+
+    part.openDocument( linkFilePath );
+    QVERIFY( part.saveAs( QUrl::fromLocalFile( linkFilePath ), Part::NoSaveAsFlags ) );
+
+    QVERIFY( QFileInfo( linkFilePath ).isSymLink() );
+
+    QFile::remove( newFilePath );
+    QFile::remove( linkFilePath );
+#endif
 }
 
 void PartTest::testSaveAs()
@@ -796,6 +923,7 @@ void PartTest::testSaveAs()
     {
         Okular::Part part(nullptr, nullptr, QVariantList());
         part.openDocument( file );
+        part.m_document->documentInfo();
 
         QCOMPARE(part.m_document->canSwapBackingFile(), canSwapBackingFile);
 
@@ -832,6 +960,7 @@ void PartTest::testSaveAs()
             QVERIFY( part.saveAs( QUrl::fromLocalFile( nativeDirectSave.fileName() ), Part::NoSaveAsFlags ) );
         }
 
+        QCOMPARE( part.m_document->documentInfo().get( Okular::DocumentInfo::FilePath ), part.m_document->currentDocument().toDisplayString() );
         part.closeUrl();
     }
 
@@ -839,6 +968,7 @@ void PartTest::testSaveAs()
     {
         Okular::Part part(nullptr, nullptr, QVariantList());
         part.openDocument( archiveSave.fileName() );
+        part.m_document->documentInfo();
 
         QCOMPARE( part.m_document->page( 0 )->annotations().size(), 1 );
         QCOMPARE( part.m_document->page( 0 )->annotations().first()->uniqueName(), annotName );
@@ -857,6 +987,7 @@ void PartTest::testSaveAs()
             closeDialogHelper.reset(new CloseDialogHelper( &part, QDialogButtonBox::No  )); // this is the "do you want to save or discard" dialog
         }
 
+        QCOMPARE( part.m_document->documentInfo().get( Okular::DocumentInfo::FilePath ), part.m_document->currentDocument().toDisplayString() );
         part.closeUrl();
     }
 
@@ -895,8 +1026,26 @@ void PartTest::testSaveAs_data()
     QTest::addColumn<bool>("canSwapBackingFile");
 
     QTest::newRow("pdf") << KDESRCDIR "data/file1.pdf" << "pdf" << true << true;
+    QTest::newRow("pdf.gz") << KDESRCDIR "data/file1.pdf.gz" << "pdf" << true << true;
     QTest::newRow("epub") << KDESRCDIR "data/contents.epub" << "epub" << false << false;
     QTest::newRow("jpg") << KDESRCDIR "data/potato.jpg" << "jpg" << false << true;
+}
+
+void PartTest::testSidebarItemAfterSaving()
+{
+    QVariantList dummyArgs;
+    Okular::Part part(nullptr, nullptr, dummyArgs);
+    QWidget *currentSidebarItem = part.m_sidebar->currentItem(); // thumbnails
+    openDocument(&part, QStringLiteral(KDESRCDIR "data/tocreload.pdf"));
+    // since it has TOC it changes to TOC
+    QVERIFY(currentSidebarItem != part.m_sidebar->currentItem());
+    // now change back to thumbnails
+    part.m_sidebar->setCurrentItem(currentSidebarItem);
+
+    part.saveAs(QUrl::fromLocalFile(QStringLiteral(KDESRCDIR "data/tocreload.pdf")));
+
+    // Check it is still thumbnails after saving
+    QCOMPARE(currentSidebarItem, part.m_sidebar->currentItem());
 }
 
 void PartTest::testSaveAsUndoStackAnnotations()
@@ -1185,7 +1334,454 @@ void PartTest::testSaveAsUndoStackForms_data()
     QTest::newRow("pdfarchive") << KDESRCDIR "data/formSamples.pdf" << "okular" << true;
 }
 
+void PartTest::testOpenUrlArguments()
+{
+    QVariantList dummyArgs;
+    Okular::Part part(NULL, NULL, dummyArgs);
+
+    KParts::OpenUrlArguments args;
+    args.setMimeType(QStringLiteral("text/rtf"));
+
+    part.setArguments(args);
+
+    part.openUrl(QUrl::fromLocalFile(QStringLiteral(KDESRCDIR "data/file1.pdf")));
+
+    QCOMPARE( part.arguments().mimeType(), QStringLiteral("text/rtf") );
 }
+
+void PartTest::test388288()
+{
+    Okular::Part part(nullptr, nullptr, QVariantList());
+
+    part.openUrl(QUrl::fromLocalFile(QStringLiteral(KDESRCDIR "data/file1.pdf")));
+
+    part.widget()->show();
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
+
+    QMetaObject::invokeMethod(part.m_pageView, "slotToggleAnnotator", Q_ARG( bool, true ));
+
+    auto annot = new Okular::HighlightAnnotation();
+    annot->setHighlightType( Okular::HighlightAnnotation::Highlight );
+    const Okular::NormalizedRect r(0.36, 0.16, 0.51, 0.17);
+    annot->setBoundingRectangle( r );
+    Okular::HighlightAnnotation::Quad q;
+    q.setCapStart( false );
+    q.setCapEnd( false );
+    q.setFeather( 1.0 );
+    q.setPoint( Okular::NormalizedPoint( r.left, r.bottom ), 0 );
+    q.setPoint( Okular::NormalizedPoint( r.right, r.bottom ), 1 );
+    q.setPoint( Okular::NormalizedPoint( r.right, r.top ), 2 );
+    q.setPoint( Okular::NormalizedPoint( r.left, r.top ), 3 );
+    annot->highlightQuads().append( q );
+
+    part.m_document->addPageAnnotation( 0, annot );
+
+    const int width = part.m_pageView->horizontalScrollBar()->maximum() +
+                      part.m_pageView->viewport()->width();
+    const int height = part.m_pageView->verticalScrollBar()->maximum() +
+                       part.m_pageView->viewport()->height();
+
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * 0.5, height * 0.5));
+    QTRY_COMPARE(part.m_pageView->cursor().shape(), Qt::OpenHandCursor);
+
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * 0.4, height * 0.165));
+    QTRY_COMPARE(part.m_pageView->cursor().shape(), Qt::ArrowCursor);
+
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * 0.1, height * 0.165));
+
+    part.m_document->undo();
+
+    annot = new Okular::HighlightAnnotation();
+    annot->setHighlightType( Okular::HighlightAnnotation::Highlight );
+    annot->setBoundingRectangle( r );
+    annot->highlightQuads().append( q );
+
+    part.m_document->addPageAnnotation( 0, annot );
+
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * 0.5, height * 0.5));
+    QTRY_COMPARE(part.m_pageView->cursor().shape(), Qt::OpenHandCursor);
+}
+
+void PartTest::testCheckBoxReadOnly()
+{
+#ifndef HAVE_POPPLER_0_64
+    return;
+#endif
+
+    const QString testFile = QStringLiteral( KDESRCDIR "data/checkbox_ro.pdf" );
+    Okular::Part part( nullptr, nullptr, QVariantList() );
+    part.openDocument( testFile );
+
+    // The test document uses the activation action of checkboxes
+    // to update the read only state. For this we need the part so that
+    // undo / redo activates the activation action.
+
+    QVERIFY( part.m_document->isOpened() );
+
+    const Okular::Page* page = part.m_document->page( 0 );
+
+    QMap<QString, Okular::FormField *> fields;
+
+    // Field names in test document are:
+    // CBMakeRW, CBMakeRO, TargetDefaultRO, TargetDefaultRW
+
+    for ( Okular::FormField *ff: page->formFields() )
+    {
+        fields.insert( ff->name(), static_cast< Okular::FormField* >( ff ) );
+    }
+
+    // First grab all fields and check that the setup is as expected.
+    auto cbMakeRW = dynamic_cast< Okular::FormFieldButton* > ( fields[QStringLiteral( "CBMakeRW" )] );
+    auto cbMakeRO = dynamic_cast< Okular::FormFieldButton* > ( fields[QStringLiteral( "CBMakeRO" )] );
+
+    auto targetDefaultRW = dynamic_cast< Okular::FormFieldText* > ( fields[QStringLiteral( "TargetDefaultRw" )] );
+    auto targetDefaultRO = dynamic_cast< Okular::FormFieldText* > ( fields[QStringLiteral( "TargetDefaultRo" )] );
+
+    QVERIFY( cbMakeRW );
+    QVERIFY( cbMakeRO );
+    QVERIFY( targetDefaultRW );
+    QVERIFY( targetDefaultRO );
+
+    QVERIFY( !cbMakeRW->state() );
+    QVERIFY( !cbMakeRO->state() );
+
+    QVERIFY( !targetDefaultRW->isReadOnly() );
+    QVERIFY( targetDefaultRO->isReadOnly() );
+
+    QList< Okular::FormFieldButton* > btns;
+    btns << cbMakeRW << cbMakeRO;
+
+    // Now check both boxes
+    QList< bool > btnStates;
+    btnStates << true << true;
+
+    part.m_document->editFormButtons( 0, btns, btnStates );
+
+    // Read only should be inverted
+    QVERIFY( targetDefaultRW->isReadOnly() );
+    QVERIFY( !targetDefaultRO->isReadOnly() );
+
+    // Test that undo / redo works
+    QVERIFY( part.m_document->canUndo() );
+    part.m_document->undo();
+    QVERIFY( !targetDefaultRW->isReadOnly() );
+    QVERIFY( targetDefaultRO->isReadOnly() );
+
+    part.m_document->redo();
+    QVERIFY( targetDefaultRW->isReadOnly() );
+    QVERIFY( !targetDefaultRO->isReadOnly() );
+
+    btnStates.clear();
+    btnStates << false << true;
+
+    part.m_document->editFormButtons( 0, btns, btnStates );
+    QVERIFY( targetDefaultRW->isReadOnly() );
+    QVERIFY( targetDefaultRO->isReadOnly() );
+
+    // Now set both to checked again and confirm that
+    // save / load works.
+    btnStates.clear();
+    btnStates << true << true;
+    part.m_document->editFormButtons( 0, btns, btnStates );
+
+    QTemporaryFile saveFile( QString( "%1/okrXXXXXX.pdf" ).arg( QDir::tempPath() ) );
+    QVERIFY( saveFile.open() );
+    saveFile.close();
+
+    // Save
+    QVERIFY( part.saveAs( QUrl::fromLocalFile( saveFile.fileName() ), Part::NoSaveAsFlags ) );
+    part.closeUrl();
+
+    // Load
+    part.openDocument( saveFile.fileName() );
+    QVERIFY( part.m_document->isOpened() );
+
+    page = part.m_document->page( 0 );
+
+    fields.clear();
+
+    for ( Okular::FormField *ff: page->formFields() )
+    {
+        fields.insert( ff->name(), static_cast< Okular::FormField* >( ff ) );
+    }
+
+    cbMakeRW = dynamic_cast< Okular::FormFieldButton* > ( fields[QStringLiteral( "CBMakeRW" )] );
+    cbMakeRO = dynamic_cast< Okular::FormFieldButton* > ( fields[QStringLiteral( "CBMakeRO" )] );
+
+    targetDefaultRW = dynamic_cast< Okular::FormFieldText* > ( fields[QStringLiteral( "TargetDefaultRw" )] );
+    targetDefaultRO = dynamic_cast< Okular::FormFieldText* > ( fields[QStringLiteral( "TargetDefaultRo" )] );
+
+    QVERIFY( cbMakeRW->state() );
+    QVERIFY( cbMakeRO->state() );
+    QVERIFY( targetDefaultRW->isReadOnly() );
+    QVERIFY( !targetDefaultRO->isReadOnly() );
+}
+
+void PartTest::testCrashTextEditDestroy()
+{
+    const QString testFile = QStringLiteral( KDESRCDIR "data/formSamples.pdf" );
+    Okular::Part part( nullptr, nullptr, QVariantList() );
+    part.openDocument( testFile );
+    part.widget()->show();
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
+
+    part.widget()->findChild<QTextEdit*>()->setText("HOLA");
+    part.actionCollection()->action(QStringLiteral("view_toggle_forms"))->trigger();
+}
+
+void PartTest::testAnnotWindow()
+{
+    QVariantList dummyArgs;
+    Okular::Part part(nullptr, nullptr, dummyArgs);
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file1.pdf")));
+    part.widget()->show();
+    part.widget()->resize(800, 600);
+    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
+
+    const int width =  part.m_pageView->horizontalScrollBar()->maximum() +
+                       part.m_pageView->viewport()->width();
+    const int height = part.m_pageView->verticalScrollBar()->maximum() +
+                       part.m_pageView->viewport()->height();
+
+    part.m_document->setViewportPage(0);
+
+    // wait for pixmap
+    QTRY_VERIFY(part.m_document->page(0)->hasPixmap(part.m_pageView));
+
+    QMetaObject::invokeMethod(part.m_pageView, "slotSetMouseNormal");
+
+    QCOMPARE(part.m_document->currentPage(), 0u);
+
+    // Create two distinct text annotations
+    Okular::Annotation * annot1 = new Okular::TextAnnotation();
+    annot1->setBoundingRectangle( Okular::NormalizedRect( 0.8, 0.1, 0.85, 0.15 ) );
+    annot1->setContents( QStringLiteral("Annot contents 111111") );
+
+    Okular::Annotation *annot2 = new Okular::TextAnnotation();
+    annot2->setBoundingRectangle( Okular::NormalizedRect(  0.8, 0.3, 0.85, 0.35 ) );
+    annot2->setContents( QStringLiteral("Annot contents 222222") );
+
+    // Add annot1 and annot2 to document
+    part.m_document->addPageAnnotation( 0, annot1 );
+    QTest::qWait(100);
+    part.m_document->addPageAnnotation( 0, annot2 );
+    QTest::qWait(100);
+    QVERIFY( part.m_document->page( 0 )->annotations().size() == 2 );
+
+    // Double click the first annotation to open its window (move mouse for visual feedback)
+    const NormalizedPoint annot1pt = annot1->boundingRectangle().center();
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * annot1pt.x, height * annot1pt.y));
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, QPoint(width * annot1pt.x, height * annot1pt.y));
+    QTRY_COMPARE( part.m_pageView->findChildren<QFrame *>("AnnotWindow").size(), 1 );
+    // Verify that the window is visible
+    QFrame* win1 = part.m_pageView->findChild<QFrame *>("AnnotWindow");
+    QVERIFY( !win1->visibleRegion().isEmpty() );
+
+    // Double click the second annotation to open its window (move mouse for visual feedback)
+    const NormalizedPoint annot2pt = annot2->boundingRectangle().center();
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * annot2pt.x, height * annot2pt.y));
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, QPoint(width * annot2pt.x, height * annot2pt.y));
+    QTRY_COMPARE( part.m_pageView->findChildren<QFrame *>("AnnotWindow").size(), 2 );
+    // Verify that the first window is hidden covered by the second, which is visible
+    QList<QFrame *> lstWin = part.m_pageView->findChildren<QFrame *>("AnnotWindow");
+    QFrame * win2;
+    if (lstWin[0] == win1) {
+        win2 = lstWin[1];
+    } else {
+        win2 = lstWin[0];
+    }
+    QVERIFY( win1->visibleRegion().isEmpty() );
+    QVERIFY( !win2->visibleRegion().isEmpty() );
+
+    // Double click the first annotation to raise its window (move mouse for visual feedback)
+    QTest::mouseMove(part.m_pageView->viewport(), QPoint(width * annot1pt.x, height * annot1pt.y));
+    QTest::mouseDClick(part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, QPoint(width * annot1pt.x, height * annot1pt.y));
+    // Verify that the second window is hidden covered by the first, which is visible
+    QVERIFY( !win1->visibleRegion().isEmpty() );
+    QVERIFY( win2->visibleRegion().isEmpty() );
+
+    // Move annotation window 1 to partially show annotation window 2
+    win1->move(QPoint(win2->pos().x(),  win2->pos().y() + 50));
+    // Verify that both windows are partially visible
+    QVERIFY( !win1->visibleRegion().isEmpty() );
+    QVERIFY( !win2->visibleRegion().isEmpty() );
+
+    // Click the second annotation window to raise it (move mouse for visual feedback)
+    auto widget = win2->window()->childAt(win2->mapTo(win2->window(), QPoint(10,  10)));
+    QTest::mouseMove(win2->window(), win2->mapTo(win2->window(), QPoint(10,  10)));
+    QTest::mouseClick(widget, Qt::LeftButton, Qt::NoModifier, widget->mapFrom(win2, QPoint(10,  10)));
+    QVERIFY( win1->visibleRegion().rects().count() == 3);
+    QVERIFY( win2->visibleRegion().rects().count() == 4);
+}
+
+// Helper for testAdditionalActionTriggers
+static void verifyTargetStates( const QString & triggerName,
+                                const QMap<QString, Okular::FormField *> &fields,
+                                bool focusVisible, bool cursorVisible, bool mouseVisible,
+                                int line)
+{
+    Okular::FormField *focusTarget = fields.value( triggerName + QStringLiteral ("_focus_target") );
+    Okular::FormField *cursorTarget = fields.value( triggerName + QStringLiteral ("_cursor_target") );
+    Okular::FormField *mouseTarget = fields.value( triggerName + QStringLiteral ("_mouse_target") );
+
+    QVERIFY( focusTarget );
+    QVERIFY( cursorTarget );
+    QVERIFY( mouseTarget );
+
+    QTRY_VERIFY2( focusTarget->isVisible() == focusVisible,
+                  QStringLiteral ("line: %1 focus for %2 not matched. Expected %3 Actual %4").
+                  arg( line ).arg( triggerName ).arg( focusTarget->isVisible() ).arg( focusVisible ).toUtf8().constData() );
+    QTRY_VERIFY2( cursorTarget->isVisible() == cursorVisible,
+                  QStringLiteral ("line: %1 cursor for %2 not matched. Actual %3 Expected %4").
+                  arg( line ).arg( triggerName ).arg( cursorTarget->isVisible() ).arg( cursorVisible ).toUtf8().constData() );
+    QTRY_VERIFY2( mouseTarget->isVisible() == mouseVisible,
+                  QStringLiteral ("line: %1 mouse for %2 not matched. Expected %3 Actual %4").
+                  arg( line ).arg( triggerName ).arg( mouseTarget->isVisible() ).arg( mouseVisible ).toUtf8().constData() );
+}
+
+void PartTest::testAdditionalActionTriggers()
+{
+#ifndef HAVE_POPPLER_0_65
+    return;
+#endif
+    const QString testFile = QStringLiteral( KDESRCDIR "data/additionalFormActions.pdf" );
+    Okular::Part part( nullptr, nullptr, QVariantList() );
+    part.openDocument( testFile );
+    part.widget()->resize(800, 600);
+
+    part.widget()->show();
+    QVERIFY( QTest::qWaitForWindowExposed( part.widget() ) );
+
+    QMap<QString, Okular::FormField *> fields;
+    // Field names in test document are:
+    // For trigger fields: tf, cb, rb, dd, pb
+    // For target fields: <trigger_name>_focus_target, <trigger_name>_cursor_target,
+    // <trigger_name>_mouse_target
+    const Okular::Page* page = part.m_document->page( 0 );
+    for ( Okular::FormField *ff: page->formFields() )
+    {
+        fields.insert( ff->name(), static_cast< Okular::FormField* >( ff ) );
+    }
+
+    // Verify that everything is set up.
+    verifyTargetStates( QStringLiteral( "tf" ), fields, true, true, true, __LINE__ );
+    verifyTargetStates( QStringLiteral( "cb" ), fields, true, true, true, __LINE__ );
+    verifyTargetStates( QStringLiteral( "rb" ), fields, true, true, true, __LINE__ );
+    verifyTargetStates( QStringLiteral( "dd" ), fields, true, true, true, __LINE__ );
+    verifyTargetStates( QStringLiteral( "pb" ), fields, true, true, true, __LINE__ );
+
+    const int width = part.m_pageView->horizontalScrollBar()->maximum() +
+                      part.m_pageView->viewport()->width();
+    const int height = part.m_pageView->verticalScrollBar()->maximum() +
+                       part.m_pageView->viewport()->height();
+
+    part.m_document->setViewportPage( 0 );
+
+    // wait for pixmap
+    QTRY_VERIFY( part.m_document->page( 0 )->hasPixmap( part.m_pageView) );
+
+    part.actionCollection()->action( QStringLiteral( "view_toggle_forms" ) )->trigger();
+
+    QPoint tfPos( width * 0.045, height * 0.05 );
+    QPoint cbPos( width * 0.045, height * 0.08 );
+    QPoint rbPos( width * 0.045, height * 0.12 );
+    QPoint ddPos( width * 0.045, height * 0.16 );
+    QPoint pbPos( width * 0.045, height * 0.26 );
+
+    // Test text field
+    auto widget = part.m_pageView->viewport()->childAt( tfPos );
+    QVERIFY( widget );
+
+    QTest::mouseMove( part.m_pageView->viewport(), QPoint( tfPos ));
+    verifyTargetStates( QStringLiteral( "tf" ), fields, true, false, true, __LINE__ );
+    QTest::mousePress( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "tf" ), fields, false, false, false, __LINE__ );
+    QTest::mouseRelease( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "tf" ), fields, false, false, true, __LINE__ );
+
+    // Checkbox
+    widget = part.m_pageView->viewport()->childAt( cbPos );
+    QVERIFY( widget );
+
+    QTest::mouseMove( part.m_pageView->viewport(), QPoint( cbPos ) );
+    verifyTargetStates( QStringLiteral( "cb" ), fields, true, false, true, __LINE__ );
+    QTest::mousePress( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "cb" ), fields, false, false, false, __LINE__ );
+    // Confirm that the textfield no longer has any invisible
+    verifyTargetStates( QStringLiteral( "tf" ), fields, true, true, true, __LINE__ );
+    QTest::mouseRelease( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "cb" ), fields, false, false, true, __LINE__ );
+
+    // Radio
+    widget = part.m_pageView->viewport()->childAt( rbPos );
+    QVERIFY( widget );
+
+    QTest::mouseMove( part.m_pageView->viewport(), QPoint( rbPos ) );
+    verifyTargetStates( QStringLiteral( "rb" ), fields, true, false, true, __LINE__ );
+    QTest::mousePress( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "rb" ), fields, false, false, false, __LINE__ );
+    QTest::mouseRelease( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "rb" ), fields, false, false, true, __LINE__ );
+
+    // Dropdown
+    widget = part.m_pageView->viewport()->childAt( ddPos );
+    QVERIFY( widget );
+
+    QTest::mouseMove( part.m_pageView->viewport(), QPoint( ddPos ) );
+    verifyTargetStates( QStringLiteral( "dd" ), fields, true, false, true, __LINE__ );
+    QTest::mousePress( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "dd" ), fields, false, false, false, __LINE__ );
+    QTest::mouseRelease( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "dd" ), fields, false, false, true, __LINE__ );
+
+    // Pushbutton
+    widget = part.m_pageView->viewport()->childAt( pbPos );
+    QVERIFY( widget );
+
+    QTest::mouseMove( part.m_pageView->viewport(), QPoint( pbPos ) );
+    verifyTargetStates( QStringLiteral( "pb" ), fields, true, false, true, __LINE__ );
+    QTest::mousePress( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "pb" ), fields, false, false, false, __LINE__ );
+    QTest::mouseRelease( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "pb" ), fields, false, false, true, __LINE__ );
+
+    // Confirm that a mouse release outside does not trigger the show action.
+    QTest::mousePress( widget, Qt::LeftButton, Qt::NoModifier, QPoint( 5, 5 ) );
+    verifyTargetStates( QStringLiteral( "pb" ), fields, false, false, false, __LINE__ );
+    QTest::mouseRelease( part.m_pageView->viewport(), Qt::LeftButton, Qt::NoModifier, tfPos );
+    verifyTargetStates( QStringLiteral( "pb" ), fields, false, false, false, __LINE__ );
+}
+
+void PartTest::testJumpToPage() {
+    const QString testFile = QStringLiteral( KDESRCDIR "data/simple-multipage.pdf" );
+    const int targetPage = 25;
+    Okular::Part part( nullptr, nullptr, QVariantList() );
+    part.openDocument( testFile );
+    part.widget()->resize(800, 600);
+    part.widget()->show();
+    QVERIFY( QTest::qWaitForWindowExposed( part.widget() ) );
+
+    part.m_document->pages();
+    part.m_document->setViewportPage( targetPage );
+
+    /* Document::setViewportPage triggers pixmap rendering in another thread.
+     * We want to test how things look AFTER finished signal arrives back,
+     * because PageView::slotRelayoutPages may displace the viewport again.
+     */
+    QTRY_VERIFY( part.m_document->page( targetPage )->hasPixmap( part.m_pageView ) );
+
+    const int contentAreaHeight = part.m_pageView->verticalScrollBar()->maximum() + part.m_pageView->viewport()->height();
+    const int pageWithSpaceTop = contentAreaHeight / part.m_document->pages() * targetPage;
+
+    /*
+     * This is a test for a "known by trial" displacement.
+     * We'd need access to part.m_pageView->d->items[targetPage]->croppedGeometry().top(),
+     * to determine the expected viewport position, but we don't have access.
+     */
+    QCOMPARE(part.m_pageView->verticalScrollBar()->value(), pageWithSpaceTop - 4);
+}
+
+} // namespace Okular
 
 int main(int argc, char *argv[])
 {

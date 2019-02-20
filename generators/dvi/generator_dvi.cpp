@@ -23,17 +23,17 @@
 #include "dviexport.h"
 #include "TeXFont.h"
 
-#include <qapplication.h>
-#include <qdir.h>
-#include <qstring.h>
-#include <qurl.h>
-#include <qvector.h>
-#include <qstack.h>
-#include <qtemporaryfile.h>
-#include <qmutex.h>
+#include <QApplication>
+#include <QDir>
+#include <QString>
+#include <QUrl>
+#include <QVector>
+#include <QStack>
+#include <QTemporaryFile>
+#include <QMutex>
 
 #include <KAboutData>
-#include <QtCore/QDebug>
+#include <QDebug>
 #include <KLocalizedString>
 
 #ifdef DVI_OPEN_BUSYLOOP
@@ -247,8 +247,10 @@ QImage DviGenerator::image( Okular::PixmapRequest *request )
     return ret;
 }
 
-Okular::TextPage* DviGenerator::textPage( Okular::Page *page )
+Okular::TextPage* DviGenerator::textPage( Okular::TextRequest *request )
 {
+    const Okular::Page *page = request->page();
+
     qCDebug(OkularDviDebug);
     dviPageInfo *pageInfo = new dviPageInfo();
     pageSize ps;
@@ -284,7 +286,6 @@ Okular::TextPage *DviGenerator::extractTextFromPage( dviPageInfo *pageInfo )
 
     QVector<TextBox>::ConstIterator it = pageInfo->textBoxList.constBegin();
     QVector<TextBox>::ConstIterator itEnd = pageInfo->textBoxList.constEnd();
-    QRect tmpRect;
 
     int pageWidth = pageInfo->width, pageHeight = pageInfo->height;
 
@@ -295,7 +296,6 @@ Okular::TextPage *DviGenerator::extractTextFromPage( dviPageInfo *pageInfo )
 #if 0
         qCDebug(OkularDviDebug) << "orientation: " << orientation
                  << ", curTB.box: " << curTB.box
-                 << ", tmpRect: " << tmpRect 
                  << ", ( " << pageWidth << "," << pageHeight << " )" 
                <<endl;
 #endif

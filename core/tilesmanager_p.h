@@ -116,7 +116,7 @@ class TilesManager
          * Also it checks the dimensions of the given parameters against the
          * current request as to avoid setting pixmaps of late requests.
          */
-        void setPixmap( const QPixmap *pixmap, const NormalizedRect &rect );
+        void setPixmap( const QPixmap *pixmap, const NormalizedRect &rect, bool isPartialPixmap );
 
         /**
          * Checks whether all tiles intersecting with @p rect are available.
@@ -131,6 +131,7 @@ class TilesManager
          * As to avoid requests of big areas, each traversed tile is checked
          * for its size and split if necessary.
          *
+         * @param rect The normalized rectangular area
          * @param tileLeaf Indicate the type of tile to return
          */
         QList<Tile> tilesAt( const NormalizedRect &rect, TileLeaf tileLeaf );

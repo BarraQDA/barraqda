@@ -50,7 +50,7 @@ QtControls.ScrollView {
         }
         Connections {
             target: root.document
-            onPathChanged: resizeTimer.restart()
+            onUrlChanged: resizeTimer.restart()
         }
         Timer {
             id: resizeTimer
@@ -91,6 +91,7 @@ QtControls.ScrollView {
                 flick.resizeContent(Math.max(flick.width+1, initialWidth * mouseArea.scale), Math.max(flick.height, initialHeight * mouseArea.scale), pinch.center);
                 mouseArea.scale = 1;
 
+                resizeTimer.stop()
                 flick.returnToBounds();
             }
             MouseArea {
@@ -268,8 +269,8 @@ QtControls.ScrollView {
                             } else {
                                 root.document.currentPage--;
                                 mouseArea.currPageDelegate = oldPrev;
-                                mouseArea.prevPageDelegate = oldCur;
-                                mouseArea. nextPageDelegate = oldNext;
+                                mouseArea.nextPageDelegate = oldCur;
+                                mouseArea.prevPageDelegate = oldNext;
                             }
                             mouseArea.currPageDelegate.z = 2;
                             mouseArea.prevPageDelegate.z = 1;

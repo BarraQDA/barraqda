@@ -14,7 +14,7 @@
 #include <qlayout.h>
 #include <qlabel.h>
 #include <qheaderview.h>
-#include <QtWidgets/qpushbutton.h>
+#include <qpushbutton.h>
 #include <qtextedit.h>
 #include <QIcon>
 #include <klineedit.h>
@@ -117,7 +117,12 @@ void AnnotsPropertiesDialog::setCaptionTextbyAnnotType()
             if(((Okular::TextAnnotation*)m_annot)->textType()==Okular::TextAnnotation::Linked)
                 captiontext = i18n( "Pop-up Note Properties" );
             else
-                captiontext = i18n( "Inline Note Properties" );
+            {
+                if(((Okular::TextAnnotation*)m_annot)->inplaceIntent()==Okular::TextAnnotation::TypeWriter)
+                    captiontext = i18n( "Typewriter Properties" );
+                else
+                    captiontext = i18n( "Inline Note Properties" );
+            }
             break;
         case Okular::Annotation::ALine:
             if ( ((Okular::LineAnnotation*)m_annot)->linePoints().count() == 2 )

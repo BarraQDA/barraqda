@@ -23,6 +23,8 @@
 #include <QPainter>
 #include <QTimer>
 #include <QStyleOptionGraphicsItem>
+#include <QQuickWindow>
+#include <QSGSimpleTextureNode>
 
 #include <core/bookmarkmanager.h>
 #include <core/document.h>
@@ -36,11 +38,10 @@
 #define REDRAW_TIMEOUT 250
 
 PageItem::PageItem(QQuickItem *parent)
-    : QQuickPaintedItem(parent),
+    : QQuickItem(parent),
       Okular::View( QLatin1String( "PageView" ) ),
       m_page(nullptr),
       m_smooth(false),
-      m_intentionalDraw(false),
       m_bookmarked(false),
       m_isThumbnail(false)
 {
@@ -51,7 +52,8 @@ PageItem::PageItem(QQuickItem *parent)
     m_redrawTimer = new QTimer(this);
     m_redrawTimer->setInterval(REDRAW_TIMEOUT);
     m_redrawTimer->setSingleShot(true);
-    connect(m_redrawTimer, &QTimer::timeout, this, &PageItem::delayedRedraw);
+    connect(m_redrawTimer, &QTimer::timeout, this, &PageItem::requestPixmap);
+    connect(this, &QQuickItem::windowChanged, m_redrawTimer, [this]() {m_redrawTimer->start(); });
 }
 
 
@@ -119,7 +121,7 @@ void PageItem::setDocument(DocumentItem *doc)
     emit documentChanged();
     m_redrawTimer->start();
 
-    connect(doc, &DocumentItem::pathChanged, this, &PageItem::documentPathChanged);
+    connect(doc, &DocumentItem::urlChanged, this, &PageItem::refreshPage);
 }
 
 int PageItem::pageNumber() const
@@ -132,18 +134,27 @@ void PageItem::setPageNumber(int number)
     if ((m_page && m_viewPort.pageNumber == number) ||
         !m_documentItem ||
         !m_documentItem.data()->isOpened() ||
-        number < 0 ||
-        (uint)number >= m_documentItem.data()->document()->pages()) {
+        number < 0) {
         return;
     }
 
     m_viewPort.pageNumber = number;
-    m_page = m_documentItem.data()->document()->page(number);
-
+    refreshPage();
     emit pageNumberChanged();
+    checkBookmarksChanged();
+}
+
+void PageItem::refreshPage()
+{
+    if (uint(m_viewPort.pageNumber) < m_documentItem.data()->document()->pages()) {
+        m_page = m_documentItem.data()->document()->page(m_viewPort.pageNumber);
+    } else {
+        m_page = nullptr;
+    }
+
     emit implicitWidthChanged();
     emit implicitHeightChanged();
-    checkBookmarksChanged();
+
     m_redrawTimer->start();
 }
 
@@ -279,77 +290,101 @@ void PageItem::removeBookmark(const QString &bookmark)
 void PageItem::geometryChanged(const QRectF &newGeometry,
                                const QRectF &oldGeometry)
 {
-    setContentsSize(newGeometry.size().toSize());
-
     if (newGeometry.size().isEmpty()) {
         return;
     }
 
+    bool changed = false;
     if (newGeometry.size() != oldGeometry.size()) {
+        changed = true;
         m_redrawTimer->start();
     }
 
     QQuickItem::geometryChanged(newGeometry, oldGeometry);
-    //Why aren't they automatically emuitted?
-    emit widthChanged();
-    emit heightChanged();
+
+    if (changed) {
+        //Why aren't they automatically emuitted?
+        emit widthChanged();
+        emit heightChanged();
+    }
 }
 
-void PageItem::paint(QPainter *painter)
+QSGNode * PageItem::updatePaintNode(QSGNode* node, QQuickItem::UpdatePaintNodeData* /*data*/)
 {
-    if (!m_documentItem || !m_page) {
-        return;
+    if (!window() || m_buffer.isNull()) {
+        delete node;
+        return nullptr;
+    }
+    QSGSimpleTextureNode *n = static_cast<QSGSimpleTextureNode *>(node);
+    if (!n) {
+        n = new QSGSimpleTextureNode();
+        n->setOwnsTexture(true);
     }
 
-    const bool setAA = m_smooth && !(painter->renderHints() & QPainter::Antialiasing);
-    if (setAA) {
-        painter->save();
-        painter->setRenderHint(QPainter::Antialiasing, true);
+    n->setTexture(window()->createTextureFromImage(m_buffer));
+    n->setRect(boundingRect());
+    return n;
+}
+
+void PageItem::requestPixmap()
+{
+    if (!m_documentItem || !m_page || !window() || width() <= 0 || height() < 0) {
+        if (!m_buffer.isNull()) {
+            m_buffer = QImage();
+            update();
+        }
+        return;
     }
 
     Observer *observer = m_isThumbnail ? m_documentItem.data()->thumbnailObserver() : m_documentItem.data()->pageviewObserver();
     const int priority = m_isThumbnail ? THUMBNAILS_PRIO : PAGEVIEW_PRIO;
 
-    if (m_intentionalDraw) {
-        QLinkedList<Okular::PixmapRequest *> requestedPixmaps;
-        requestedPixmaps.push_back(new Okular::PixmapRequest(observer, m_viewPort.pageNumber, width(), height(), priority, Okular::PixmapRequest::Asynchronous));
-        const Okular::Document::PixmapRequestFlag prf = m_isThumbnail ? Okular::Document::NoOption : Okular::Document::RemoveAllPrevious;
-        m_documentItem.data()->document()->requestPixmaps(requestedPixmaps, prf);
-        m_intentionalDraw = false;
-    }
-    const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations | PagePainter::Taggings;
-    // Simply using the limits as described by contentsSize will, at times, result in the page painter
-    // attempting to write outside the data area, unsurprisingly resulting in a crash.
-    QRect limits(QPoint(0, 0), contentsSize());
-    if(limits.width() > width())
-        limits.setWidth(width());
-    if(limits.height() > height())
-        limits.setHeight(height());
-    PagePainter::paintPageOnPainter(painter, m_page, observer, flags, width(), height(), limits);
+    const qreal dpr = window()->devicePixelRatio();
 
-    if (setAA) {
-        painter->restore();
+    // Here we want to request the pixmap for the page, but it may happen that the page
+    // already has the pixmap, thus requestPixmaps would not trigger pageHasChanged
+    // and we would not call paint. Always call paint, if we don't have a pixmap
+    // it's a noop. Requesting a page that already has a pixmap is also
+    // almost a noop.
+    // Ideally we would do one or the other but for now this is good enough
+    paint();
+    {
+        auto request = new Okular::PixmapRequest(observer, m_viewPort.pageNumber, width() * dpr, height() * dpr, priority, Okular::PixmapRequest::Asynchronous);
+        request->setNormalizedRect(Okular::NormalizedRect(0,0,1,1));
+        const Okular::Document::PixmapRequestFlag prf = Okular::Document::NoOption;
+        m_documentItem.data()->document()->requestPixmaps({request}, prf);
     }
+}
+
+void PageItem::paint()
+{
+    Observer *observer = m_isThumbnail ? m_documentItem.data()->thumbnailObserver() : m_documentItem.data()->pageviewObserver();
+    const int flags = PagePainter::Accessibility | PagePainter::Highlights | PagePainter::Annotations | PagePainter::Taggings;
+
+    const qreal dpr = window()->devicePixelRatio();
+    const QRect limits(QPoint(0, 0), QSize(width()*dpr, height()*dpr));
+    QPixmap pix(limits.size());
+    pix.setDevicePixelRatio(dpr);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, m_smooth);
+    PagePainter::paintPageOnPainter(&p, m_page, observer, flags, width(), height(), limits);
+    p.end();
+
+    m_buffer = pix.toImage();
+
+    update();
 }
 
 //Protected slots
-void PageItem::delayedRedraw()
-{
-    if (m_documentItem && m_page) {
-        m_intentionalDraw = true;
-        update();
-    }
-}
-
 void PageItem::pageHasChanged(int page, int flags)
 {
     if (m_viewPort.pageNumber == page) {
-        if (flags == 32) {
+        if (flags == Okular::DocumentObserver::BoundingBox) {
             // skip bounding box updates
             //kDebug() << "32" << m_page->boundingBox();
         } else if (flags == Okular::DocumentObserver::Pixmap) {
             // if pixmaps have updated, just repaint .. don't bother updating pixmaps AGAIN
-            update();
+            paint();
         } else {
             m_redrawTimer->start();
         }
@@ -389,15 +424,6 @@ void PageItem::contentYChanged()
 
     m_viewPort.rePos.normalizedY = m_flickable.data()->property("contentY").toReal() / (height() - m_flickable.data()->height());
 }
-
-void PageItem::documentPathChanged()
-{
-    m_page = nullptr;
-    setPageNumber(0);
-
-    m_redrawTimer->start();
-}
-
 
 void PageItem::setIsThumbnail(bool thumbnail)
 {

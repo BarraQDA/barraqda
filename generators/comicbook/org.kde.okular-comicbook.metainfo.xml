@@ -5,7 +5,6 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-2.0+ and GFDL-1.3</project_license>
   <name>Comic Books</name>
-  <name xml:lang="ast">Cómics</name>
   <name xml:lang="ca">Llibres de còmics</name>
   <name xml:lang="ca-valencia">Llibres de còmics</name>
   <name xml:lang="cs">Komiksy</name>
@@ -14,6 +13,7 @@
   <name xml:lang="en-GB">Comic Books</name>
   <name xml:lang="es">Libros de cómics</name>
   <name xml:lang="et">Koomiksid</name>
+  <name xml:lang="eu">Komiki-liburuak</name>
   <name xml:lang="fi">Sarjakuvakirjat</name>
   <name xml:lang="fr">Bandes dessinées</name>
   <name xml:lang="gl">Libros de banda deseñada</name>
@@ -39,7 +39,6 @@
   <name xml:lang="zh-CN">漫画书</name>
   <name xml:lang="zh-TW">漫畫書</name>
   <summary>Adds support for reading comic books</summary>
-  <summary xml:lang="ast">Amiesta sofitu pa la llectura de cómics</summary>
   <summary xml:lang="ca">Afegeix la implementació per a llegir llibres de còmics</summary>
   <summary xml:lang="ca-valencia">Afig la implementació per a llegir llibres de còmics</summary>
   <summary xml:lang="cs">Přidává podporu pro čtení komiksů</summary>
@@ -48,9 +47,10 @@
   <summary xml:lang="en-GB">Adds support for reading comic books</summary>
   <summary xml:lang="es">Permite la lectura de libros de cómics</summary>
   <summary xml:lang="et">Koomiksite lugemise toetus</summary>
+  <summary xml:lang="eu">Komiki-liburuak irakurtzeko euskarria gehitzen du</summary>
   <summary xml:lang="fi">Lisää sarjakuvakirjojen lukutuen</summary>
   <summary xml:lang="fr">Permet la lecture des bandes dessinées</summary>
-  <summary xml:lang="gl">Permite ler libros de banda deseñada.</summary>
+  <summary xml:lang="gl">Engade a posibilidade de ler libros de banda deseñada</summary>
   <summary xml:lang="ia">Adde supporto per leger libros de comic</summary>
   <summary xml:lang="it">Aggiunge il supporto per la lettura di fumetti</summary>
   <summary xml:lang="ko">만화책 읽기 지원 추가</summary>
@@ -58,7 +58,7 @@
   <summary xml:lang="nn">Legg til støtte for å lesa teikneseriefiler</summary>
   <summary xml:lang="pl">Dodaje obsługę komiksów</summary>
   <summary xml:lang="pt">Adiciona o suporte para ler livros de banda desenhada</summary>
-  <summary xml:lang="pt-BR">Adiciona suporte para ler histórias em quadrinho</summary>
+  <summary xml:lang="pt-BR">Adiciona o suporte para leitura de comic books</summary>
   <summary xml:lang="ru">Поддержка чтения комиксов</summary>
   <summary xml:lang="sk">Pridá podporu pre čítanie komiksov</summary>
   <summary xml:lang="sl">Doda podporo za branje stripov</summary>

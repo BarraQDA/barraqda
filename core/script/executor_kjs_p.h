@@ -16,14 +16,15 @@ namespace Okular {
 
 class DocumentPrivate;
 class ExecutorKJSPrivate;
+class Event;
 
 class ExecutorKJS
 {
     public:
-        ExecutorKJS( DocumentPrivate *doc );
+        explicit ExecutorKJS( DocumentPrivate *doc );
         ~ExecutorKJS();
 
-        void execute( const QString &script );
+        void execute( const QString &script, Event *event );
 
     private:
         friend class ExecutorKJSPrivate;

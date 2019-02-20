@@ -49,7 +49,7 @@
 #include <KLocalizedString>
 #include <KSharedConfig>
 #include <KIO/Global>
-#ifndef Q_OS_WIN
+#ifdef WITH_KACTIVITIES
 #include <KActivities/ResourceInstance>
 #endif
 
@@ -278,12 +278,12 @@ void Shell::openUrl( const QUrl & url, const QString &serializedOptions )
             m_tabWidget->setTabText( activeTab, url.fileName() );
             applyOptionsToPart( activePart, serializedOptions );
             bool openOk = activePart->openUrl( url );
-            const bool isstdin = url.fileName() == QLatin1String( "-" );
+            const bool isstdin = url.fileName() == QLatin1String( "-" ) || url.scheme() == QLatin1String( "fd" );
             if ( !isstdin )
             {
                 if ( openOk )
                 {
-#ifndef Q_OS_WIN
+#ifdef WITH_KACTIVITIES
                     if ( !m_activityResource )
                         m_activityResource = new KActivities::ResourceInstance( window()->winId(), this );
 
@@ -383,13 +383,13 @@ void Shell::readProperties(const KConfigGroup &group)
 {
     // Reopen documents based on saved settings
     QStringList urls = group.readPathEntry( SESSION_URL_KEY, QStringList() );
+    int desiredTab = group.readEntry<int>( SESSION_TAB_KEY, 0 );
 
     while( !urls.isEmpty() )
     {
         openUrl( QUrl(urls.takeFirst()) );
     }
 
-    int desiredTab = group.readEntry<int>( SESSION_TAB_KEY, 0 );
     if( desiredTab < m_tabs.size() )
     {
         setActiveTab( desiredTab );
@@ -442,6 +442,7 @@ void Shell::fileOpen()
     dlg->setDirectoryUrl( startDir );
     dlg->setAcceptMode( QFileDialog::AcceptOpen );
     dlg->setOption( QFileDialog::HideNameFilterDetails, true );
+    dlg->setFileMode( QFileDialog::ExistingFiles );   // Allow selection of more than one file
 
     QMimeDatabase mimeDatabase;
     QSet<QString> globPatterns;
@@ -684,6 +685,8 @@ void Shell::applyOptionsToPart( QObject* part, const QString &serializedOptions 
         doc->startPresentation();
     if ( ShellUtils::showPrintDialog(serializedOptions) )
         QMetaObject::invokeMethod( part, "enableStartWithPrint" );
+    if ( ShellUtils::showPrintDialogAndExit(serializedOptions) )
+        QMetaObject::invokeMethod( part, "enableExitAfterPrint" );
 }
 
 void Shell::connectPart( QObject* part )

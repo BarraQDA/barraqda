@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.0)
 
 # KDE Application Version, managed by release script
-set (KDE_APPLICATIONS_VERSION_MAJOR "17")
+set (KDE_APPLICATIONS_VERSION_MAJOR "18")
 set (KDE_APPLICATIONS_VERSION_MINOR "12")
-set (KDE_APPLICATIONS_VERSION_MICRO "1")
+set (KDE_APPLICATIONS_VERSION_MICRO "2")
 set (KDE_APPLICATIONS_VERSION "${KDE_APPLICATIONS_VERSION_MAJOR}.${KDE_APPLICATIONS_VERSION_MINOR}.${KDE_APPLICATIONS_VERSION_MICRO}")
 
-project(okular VERSION 1.3.${KDE_APPLICATIONS_VERSION_MICRO})
+project(okular VERSION 1.6.${KDE_APPLICATIONS_VERSION_MICRO})
 
-set(QT_REQUIRED_VERSION "5.6.0")
-set(KF5_REQUIRED_VERSION "5.16.0")
+set(QT_REQUIRED_VERSION "5.8.0")
+set(KF5_REQUIRED_VERSION "5.33.0")
 
-find_package(ECM 5.19.0 CONFIG REQUIRED)
+find_package(ECM 5.33.0 CONFIG REQUIRED)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ECM_MODULE_PATH})
 
 include(ECMInstallIcons)
@@ -40,6 +40,19 @@ else()
     add_definitions(-DHAVE_SPEECH)
 endif()
 
+if(NOT CMAKE_VERSION VERSION_LESS "3.10.0")
+  # CMake 3.9+ warns about automoc on files without Q_OBJECT, and doesn't know about other macros.
+  # 3.10+ lets us provide more macro names that require automoc.
+  list(APPEND CMAKE_AUTOMOC_MACRO_NAMES "OKULAR_EXPORT_PLUGIN")
+endif()
+
+set(optionalComponents)
+if (ANDROID)
+#   we want to make sure that generally all components are found
+
+    set(optionalComponents "OPTIONAL_COMPONENTS")
+endif()
+
 find_package(KF5 ${KF5_REQUIRED_VERSION} REQUIRED COMPONENTS
     Archive
     Bookmarks
@@ -47,19 +60,34 @@ find_package(KF5 ${KF5_REQUIRED_VERSION} REQUIRED COMPONENTS
     Config
     ConfigWidgets
     CoreAddons
-    DocTools
+    Crash
     IconThemes
-    JS
     KIO
     Parts
     ThreadWeaver
-    Wallet
     WindowSystem
+    ${optionalComponents}
+    DocTools
+    JS
+    Wallet
 )
-if(NOT WIN32)
+
+if(KF5Wallet_FOUND)
+    add_definitions(-DWITH_KWALLET=1)
+endif()
+if(KF5JS_FOUND)
+    add_definitions(-DWITH_KJS=1)
+endif()
+
+if(NOT WIN32 AND NOT ANDROID)
     find_package(KF5 ${KF5_REQUIRED_VERSION} REQUIRED COMPONENTS
         Activities
     )
+    set_package_properties("KF5Activities" PROPERTIES
+        DESCRIPTION  "Activities interface library"
+        URL "https://api.kde.org/frameworks/kactivities/html/"
+        TYPE RECOMMENDED
+        PURPOSE "Required for Activities integration.")
 endif()
 find_package(KF5Kirigami2)
 set_package_properties(KF5Kirigami2 PROPERTIES
@@ -84,12 +112,22 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
 
 find_package(ZLIB REQUIRED)
 
-add_definitions(-DQT_USE_FAST_CONCATENATION -DQT_USE_FAST_OPERATOR_PLUS)
+# This is here instead of in generators since we use if(Poppler_Qt5_FOUND) in autotests/
+find_package(Poppler "0.12.1" COMPONENTS Qt5)
+set_package_properties("Poppler" PROPERTIES
+        TYPE RECOMMENDED
+        PURPOSE "Support for PDF files in okular.")
+
+add_definitions(-DQT_USE_FAST_OPERATOR_PLUS)
 add_definitions(-DTRANSLATION_DOMAIN="okular")
+add_definitions(-DQT_NO_URL_CAST_FROM_STRING)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${PHONON_INCLUDES} core/synctex ${ZLIB_INCLUDE_DIR} ${CMAKE_BINARY_DIR}/core)
 
-add_subdirectory( mobile )
+option(BUILD_OKULARKIRIGAMI "Builds the touch-friendly frontend" ON)
+if (BUILD_OKULARKIRIGAMI)
+    add_subdirectory( mobile )
+endif()
 option(BUILD_COVERAGE "Build the project with gcov support" OFF)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -106,10 +144,14 @@ endif()
 add_subdirectory( ui )
 add_subdirectory( shell )
 add_subdirectory( generators )
-add_subdirectory( autotests )
-add_subdirectory( conf/autotests )
+if(BUILD_TESTING)
+   add_subdirectory( autotests )
+   add_subdirectory( conf/autotests )
+endif()
 
-add_subdirectory(doc)
+if(KF5DocTools_FOUND)
+    add_subdirectory(doc)
+endif()
 
 include(OkularConfigureChecks.cmake)
 
@@ -155,17 +197,12 @@ set(okularcore_SRCS
    core/utils.cpp
    core/view.cpp
    core/fileprinter.cpp
-   core/script/executor_kjs.cpp
-   core/script/kjs_app.cpp
-   core/script/kjs_console.cpp
-   core/script/kjs_data.cpp
-   core/script/kjs_document.cpp
-   core/script/kjs_fullscreen.cpp
-   core/script/kjs_field.cpp
-   core/script/kjs_spell.cpp
-   core/script/kjs_util.cpp
+   core/script/event.cpp
    core/synctex/synctex_parser.c
    core/synctex/synctex_parser_utils.c
+)
+qt5_add_resources(okularcore_SRCS
+   core/script/builtin.qrc
 )
 
 ki18n_wrap_ui(okularcore_SRCS
@@ -215,6 +252,15 @@ kconfig_add_kcfg_files(okularcore_SRCS conf/settings_core.kcfgc)
 add_library(okularcore SHARED ${okularcore_SRCS})
 generate_export_header(okularcore BASE_NAME okularcore EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/core/okularcore_export.h")
 
+if (ANDROID)
+    set(fileName ${CMAKE_BINARY_DIR}/Okular5Core-android-dependencies.xml)
+    file(WRITE "${fileName}" "<rules><dependencies><lib name='Okular5Core'><depends>\n"
+                                "<bundled file='${KDE_INSTALL_PLUGINDIR}/okular/generators' />\n"
+                             "</depends></lib></dependencies></rules>\n")
+    install(FILES ${fileName} DESTINATION ${KDE_INSTALL_LIBDIR})
+endif()
+
+
 # Special handling for linking okularcore on OSX/Apple
 IF(APPLE)
     SET(OKULAR_IOKIT "-framework IOKit" CACHE STRING "Apple IOKit framework")
@@ -230,13 +276,10 @@ PRIVATE
     ${OKULAR_IOKIT}
     ${SHLWAPI}
     KF5::Archive
-    KF5::JS
-    KF5::JSApi
     KF5::KIOCore
     KF5::KIOWidgets
     KF5::I18n
     KF5::ThreadWeaver
-    KF5::Wallet
     KF5::Bookmarks
     Phonon::phonon4qt5
     ${MATH_LIB}
@@ -249,7 +292,28 @@ PUBLIC  # these are included from the installed headers
     Qt5::Widgets
 )
 
-set_target_properties(okularcore PROPERTIES VERSION 8.0.0 SOVERSION 8 OUTPUT_NAME Okular5Core EXPORT_NAME Core)
+
+if (KF5Wallet_FOUND)
+    target_link_libraries(okularcore PRIVATE KF5::Wallet)
+endif()
+if (KF5JS_FOUND)
+    target_sources(okularcore PRIVATE
+            core/script/executor_kjs.cpp
+            core/script/kjs_app.cpp
+            core/script/kjs_console.cpp
+            core/script/kjs_data.cpp
+            core/script/kjs_document.cpp
+            core/script/kjs_field.cpp
+            core/script/kjs_fullscreen.cpp
+            core/script/kjs_field.cpp
+            core/script/kjs_spell.cpp
+            core/script/kjs_util.cpp
+            core/script/kjs_event.cpp
+    )
+    target_link_libraries(okularcore PRIVATE KF5::JS KF5::JSApi)
+endif()
+
+set_target_properties(okularcore PROPERTIES VERSION 9.0.0 SOVERSION 9 OUTPUT_NAME Okular5Core EXPORT_NAME Core)
 
 install(TARGETS okularcore EXPORT Okular5Targets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
@@ -356,12 +420,14 @@ target_link_libraries(okularpart okularcore
     KF5::KIOCore
     KF5::KIOFileWidgets
     KF5::KIOWidgets
-    KF5::KIONTLM
     KF5::Parts
     KF5::Solid
-    KF5::Wallet
     KF5::WindowSystem
 )
+
+if(KF5Wallet_FOUND)
+    target_link_libraries(okularpart KF5::Wallet)
+endif()
 
 if (KDEExperimentalPurpose_FOUND)
     target_link_libraries(okularpart KDEExperimental::PurposeWidgets)

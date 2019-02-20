@@ -11,7 +11,7 @@
 #include "form_p.h"
 
 // qt includes
-#include <QtCore/QVariant>
+#include <QVariant>
 
 #include "action.h"
 
@@ -25,6 +25,8 @@ FormFieldPrivate::FormFieldPrivate( FormField::FieldType type )
 FormFieldPrivate::~FormFieldPrivate()
 {
     delete m_activateAction;
+    qDeleteAll( m_additionalActions.values() );
+    qDeleteAll( m_additionalAnnotActions.values() );
 }
 
 void FormFieldPrivate::setDefault()
@@ -55,9 +57,17 @@ bool FormField::isReadOnly() const
     return false;
 }
 
+void FormField::setReadOnly( bool )
+{
+}
+
 bool FormField::isVisible() const
 {
     return true;
+}
+
+void FormField::setVisible( bool )
+{
 }
 
 Action* FormField::activationAction() const
@@ -84,6 +94,19 @@ void FormField::setAdditionalAction( AdditionalActionType type, Action *action )
     Q_D( FormField );
     delete d->m_additionalActions.value(type);
     d->m_additionalActions[type] = action;
+}
+
+Action* FormField::additionalAction( Annotation::AdditionalActionType type ) const
+{
+    Q_D( const FormField );
+    return d->m_additionalAnnotActions.value(type);
+}
+
+void FormField::setAdditionalAction( Annotation::AdditionalActionType type, Action *action )
+{
+    Q_D( FormField );
+    delete d->m_additionalAnnotActions.value(type);
+    d->m_additionalAnnotActions[type] = action;
 }
 
 

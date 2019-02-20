@@ -10,8 +10,8 @@
 #ifndef ANNOTATIONPROXYMODEL_H
 #define ANNOTATIONPROXYMODEL_H
 
-#include <QtCore/QSortFilterProxyModel>
-#include <QtCore/QPair>
+#include <QSortFilterProxyModel>
+#include <QPair>
 
 /**
  * A proxy model, which filters out all pages except the
@@ -87,6 +87,7 @@ class PageGroupProxyModel : public QAbstractProxyModel
 
   private Q_SLOTS:
     void rebuildIndexes();
+    void sourceDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles);
 
   private:
     bool mGroupByPage;
@@ -136,6 +137,7 @@ class AuthorGroupProxyModel : public QAbstractProxyModel
 
     private Q_SLOTS:
         void rebuildIndexes();
+        void sourceDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles);
 
     private:
         class Private;

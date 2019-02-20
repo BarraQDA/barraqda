@@ -61,6 +61,52 @@ int main()
 }
 " HAVE_POPPLER_0_62)
 
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+#include <QImage>
+int main()
+{
+  Poppler::Page *p;
+  p->renderToImage(0, 0, 0, 0, 0, 0, Poppler::Page::Rotate0, nullptr, nullptr, nullptr, QVariant());
+  return 0;
+}
+" HAVE_POPPLER_0_63)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+#include <poppler-form.h>
+#include <poppler-link.h>
+int main()
+{
+  Poppler::FormField *f;
+  f->setReadOnly(true);
+  f->setVisible(true);
+  Poppler::Link *l;
+  l->nextLinks();
+}
+" HAVE_POPPLER_0_64)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+#include <poppler-form.h>
+int main()
+{
+  Poppler::FormField *f;
+  f->additionalAction(Poppler::Annotation::CursorEnteringAction);
+}
+" HAVE_POPPLER_0_65)
+
+check_cxx_source_compiles("
+#include <poppler-qt5.h>
+#include <QColor>
+int main()
+{
+    Poppler::TextAnnotation *annot = new Poppler::TextAnnotation( Poppler::TextAnnotation::InPlace );
+    annot->setTextColor( Qt::blue );
+    return 0;
+}
+" HAVE_POPPLER_0_69)
+
 configure_file(
    ${CMAKE_CURRENT_SOURCE_DIR}/config-okular-poppler.h.cmake
    ${CMAKE_CURRENT_BINARY_DIR}/config-okular-poppler.h

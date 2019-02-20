@@ -7,8 +7,10 @@
  *   (at your option) any later version.                                   *
  ***************************************************************************/
 
+#ifndef _TXT_DOCUMENT_H_
+#define _TXT_DOCUMENT_H_
 
-#include <QtGui/QTextDocument>
+#include <QTextDocument>
 
 namespace Txt
 {
@@ -17,10 +19,12 @@ namespace Txt
         Q_OBJECT
 
         public:
-            Document( const QString &fileName );
+            explicit Document( const QString &fileName );
             ~Document();
 
         private:
             QString toUnicode( const QByteArray &array );
     };
 }
+
+#endif

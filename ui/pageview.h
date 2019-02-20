@@ -67,9 +67,9 @@ friend class TaggingPopup;
         PageView( QWidget *parent, Okular::Document *document );
         ~PageView();
 
-        // Zoom mode ( last 3 are internally used only! )
+        // Zoom mode ( last 4 are internally used only! )
         enum ZoomMode { ZoomFixed = 0, ZoomFitWidth = 1, ZoomFitPage = 2, ZoomFitAuto = 3,
-                        ZoomIn, ZoomOut, ZoomRefreshCurrent };
+                        ZoomIn, ZoomOut, ZoomRefreshCurrent, ZoomActual };
 
         enum ClearMode { ClearAllSelection, ClearOnlyDividers };
 
@@ -131,6 +131,9 @@ friend class TaggingPopup;
         void openAnnotationWindow( Okular::Annotation *annotation, int pageNumber );
         void openTaggingWindow( Okular::Tagging *tagging, int pageNumber );
         void reloadForms();
+
+        void slotToggleChangeColors();
+        void slotSetChangeColors(bool active);
 
     Q_SIGNALS:
         void rightClick( const Okular::Page *, const QPoint & );
@@ -206,6 +209,7 @@ private:
         QMenu* createProcessLinkMenu( PageViewItem *item, const QPoint & eventPos );
         // used when selecting stuff, makes the view scroll as necessary to keep the mouse inside the view
         void scrollPosIntoView( const QPoint & pos );
+        QPoint viewportToContentArea( const Okular::DocumentViewport & vp ) const;
 
         // called from slots to turn off trim modes mutually exclusive to id
         void updateTrimMode( int except_id );
@@ -247,6 +251,7 @@ private Q_SLOTS:
         void slotZoom();
         void slotZoomIn();
         void slotZoomOut();
+        void slotZoomActual();
         void slotFitToWidthToggled( bool );
         void slotFitToPageToggled( bool );
         void slotAutoFitToggled( bool );
@@ -283,7 +288,6 @@ private Q_SLOTS:
         void slotTaggingWindowDestroyed( QObject *window );
         void slotProcessMovieAction( const Okular::MovieAction *action );
         void slotProcessRenditionAction( const Okular::RenditionAction *action );
-        void slotToggleChangeColors();
         void slotFitWindowToPage();
 };
 

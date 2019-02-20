@@ -4,7 +4,6 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-2.0+ and GFDL-1.3</project_license>
   <name>Okular</name>
-  <name xml:lang="ast">Okular</name>
   <name xml:lang="ca">Okular</name>
   <name xml:lang="ca-valencia">Okular</name>
   <name xml:lang="cs">Okular</name>
@@ -13,9 +12,11 @@
   <name xml:lang="en-GB">Okular</name>
   <name xml:lang="es">Okular</name>
   <name xml:lang="et">Okular</name>
+  <name xml:lang="eu">Okular</name>
   <name xml:lang="fi">Okular</name>
   <name xml:lang="fr">Okular</name>
   <name xml:lang="gl">Okular</name>
+  <name xml:lang="id">Okular</name>
   <name xml:lang="it">Okular</name>
   <name xml:lang="ko">Okular</name>
   <name xml:lang="nl">Okular</name>
@@ -37,7 +38,6 @@
   <name xml:lang="zh-CN">Okular</name>
   <name xml:lang="zh-TW">Okular</name>
   <summary>Document Viewer</summary>
-  <summary xml:lang="ast">Visor de documentos</summary>
   <summary xml:lang="ca">Visualitzador de documents</summary>
   <summary xml:lang="ca-valencia">Visualitzador de documents</summary>
   <summary xml:lang="cs">Prohlížeč dokumentů</summary>
@@ -46,10 +46,12 @@
   <summary xml:lang="en-GB">Document Viewer</summary>
   <summary xml:lang="es">Visor de documentos</summary>
   <summary xml:lang="et">Dokumendinäitaja</summary>
+  <summary xml:lang="eu">Dokumentu erakuslea</summary>
   <summary xml:lang="fi">Asiakirjakatselin</summary>
   <summary xml:lang="fr">Afficheur de documents</summary>
   <summary xml:lang="gl">Visor de documentos</summary>
   <summary xml:lang="ia">Visor de documento</summary>
+  <summary xml:lang="id">Penampil Dokumen</summary>
   <summary xml:lang="it">Visore di documenti</summary>
   <summary xml:lang="ko">문서 뷰어</summary>
   <summary xml:lang="nl">Documentenviewer</summary>
@@ -74,7 +76,6 @@
     <p>
    Okular is a universal document viewer developed by KDE. Okular works on multiple platforms, including but not limited to Linux, Windows, Mac OS X, *BSD, etc.
   </p>
-    <p xml:lang="ast">Okular ye un visor universal de documentos desendolcáu por KDE. Okular funciona en múltiples plataformes como Linux, *BSD, MacOS, Windows... etc.</p>
     <p xml:lang="ca">L'Okular és un visualitzador universal de documents desenvolupat pel KDE. L'Okular funciona en diverses plataformes, incloent-hi però sense limitar en el Linux, Windows, Mac OS X, *BSD, etc.</p>
     <p xml:lang="ca-valencia">L'Okular és un visualitzador universal de documents desenvolupat pel KDE. L'Okular funciona en diverses plataformes, incloent-hi però sense limitar en el Linux, Windows, Mac OS X, *BSD, etc.</p>
     <p xml:lang="de">Okular ist ein universeller Dokumentenbetrachter, der von  KDE entwickelt wird. Okular ist auf verschiedenen Plattformen verfügbar, darunter auch Linux, Windows, Mac OS X, *BSD usw.</p>
@@ -82,15 +83,18 @@
     <p xml:lang="en-GB">Okular is a universal document viewer developed by KDE. Okular works on multiple platforms, including but not limited to Linux, Windows, Mac OS X, *BSD, etc.</p>
     <p xml:lang="es">Okular es un visor universal de documentos desarrollado por KDE. Okular funciona en diversas plataformas, incluidas Linux, Windows, Mac OS X, *BSD, etc.</p>
     <p xml:lang="et">Okular on KDE välja töötatud universaalne dokumentide näitaja. Okular võib töötada eri platvormidel, kaasa arvatud Linux, Windows, Mac OS X, *BSD jne.</p>
+    <p xml:lang="eu">Okular KDEk garatutako dokumentu erakusle unibertsal bat da. Okular hainbat  plataformatan dabil, haien artean baino ez soilik haietara mugatua, Linux,  windows, Mac OS X, *BSD, etab.</p>
     <p xml:lang="fi">Okular on KDE:n kehittämä yleiskäyttöinen asiakirjakatselin. Okular toimii useissa ympäristöissä kuten Linuxissa, Windowsissa, Mac OS X:ssä, *BSD:ssä jne.</p>
     <p xml:lang="fr">Okular est un afficheur universel de documents développé par KDE. Okular fonctionne sur de multiples plate-formes, comme Linux, Windows, Mac OS X, etc.</p>
     <p xml:lang="gl">Okular é un visor de documentos universal desenvolvido por KDE. Okular funciona en varias plataformas, entre elas Linux, Windows, Mac OS X, *BSD, etc.</p>
+    <p xml:lang="id">Okular adalah penampil dokumen universal yang dikembangkan oleh KDE. Okular bekerja pada banyak platform, termasuk tetapi tidak terbatas pada Linux, Windows, Mac OS X, *BSD, dll.</p>
     <p xml:lang="it">Okular è un lettore universale di documenti sviluppato da KDE. Okular funziona su varie piattaforme, incluse (ma non solo) Linux, Windows, Mac OS X, *BSD, ecc.</p>
     <p xml:lang="ko">Okular는 만능 문서 뷰어입니다. Okular는 리눅스, macOS, Windows, *BSD 등 여러 플랫폼에서 동작합니다.</p>
     <p xml:lang="nl">Okular is een universele documentviewer ontwikkeld door KDE. Okular werkt op meerdere platforms, inclusief, maar niet beperkt tot Linux, Windows, Mac OS X, *BSD, etc.</p>
     <p xml:lang="nn">Okular er ein dokumentvisar for mange ulike filformat, og er utvikla av KDE. Okular køyrer på fleire plattformer, blant anna Linux, Windows, Mac OS X og *BSD.</p>
     <p xml:lang="pl">Okular jest wszechstronną przeglądarką dokumentów opracowaną przez KDE. Okular działa na wielu platformach takich jak Linux, Windows, Mac OS X, *BSD, itp.</p>
     <p xml:lang="pt">O Okular é um visualizador universal de documentos desenvolvido pelo KDE. O Okular funciona em diversas plataformas, incluindo mas não se limitando ao Linux, Windows, Mac OS X, *BSD, etc.</p>
+    <p xml:lang="pt-BR">O Okular é um visualizador de documentos universal desenvolvido pelo KDE. Ele funciona em várias plataformas, incluindo, mas não se limitando, o Linux, Windows, Mac OS X, *BSD, etc.</p>
     <p xml:lang="ru">Okular — универсальная программа просмотра документов от KDE. Okular работает на многих платформах: Linux, Windows, Mac OS X, *BSD и других.</p>
     <p xml:lang="sk">Okular je univerzálny prehliadač dokumentov vyvinutý v KDE. Okular beží na mnohých platformách, vrátane Linux, Windows, Mac OS X, *BSD, atď.</p>
     <p xml:lang="sl">Okular je univerzalni pregledovalnik dokumentov, ki so ga razvili pri KDE. Dela v več okoljih vključno s sistemi Linux, Windows, Mac OS X in *BSD.</p>
@@ -105,7 +109,6 @@
     <p xml:lang="zh-CN">Okular 是由 KDE 开发的通用文档查看器。Okular 可在多个平台上运行，包括但不是限于 Linux，Windows，Mac OS X，* BSD，等。</p>
     <p xml:lang="zh-TW">Okular 是一個由 KDE 開發的通用文件檢視器。Okular 可以在多種平臺上運作，包含但不限於 Linux, Windows, Mac OS X, *BSD 等等。</p>
     <p>Features:</p>
-    <p xml:lang="ast">Carauterístiques:</p>
     <p xml:lang="ca">Característiques:</p>
     <p xml:lang="ca-valencia">Característiques:</p>
     <p xml:lang="cs">Vlastnosti:</p>
@@ -114,17 +117,19 @@
     <p xml:lang="en-GB">Features:</p>
     <p xml:lang="es">Funciones:</p>
     <p xml:lang="et">Omadused:</p>
+    <p xml:lang="eu">Eginbideak:</p>
     <p xml:lang="fi">Ominaisuuksia:</p>
     <p xml:lang="fr">Fonctionnalités :</p>
     <p xml:lang="gl">Funcionalidades:</p>
     <p xml:lang="ia">Characteristicas:</p>
+    <p xml:lang="id">Fitur:</p>
     <p xml:lang="it">Funzionalità:</p>
     <p xml:lang="ko">기능:</p>
     <p xml:lang="nl">Kenmerken:</p>
     <p xml:lang="nn">Funksjonar:</p>
     <p xml:lang="pl">Możliwości:</p>
     <p xml:lang="pt">Funcionalidades:</p>
-    <p xml:lang="pt-BR">Recursos:</p>
+    <p xml:lang="pt-BR">Funcionalidades:</p>
     <p xml:lang="ru">Возможности:</p>
     <p xml:lang="sk">Funkcie:</p>
     <p xml:lang="sl">Zmožnosti:</p>
@@ -140,7 +145,6 @@
     <p xml:lang="zh-TW">功能：</p>
     <ul>
       <li>Supported Formats: PDF, PS, Tiff, CHM, DjVu, Images, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
-      <li xml:lang="ast">Formatos sofitaos: PDF, PS, Tiff, CHM, DjVU, imáxenes, DVI, XPS, ODT, FictionBook, cómics, Pluker, Epub y Fax</li>
       <li xml:lang="ca">Formats acceptats: PDF, PS, Tiff, CHM, DjVu, imatges, DVI, XPS, ODT, Fiction Book, llibres de còmic, Plucker, EPub, Fax</li>
       <li xml:lang="ca-valencia">Formats acceptats: PDF, PS, Tiff, CHM, DjVu, imatges, DVI, XPS, ODT, Fiction Book, llibres de còmic, Plucker, EPub, Fax</li>
       <li xml:lang="cs">Podporované formáty: PDF, PS, Tiff, CHM, DjVu, obrázky, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
@@ -149,16 +153,18 @@
       <li xml:lang="en-GB">Supported Formats: PDF, PS, Tiff, CHM, DjVu, Images, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
       <li xml:lang="es">Formatos permitidos: PDF, PS, Tiff, CHM, DjVu, imágenes, DVI, XPS, ODT, Fiction Book, libros de cómics, Plucker, EPub, Fax</li>
       <li xml:lang="et">Toetatud vormingud: PDF, PS, Tiff, CHM, DjVu, pildid, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, faks</li>
+      <li xml:lang="eu">Onartutako formatuak: PDF, PS, Tiff, CHM, DjVu, irudiak, DVI, XPS, ODT,  FictionBook, Comic Book, Plucker, EPub, Fax</li>
       <li xml:lang="fi">Tuetut tiedostomuodot: PDF, PS, TIFF, CHM, DjVu, kuvatiedostot, DVI, XPS, ODT, FictionBook, sarjakuvakirjat, Plucker, EPub, faksit</li>
       <li xml:lang="fr">Formats de fichiers gérés : PDF, PS, Tiff, CHM, DjVu, Images, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
       <li xml:lang="gl">Formatos compatíbeis: PDF, PS, Tiff, CHM, DjVu, imaxes, DVI, XPS, ODT, FictionBook, banda deseñada, Plucker, EPub e fax.</li>
+      <li xml:lang="id">Format Yang Didukung: PDF, PS, Tiff, CHM, DjVu, Images, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
       <li xml:lang="it">Formati supportati: PDF, PS, Tiff, CHM, DjVu, immagini, DVI, XPS, ODT, Fiction Book, fumetti, Plucker, EPub, Fax</li>
       <li xml:lang="ko">지원하는 형식: PDF, PS, Tiff, CHM, DjVu, 사진, DVI, XPS, ODT, Fiction Book, 만화책, Plucker, EPub, 팩스</li>
       <li xml:lang="nl">Ondersteunde formaten: PDF, PS, Tiff, CHM, DjVu, Afbeeldingen, DVI, XPS, ODT, Fictie boek, Stripboek, Plucker, EPub, Fax</li>
       <li xml:lang="nn">Støtta format: PDF, PS, Tiff, CHM, DjVu, bilete, DVI, XPS, ODT, e-bøker, teikneseriar, Plucker, EPub, Fax</li>
       <li xml:lang="pl">Obsługa formatów: PDF, PS, Tiff, CHM, DjVu, Obrazy, DVI, XPS, ODT, Fikcja, Komiksy, Plucker, EPub, Fax</li>
       <li xml:lang="pt">Formatos Suportados: PDF, PS, Tiff, CHM, DjVu, Imagens, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
-      <li xml:lang="pt-BR">Formatos suportados: PDF, PS, Tiff, CHM, DjVu, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, fax, imagens</li>
+      <li xml:lang="pt-BR">Suporte aos formatos: PDF, PS, TIFF, CHM, DjVu, imagens, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
       <li xml:lang="ru">Поддержка форматов PDF, PS, Tiff, CHM, DjVu, изображений, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, факсов;</li>
       <li xml:lang="sk">Podporované formáty: PDF, PS, Tiff, CHM, DjVu, Images, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
       <li xml:lang="sl">Podprte vrste: PDF, PS, Tiff, CHM, DjVu, slike, DVI, XPS, ODT, Fiction Book, stripi, Plucker, EPub, faks</li>
@@ -173,7 +179,6 @@
       <li xml:lang="zh-CN">支持的格式︰ PDF，PS，Tiff，CHM，DjVu，图片，DVI，XPS，ODT，FictionBook，漫画书，Plucker，EPub，传真</li>
       <li xml:lang="zh-TW">支援的檔案格式：PDF, PS, Tiff, CHM, DjVu, Images, DVI, XPS, ODT, Fiction Book, Comic Book, Plucker, EPub, Fax</li>
       <li>Sidebar with contents, thumbnails, reviews and bookmarks</li>
-      <li xml:lang="ast">Barra llateral colos conteníos, miniatures, reseñes y marcadores</li>
       <li xml:lang="ca">Barra lateral amb el contingut, miniatures, revisions i punts</li>
       <li xml:lang="ca-valencia">Barra lateral amb el contingut, miniatures, revisions i punts</li>
       <li xml:lang="de">Seitenleiste mit Inhalten, Vorschauen und Lesezeichen</li>
@@ -181,15 +186,18 @@
       <li xml:lang="en-GB">Sidebar with contents, thumbnails, reviews and bookmarks</li>
       <li xml:lang="es">Barra lateral con contenido, miniaturas, revisiones y marcadores</li>
       <li xml:lang="et">Külgriba sisukorra, pisipiltide, annotatsioonide ja järjehoidjatega</li>
+      <li xml:lang="eu">Alboko-barra edukiekin, koadro-txikiekin, iritziekin eta laster-markekin</li>
       <li xml:lang="fi">Sivupaneeli, jossa sisältö, pienoiskuvat, tarkastelut ja kirjanmerkit</li>
       <li xml:lang="fr">Barre latérale montrant les contenus, miniatures, informations de relecture et signets</li>
       <li xml:lang="gl">Barra lateral con contido, miniaturas, revisións e marcadores.</li>
+      <li xml:lang="id">Bilah sisi dengan konten, thumbnail, ulasan, dan markah</li>
       <li xml:lang="it">Barra laterale con contenuti, miniature, revisioni e segnalibri</li>
       <li xml:lang="ko">목차, 책갈피, 미리 보기, 주석이 있는 사이드바</li>
       <li xml:lang="nl">Zijbalk met inhoud, miniaturen, reviews en bladwijzers</li>
       <li xml:lang="nn">Sidestolpe med innhaldsliste, miniatyrbilete, omtalar og bokmerke</li>
       <li xml:lang="pl">Pasek boczny z treścią, miniaturami, recenzją i zakładkami</li>
       <li xml:lang="pt">Barra lateral com o conteúdo, miniaturas, revisões e marcação de favoritos</li>
+      <li xml:lang="pt-BR">Barra lateral com o conteúdo, miniaturas, revisões e favoritos</li>
       <li xml:lang="ru">Боковая панель с содержанием, миниатюрами страниц, комментариями и закладками;</li>
       <li xml:lang="sk">Posuvník s obsahom, miniatúrami, revíziami a záložkami</li>
       <li xml:lang="sl">Stranska vrstica z vsebino, sličicami, ocenami in zaznamki</li>
@@ -204,7 +212,6 @@
       <li xml:lang="zh-CN">目录，缩略图，批注和书签侧边栏</li>
       <li xml:lang="zh-TW">有內容、縮圖、回顧與書籤等選項的側邊欄</li>
       <li>Annotations support</li>
-      <li xml:lang="ast">Sofitu d'anotaciones</li>
       <li xml:lang="ca">Admet anotacions</li>
       <li xml:lang="ca-valencia">Admet anotacions</li>
       <li xml:lang="de">Unterstützung für Anmerkungen</li>
@@ -212,16 +219,18 @@
       <li xml:lang="en-GB">Annotations support</li>
       <li xml:lang="es">Permite el uso de notas</li>
       <li xml:lang="et">Annotatsioonide toetus</li>
+      <li xml:lang="eu">Idatzoharrak onartzen ditu</li>
       <li xml:lang="fi">Merkintöjen tuki</li>
       <li xml:lang="fr">Gestion des annotations</li>
       <li xml:lang="gl">Funcionalidade de anotacións.</li>
+      <li xml:lang="id">Dukungan anotasi</li>
       <li xml:lang="it">Supporto per le annotazioni</li>
       <li xml:lang="ko">주석 지원</li>
       <li xml:lang="nl">Ondersteuning van annotaties</li>
       <li xml:lang="nn">Støtte for merknadar</li>
       <li xml:lang="pl">Obsługa przypisów</li>
       <li xml:lang="pt">Suporte para anotações</li>
-      <li xml:lang="pt-BR">Suporte à anotações</li>
+      <li xml:lang="pt-BR">Suporte a anotações</li>
       <li xml:lang="ru">Поддержка комментариев.</li>
       <li xml:lang="sk">Podpora anotácií</li>
       <li xml:lang="sl">Podpora zabeležkam</li>
@@ -239,11 +248,33 @@
   </description>
   <screenshots>
     <screenshot type="default">
+      <caption>Reading manual in Okular</caption>
+      <caption xml:lang="ca">Lectura de manuals a l'Okular</caption>
+      <caption xml:lang="ca-valencia">Lectura de manuals a l'Okular</caption>
+      <caption xml:lang="de">Lesen eines Handbuchs in Okular</caption>
+      <caption xml:lang="en-GB">Reading manual in Okular</caption>
+      <caption xml:lang="es">Lectura del manual en Okular</caption>
+      <caption xml:lang="fr">Lecture d'un manuel dans Okular</caption>
+      <caption xml:lang="gl">Ler o manual en Okular</caption>
+      <caption xml:lang="id">Membaca manual di Okular</caption>
+      <caption xml:lang="it">Consultazione di un manuale in Okular</caption>
+      <caption xml:lang="nl">Handleiding wordt gelezen in Okular</caption>
+      <caption xml:lang="nn">Lesing av brukarhandbok i Okular</caption>
+      <caption xml:lang="pl">Instrukcja czytania w Okular</caption>
+      <caption xml:lang="pt">Leitura de manual no Okular</caption>
+      <caption xml:lang="pt-BR">Lendo manual no Okular</caption>
+      <caption xml:lang="ru">Документ, открытый в Okular</caption>
+      <caption xml:lang="sv">Läsa handbok i Okular</caption>
+      <caption xml:lang="uk">Читання підручника в Okular</caption>
+      <caption xml:lang="x-test">xxReading manual in Okularxx</caption>
+      <caption xml:lang="zh-CN">在 Okular 中阅读手册</caption>
+      <caption xml:lang="zh-TW">在 Okular 中閱讀文件</caption>
       <image>https://www.kde.org/images/screenshots/okular.png</image>
     </screenshot>
   </screenshots>
   <url type="homepage">https://okular.kde.org/</url>
   <url type="bugtracker">https://bugs.kde.org/enter_bug.cgi?format=guided&amp;product=okular</url>
+  <url type="donation">https://www.kde.org/community/donations/?app=okular&amp;source=appdata</url>
   <project_group>KDE</project_group>
   <provides>
     <binary>okular</binary>

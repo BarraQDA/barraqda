@@ -14,9 +14,8 @@
 #include <QUrl>
 #include <QVariant>
 #include <QImage>
-#include <QUrl>
 #include <epub.h>
-#include <QtCore/qloggingcategory.h>
+#include <QLoggingCategory>
 
 namespace Epub {
 
@@ -25,7 +24,7 @@ namespace Epub {
     Q_OBJECT
 
   public:
-    EpubDocument(const QString &fileName);
+    explicit EpubDocument(const QString &fileName);
     bool isValid();
     ~EpubDocument();
     struct epub *getEpub();

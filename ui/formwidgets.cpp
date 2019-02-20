@@ -3,6 +3,7 @@
  *   Copyright (C) 2017    Klarälvdalens Datakonsult AB, a KDAB Group      *
  *                         company, info@kdab.com. Work sponsored by the   *
  *                         LiMux project of the city of Munich             *
+ *   Copyright (C) 2018    Intevation GmbH <intevation@intevation.de>      *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -70,6 +71,10 @@ FormWidgetsController::FormWidgetsController( Okular::Document *doc )
              this, &FormWidgetsController::canUndoChanged );
     connect( doc, &Okular::Document::canRedoChanged,
              this, &FormWidgetsController::canRedoChanged );
+
+    // Connect the generic formWidget refresh signal
+    connect( doc, &Okular::Document::refreshFormWidget,
+             this, &FormWidgetsController::refreshFormWidget );
 }
 
 FormWidgetsController::~FormWidgetsController()
@@ -150,7 +155,8 @@ bool FormWidgetsController::canRedo()
 void FormWidgetsController::slotButtonClicked( QAbstractButton *button )
 {
     int pageNumber = -1;
-    if ( CheckBoxEdit *check = qobject_cast< CheckBoxEdit * >( button ) )
+    CheckBoxEdit *check = qobject_cast< CheckBoxEdit * >( button );
+    if ( check )
     {
         // Checkboxes need to be uncheckable so if clicking a checked one
         // disable the exclusive status temporarily and uncheck it
@@ -182,6 +188,13 @@ void FormWidgetsController::slotButtonClicked( QAbstractButton *button )
     }
     if (checked != prevChecked)
         emit formButtonsChangedByWidget( pageNumber, formButtons, checked );
+    if ( check )
+    {
+        // The formButtonsChangedByWidget signal changes the value of the underlying
+        // Okular::FormField of the checkbox. We need to execute the activiation
+        // action after this.
+        check->doActivateAction();
+    }
 }
 
 void FormWidgetsController::slotFormButtonsChangedByUndoRedo( int pageNumber, const QList< Okular::FormFieldButton* > & formButtons)
@@ -190,6 +203,11 @@ void FormWidgetsController::slotFormButtonsChangedByUndoRedo( int pageNumber, co
     {
         int id = formButton->id();
         QAbstractButton* button = m_buttons[id];
+        CheckBoxEdit *check = qobject_cast< CheckBoxEdit * >( button );
+        if ( check )
+        {
+            emit refreshFormWidget( check->formField() );
+        }
         // temporarily disable exclusiveness of the button group
         // since it breaks doing/redoing steps into which all the checkboxes
         // are unchecked
@@ -206,9 +224,6 @@ void FormWidgetsController::slotFormButtonsChangedByUndoRedo( int pageNumber, co
 FormWidgetIface * FormWidgetFactory::createWidget( Okular::FormField * ff, QWidget * parent )
 {
     FormWidgetIface * widget = nullptr;
-
-    if (ff->isReadOnly())
-        return nullptr;
 
     switch ( ff->type() )
     {
@@ -263,15 +278,17 @@ FormWidgetIface * FormWidgetFactory::createWidget( Okular::FormField * ff, QWidg
         }
         default: ;
     }
+
+    if ( ff->isReadOnly() )
+        widget->setVisibility( false );
+
     return widget;
 }
 
 
-FormWidgetIface::FormWidgetIface( QWidget * w, Okular::FormField * ff, bool canBeEnabled )
-    : m_controller( nullptr ), m_ff( ff ), m_widget( w ), m_pageItem( nullptr ),
-      m_canBeEnabled( canBeEnabled )
+FormWidgetIface::FormWidgetIface( QWidget * w, Okular::FormField * ff )
+    : m_controller( nullptr ), m_ff( ff ), m_widget( w ), m_pageItem( nullptr )
 {
-    m_widget->setEnabled( m_canBeEnabled );
 }
 
 FormWidgetIface::~FormWidgetIface()
@@ -304,7 +321,7 @@ bool FormWidgetIface::setVisibility( bool visible )
 
 void FormWidgetIface::setCanBeFilled( bool fill )
 {
-    m_widget->setEnabled( fill && m_canBeEnabled );
+    m_widget->setEnabled( fill );
 }
 
 void FormWidgetIface::setPageItem( PageViewItem *pageItem )
@@ -330,28 +347,36 @@ PageViewItem* FormWidgetIface::pageItem() const
 void FormWidgetIface::setFormWidgetsController( FormWidgetsController *controller )
 {
     m_controller = controller;
+    QObject *obj = dynamic_cast< QObject * > ( this );
+    QObject::connect( m_controller, &FormWidgetsController::refreshFormWidget, obj,
+                      [this] ( Okular::FormField *form ) {
+                          slotRefresh ( form );
+                      });
+}
+
+void FormWidgetIface::slotRefresh( Okular::FormField * form )
+{
+    if ( m_ff != form )
+    {
+        return;
+    }
+    setVisibility( form->isVisible() && !form->isReadOnly() );
+
+    m_widget->setEnabled( !form->isReadOnly() );
 }
 
 
 PushButtonEdit::PushButtonEdit( Okular::FormFieldButton * button, QWidget * parent )
-    : QPushButton( parent ), FormWidgetIface( this, button, !button->isReadOnly() )
+    : QPushButton( parent ), FormWidgetIface( this, button )
 {
     setText( button->caption() );
     setVisible( button->isVisible() );
     setCursor( Qt::ArrowCursor );
-
-    connect( this, &QAbstractButton::clicked, this, &PushButtonEdit::slotClicked );
-}
-
-void PushButtonEdit::slotClicked()
-{
-    if ( m_ff->activationAction() )
-        m_controller->signalAction( m_ff->activationAction() );
 }
 
 
 CheckBoxEdit::CheckBoxEdit( Okular::FormFieldButton * button, QWidget * parent )
-    : QCheckBox( parent ), FormWidgetIface( this, button, !button->isReadOnly() )
+    : QCheckBox( parent ), FormWidgetIface( this, button )
 {
     setText( button->caption() );
 
@@ -365,19 +390,36 @@ void CheckBoxEdit::setFormWidgetsController( FormWidgetsController *controller )
     FormWidgetIface::setFormWidgetsController( controller );
     m_controller->registerRadioButton( this, form );
     setChecked( form->state() );
-    connect( this, &QCheckBox::stateChanged, this, &CheckBoxEdit::slotStateChanged );
 }
 
-void CheckBoxEdit::slotStateChanged( int state )
+void CheckBoxEdit::doActivateAction()
 {
     Okular::FormFieldButton *form = static_cast<Okular::FormFieldButton *>(m_ff);
-    if ( state == Qt::Checked && form->activationAction() )
+    if ( form->activationAction() )
         m_controller->signalAction( form->activationAction() );
+}
+
+void CheckBoxEdit::slotRefresh( Okular::FormField * form )
+{
+    if ( form != m_ff )
+    {
+        return;
+    }
+    FormWidgetIface::slotRefresh( form );
+
+    Okular::FormFieldButton *button = static_cast<Okular::FormFieldButton *>(m_ff);
+    bool oldState = isChecked();
+    bool newState = button->state();
+    if ( oldState != newState )
+    {
+        setChecked( button->state() );
+        doActivateAction();
+    }
 }
 
 
 RadioButtonEdit::RadioButtonEdit( Okular::FormFieldButton * button, QWidget * parent )
-    : QRadioButton( parent ), FormWidgetIface( this, button, !button->isReadOnly() )
+    : QRadioButton( parent ), FormWidgetIface( this, button )
 {
     setText( button->caption() );
 
@@ -395,7 +437,7 @@ void RadioButtonEdit::setFormWidgetsController( FormWidgetsController *controlle
 
 
 FormLineEdit::FormLineEdit( Okular::FormFieldText * text, QWidget * parent )
-    : QLineEdit( parent ), FormWidgetIface( this, text, true )
+    : QLineEdit( parent ), FormWidgetIface( this, text )
 {
     int maxlen = text->maximumLength();
     if ( maxlen >= 0 )
@@ -515,8 +557,20 @@ void FormLineEdit::slotHandleTextChangedByUndoRedo( int pageNumber,
     setFocus();
 }
 
+void FormLineEdit::slotRefresh( Okular::FormField *form )
+{
+    if (form != m_ff)
+    {
+        return;
+    }
+    FormWidgetIface::slotRefresh( form );
+
+    Okular::FormFieldText *text = static_cast<Okular::FormFieldText *> ( form );
+    setText( text->text() );
+}
+
 TextAreaEdit::TextAreaEdit( Okular::FormFieldText * text, QWidget * parent )
-: KTextEdit( parent ), FormWidgetIface( this, text, true )
+: KTextEdit( parent ), FormWidgetIface( this, text )
 {
     setAcceptRichText( text->isRichText() );
     setCheckSpellingEnabled( text->canBeSpellChecked() );
@@ -531,6 +585,14 @@ TextAreaEdit::TextAreaEdit( Okular::FormFieldText * text, QWidget * parent )
     m_prevCursorPos = textCursor().position();
     m_prevAnchorPos = textCursor().anchor();
     setVisible( text->isVisible() );
+}
+
+TextAreaEdit::~TextAreaEdit()
+{
+    // We need this because otherwise on destruction we destruct the syntax highlighter
+    // that ends up calling text changed but then we go to slotChanged and we're already
+    // half destructed and all is bad
+    disconnect( this, &QTextEdit::textChanged, this, &TextAreaEdit::slotChanged );
 }
 
 bool TextAreaEdit::event( QEvent* e )
@@ -623,9 +685,20 @@ void TextAreaEdit::slotChanged()
     m_prevAnchorPos = textCursor().anchor();
 }
 
+void TextAreaEdit::slotRefresh( Okular::FormField *form )
+{
+    if (form != m_ff)
+    {
+        return;
+    }
+    FormWidgetIface::slotRefresh( form );
+
+    Okular::FormFieldText *text = static_cast<Okular::FormFieldText *> ( form );
+    setPlainText( text->text() );
+}
 
 FileEdit::FileEdit( Okular::FormFieldText * text, QWidget * parent )
-    : KUrlRequester( parent ), FormWidgetIface( this, text, !text->isReadOnly() )
+    : KUrlRequester( parent ), FormWidgetIface( this, text )
 {
     setMode( KFile::File | KFile::ExistingOnly | KFile::LocalOnly );
     setFilter( i18n( "*|All Files" ) );
@@ -751,7 +824,7 @@ void FileEdit::slotHandleFileChangedByUndoRedo( int pageNumber,
 }
 
 ListEdit::ListEdit( Okular::FormFieldChoice * choice, QWidget * parent )
-    : QListWidget( parent ), FormWidgetIface( this, choice, !choice->isReadOnly() )
+    : QListWidget( parent ), FormWidgetIface( this, choice )
 {
     addItems( choice->choices() );
     setSelectionMode( choice->multiSelect() ? QAbstractItemView::ExtendedSelection : QAbstractItemView::SingleSelection );
@@ -821,7 +894,7 @@ void ListEdit::slotHandleFormListChangedByUndoRedo( int pageNumber,
 }
 
 ComboEdit::ComboEdit( Okular::FormFieldChoice * choice, QWidget * parent )
-    : QComboBox( parent ), FormWidgetIface( this, choice, !choice->isReadOnly() )
+    : QComboBox( parent ), FormWidgetIface( this, choice )
 {
     addItems( choice->choices() );
     setEditable( true );
@@ -978,5 +1051,93 @@ bool ComboEdit::event( QEvent* e )
     }
     return QComboBox::event( e );
 }
+
+// Code for additional action handling.
+// Challenge: Change preprocessor magic to C++ magic!
+//
+// The mouseRelease event is special because the PDF spec
+// says that the activation action takes precedence over this.
+// So the mouse release action is only signaled if no activation
+// action exists.
+//
+// For checkboxes the activation action is not triggered as
+// they are still triggered from the clicked signal and additionally
+// when the checked state changes.
+
+#define DEFINE_ADDITIONAL_ACTIONS(FormClass, BaseClass) \
+    void FormClass::mousePressEvent( QMouseEvent *event ) \
+    { \
+        Okular::Action *act = m_ff->additionalAction( Okular::Annotation::MousePressed ); \
+        if ( act ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        BaseClass::mousePressEvent( event ); \
+    } \
+    void FormClass::mouseReleaseEvent( QMouseEvent *event ) \
+    { \
+        if ( !QWidget::rect().contains( event->localPos().toPoint() ) ) \
+        { \
+            BaseClass::mouseReleaseEvent( event ); \
+            return; \
+        } \
+        Okular::Action *act = m_ff->activationAction(); \
+        if ( act && !qobject_cast< CheckBoxEdit* > ( this ) ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        else if ( ( act = m_ff->additionalAction( Okular::Annotation::MouseReleased ) ) ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        BaseClass::mouseReleaseEvent( event ); \
+    } \
+    void FormClass::focusInEvent( QFocusEvent *event ) \
+    { \
+        Okular::Action *act = m_ff->additionalAction( Okular::Annotation::FocusIn ); \
+        if ( act ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        BaseClass::focusInEvent( event ); \
+    } \
+    void FormClass::focusOutEvent( QFocusEvent *event ) \
+    { \
+        Okular::Action *act = m_ff->additionalAction( Okular::Annotation::FocusOut ); \
+        if ( act ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        BaseClass::focusOutEvent( event ); \
+    } \
+    void FormClass::leaveEvent( QEvent *event ) \
+    { \
+        Okular::Action *act = m_ff->additionalAction( Okular::Annotation::CursorLeaving ); \
+        if ( act ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        BaseClass::leaveEvent( event ); \
+    } \
+    void FormClass::enterEvent( QEvent *event ) \
+    { \
+        Okular::Action *act = m_ff->additionalAction( Okular::Annotation::CursorEntering ); \
+        if ( act ) \
+        { \
+            m_controller->signalAction( act ); \
+        } \
+        BaseClass::enterEvent( event ); \
+    }
+
+DEFINE_ADDITIONAL_ACTIONS( PushButtonEdit, QPushButton )
+DEFINE_ADDITIONAL_ACTIONS( CheckBoxEdit, QCheckBox )
+DEFINE_ADDITIONAL_ACTIONS( RadioButtonEdit, QRadioButton )
+DEFINE_ADDITIONAL_ACTIONS( FormLineEdit, QLineEdit )
+DEFINE_ADDITIONAL_ACTIONS( TextAreaEdit, KTextEdit )
+DEFINE_ADDITIONAL_ACTIONS( FileEdit, KUrlRequester )
+DEFINE_ADDITIONAL_ACTIONS( ListEdit, QListWidget )
+DEFINE_ADDITIONAL_ACTIONS( ComboEdit, QComboBox )
+
+#undef DEFINE_ADDITIONAL_ACTIONS
 
 #include "moc_formwidgets.cpp"

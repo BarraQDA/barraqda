@@ -10,7 +10,7 @@
 #include "pageviewannotator.h"
 
 // qt / kde includes
-#include <QtCore/qloggingcategory.h>
+#include <qloggingcategory.h>
 #include <qapplication.h>
 #include <qfile.h>
 #include <qcolor.h>
@@ -24,11 +24,12 @@
 #include <KLocalizedString>
 
 #include <kuser.h>
-#include <QtCore/QDebug>
+#include <QDebug>
 #include <qmenu.h>
 
 // system includes
 #include <math.h>
+#include <memory>
 #include <QStandardPaths>
 
 // local includes
@@ -47,7 +48,7 @@ class PickPointEngine : public AnnotatorEngine
 {
     public:
         PickPointEngine( const QDomElement & engineElement )
-            : AnnotatorEngine( engineElement ), clicked( false ), pixmap( nullptr ),
+            : AnnotatorEngine( engineElement ), clicked( false ),
               xscale( 1.0 ), yscale( 1.0 )
         {
             // parse engine specific attributes
@@ -64,12 +65,7 @@ class PickPointEngine : public AnnotatorEngine
 
             // create engine objects
             if ( !hoverIconName.simplified().isEmpty() )
-                pixmap = new QPixmap( GuiUtils::loadStamp( hoverIconName, QSize( size, size ) ) );
-        }
-
-        ~PickPointEngine() override
-        {
-            delete pixmap;
+                pixmap = GuiUtils::loadStamp( hoverIconName, QSize( size, size ) );
         }
 
         QRect event( EventType type, Button button, double nX, double nY, double xScale, double yScale, const Okular::Page * page ) override
@@ -140,9 +136,55 @@ class PickPointEngine : public AnnotatorEngine
                     painter->drawRect( realrect );
                     painter->setPen( origpen );
                 }
-                if ( pixmap )
-                    painter->drawPixmap( QPointF( rect.left * xScale, rect.top * yScale ), *pixmap );
+                if ( !pixmap.isNull() )
+                    painter->drawPixmap( QPointF( rect.left * xScale, rect.top * yScale ), pixmap );
             }
+        }
+
+        void addInPlaceTextAnnotation( Okular::Annotation * &ann, const QString summary, const QString content, Okular::TextAnnotation::InplaceIntent inplaceIntent )
+        {
+            Okular::TextAnnotation * ta = new Okular::TextAnnotation();
+            ann = ta;
+            ta->setFlags( ta->flags() | Okular::Annotation::FixedRotation );
+            ta->setContents( content );
+            ta->setTextType( Okular::TextAnnotation::InPlace );
+            ta->setInplaceIntent( inplaceIntent );
+            //set alignment
+            if ( m_annotElement.hasAttribute( QStringLiteral("align") ) )
+                ta->setInplaceAlignment( m_annotElement.attribute( QStringLiteral("align") ).toInt() );
+            //set font
+            if ( m_annotElement.hasAttribute( QStringLiteral("font") ) )
+            {
+                QFont f;
+                f.fromString( m_annotElement.attribute( QStringLiteral("font") ) );
+                ta->setTextFont( f );
+            }
+            // set font color
+            if ( m_annotElement.hasAttribute( QStringLiteral("textColor") ) )
+            {
+                if ( inplaceIntent == Okular::TextAnnotation::TypeWriter )
+                    ta->setTextColor( m_annotElement.attribute( QStringLiteral("textColor") ) );
+                else
+                    ta->setTextColor( Qt::black );
+            }
+            //set width
+            if ( m_annotElement.hasAttribute( QStringLiteral ( "width" ) ) )
+            {
+                ta->style().setWidth( m_annotElement.attribute( QStringLiteral ( "width" ) ).toDouble() );
+            }
+            //set boundary
+            rect.left = qMin(startpoint.x,point.x);
+            rect.top = qMin(startpoint.y,point.y);
+            rect.right = qMax(startpoint.x,point.x);
+            rect.bottom = qMax(startpoint.y,point.y);
+            qCDebug(OkularUiDebug).nospace() << "xyScale=" << xscale << "," << yscale;
+            static const int padding = 2;
+            const QFontMetricsF mf(ta->textFont());
+            const QRectF rcf = mf.boundingRect( Okular::NormalizedRect( rect.left, rect.top, 1.0, 1.0 ).geometry( (int)pagewidth, (int)pageheight ).adjusted( padding, padding, -padding, -padding ),
+                                          Qt::AlignTop | Qt::AlignLeft | Qt::TextWordWrap, ta->contents() );
+            rect.right = qMax(rect.right, rect.left+(rcf.width()+padding*2)/pagewidth);
+            rect.bottom = qMax(rect.bottom, rect.top+(rcf.height()+padding*2)/pageheight);
+            ta->window().setSummary( summary );
         }
 
         QList< Okular::Annotation* > end() override
@@ -158,52 +200,22 @@ class PickPointEngine : public AnnotatorEngine
             // find out annotation's type
             Okular::Annotation * ann = nullptr;
             const QString typeString = m_annotElement.attribute( QStringLiteral("type") );
-            // create TextAnnotation from path
-            if ( typeString == QLatin1String("FreeText"))	//<annotation type="Text"
+            // create InPlace TextAnnotation from path
+            if ( typeString == QLatin1String("FreeText") )
             {
-                //note dialog
-                const QString prompt = i18n( "Text of the new note:" );
                 bool resok;
-                const QString note = QInputDialog::getMultiLineText(nullptr, i18n( "New Text Note" ), prompt, QString(), &resok);
-                if(resok)
-                {
-                    //add note
-                    Okular::TextAnnotation * ta = new Okular::TextAnnotation();
-                    ann = ta;
-                    ta->setFlags( ta->flags() | Okular::Annotation::FixedRotation );
-                    ta->setContents( note );
-                    ta->setTextType( Okular::TextAnnotation::InPlace );
-                    //set alignment
-                    if ( m_annotElement.hasAttribute( QStringLiteral("align") ) )
-                        ta->setInplaceAlignment( m_annotElement.attribute( QStringLiteral("align") ).toInt() );
-                    //set font
-                    if ( m_annotElement.hasAttribute( QStringLiteral("font") ) )
-                    {
-                        QFont f;
-                        f.fromString( m_annotElement.attribute( QStringLiteral("font") ) );
-                        ta->setTextFont( f );
-                    }
-                    //set width
-                    if ( m_annotElement.hasAttribute( QStringLiteral ( "width" ) ) )
-                    {
-                        ta->style().setWidth( m_annotElement.attribute( QStringLiteral ( "width" ) ).toDouble() );
-                    }
-                    //set boundary
-                    rect.left = qMin(startpoint.x,point.x);
-                    rect.top = qMin(startpoint.y,point.y);
-                    rect.right = qMax(startpoint.x,point.x);
-                    rect.bottom = qMax(startpoint.y,point.y);
-                    qCDebug(OkularUiDebug).nospace() << "xyScale=" << xscale << "," << yscale;
-                    static const int padding = 2;
-                    const QFontMetricsF mf(ta->textFont());
-                    const QRectF rcf = mf.boundingRect( Okular::NormalizedRect( rect.left, rect.top, 1.0, 1.0 ).geometry( (int)pagewidth, (int)pageheight ).adjusted( padding, padding, -padding, -padding ),
-                                                  Qt::AlignTop | Qt::AlignLeft | Qt::TextWordWrap, ta->contents() );
-                    rect.right = qMax(rect.right, rect.left+(rcf.width()+padding*2)/pagewidth);
-                    rect.bottom = qMax(rect.bottom, rect.top+(rcf.height()+padding*2)/pageheight);
-                    ta->window().setSummary( i18n( "Inline Note" ) );
-                }
+                const QString content = QInputDialog::getMultiLineText(nullptr, i18n( "New Text Note" ), i18n( "Text of the new note:" ), QString(), &resok);
+                if( resok )
+                    addInPlaceTextAnnotation( ann, i18n("Inline Note"), content, Okular::TextAnnotation::Unknown );
             }
-            else if ( typeString == QLatin1String("Text"))
+            else if ( typeString == QLatin1String("Typewriter") )
+            {
+                bool resok;
+                const QString content = QInputDialog::getMultiLineText(nullptr, i18n( "New Text Note" ), i18n( "Text of the new note:" ), QString(), &resok);
+                if( resok )
+                    addInPlaceTextAnnotation( ann, i18n("Typewriter"), content, Okular::TextAnnotation::TypeWriter );
+            }
+            else if ( typeString == QLatin1String("Text") )
             {
                 Okular::TextAnnotation * ta = new Okular::TextAnnotation();
                 ann = ta;
@@ -305,7 +317,7 @@ class PickPointEngine : public AnnotatorEngine
         Okular::NormalizedRect rect;
         Okular::NormalizedPoint startpoint;
         Okular::NormalizedPoint point;
-        QPixmap * pixmap;
+        QPixmap pixmap;
         QString hoverIconName, iconName;
         int size;
         double xscale,yscale;
@@ -490,15 +502,9 @@ class TextSelectorEngine : public AnnotatorEngine
 {
     public:
         TextSelectorEngine( const QDomElement & engineElement, PageView * pageView )
-            : AnnotatorEngine( engineElement ), m_pageView( pageView ),
-            selection( nullptr )
+            : AnnotatorEngine( engineElement ), m_pageView( pageView )
         {
             // parse engine specific attributes
-        }
-
-        ~TextSelectorEngine() override
-        {
-            delete selection;
         }
 
         QRect event( EventType type, Button button, double nX, double nY, double xScale, double yScale, const Okular::Page * /*page*/ ) override
@@ -521,9 +527,8 @@ class TextSelectorEngine : public AnnotatorEngine
                 {
                     const QPoint start( (int)( lastPoint.x * item()->uncroppedWidth() ), (int)( lastPoint.y * item()->uncroppedHeight() ) );
                     const QPoint end( (int)( nX * item()->uncroppedWidth() ), (int)( nY * item()->uncroppedHeight() ) );
-                    delete selection;
-                    selection = nullptr;
-                    Okular::RegularAreaRect * newselection = m_pageView->textSelectionForItem( item(), start, end );
+                    selection.reset();
+                    std::unique_ptr<Okular::RegularAreaRect> newselection( m_pageView->textSelectionForItem( item(), start, end ) );
                     if ( newselection && !newselection->isEmpty() )
                     {
                         const QList<QRect> geom = newselection->geometry( (int)xScale, (int)yScale );
@@ -536,11 +541,7 @@ class TextSelectorEngine : public AnnotatorEngine
                                 newrect |= r;
                         }
                         rect |= newrect;
-                        selection = newselection;
-                    }
-                    else
-                    {
-                        delete newselection;
+                        selection = std::move(newselection);
                     }
                 }
             }
@@ -621,8 +622,7 @@ class TextSelectorEngine : public AnnotatorEngine
                 ann = ha;
             }
 
-            delete selection;
-            selection = nullptr;
+            selection.reset();
 
             // safety check
             if ( !ann )
@@ -647,7 +647,7 @@ class TextSelectorEngine : public AnnotatorEngine
         // data
         PageView * m_pageView;
         // TODO: support more pages
-        Okular::RegularAreaRect * selection;
+        std::unique_ptr<Okular::RegularAreaRect> selection;
         Okular::NormalizedPoint lastPoint;
         QRect rect;
 };
@@ -1044,6 +1044,8 @@ void PageViewAnnotator::slotToolSelected( int toolID )
                 tip = i18nc( "Annotation tool", "Strike out text" );
             else if ( annotType == QLatin1String("underline") )
                 tip = i18nc( "Annotation tool", "Underline text" );
+            else if ( annotType == QLatin1String("typewriter") )
+                tip = i18nc( "Annotation tool", "Typewriter Annotation (drag to select a zone)" );
 
             if ( !tip.isEmpty() && !m_continuousMode )
                 m_pageView->displayMessage( tip, QString(), PageViewMessage::Annotation );
@@ -1105,6 +1107,8 @@ QString PageViewAnnotator::defaultToolName( const QDomElement &toolElement )
         return i18n( "Strike out" );
     else if ( annotType == QLatin1String("underline") )
         return i18n( "Underline" );
+    else if ( annotType == QLatin1String("typewriter") )
+        return i18n( "Typewriter" );
     else
         return QString();
 }
@@ -1125,7 +1129,7 @@ QPixmap PageViewAnnotator::makeToolPixmap( const QDomElement &toolElement )
     pixmap.load( QStandardPaths::locate(QStandardPaths::GenericDataLocation, QString("okular/pics/tool-base-okular" + imageVariant + ".png") ) );
 
     /* Parse color, innerColor and icon (if present) */
-    QColor engineColor, innerColor;
+    QColor engineColor, innerColor, textColor, annotColor;
     QString icon;
     QDomNodeList engineNodeList = toolElement.elementsByTagName( QStringLiteral("engine") );
     if ( engineNodeList.size() > 0 )
@@ -1138,10 +1142,17 @@ QPixmap PageViewAnnotator::makeToolPixmap( const QDomElement &toolElement )
     if ( annotationNodeList.size() > 0 )
     {
         QDomElement annotationEl = annotationNodeList.item( 0 ).toElement();
-        if ( !annotationEl.isNull() && annotationEl.hasAttribute( QStringLiteral("innerColor") ) )
-            innerColor = QColor( annotationEl.attribute( QStringLiteral("innerColor") ) );
-        if ( !annotationEl.isNull() && annotationEl.hasAttribute( QStringLiteral("icon") ) )
-            icon = annotationEl.attribute( QStringLiteral("icon") );
+        if ( !annotationEl.isNull() )
+        {
+            if ( annotationEl.hasAttribute( QStringLiteral("color") ) )
+                annotColor = annotationEl.attribute( QStringLiteral("color") );
+            if ( annotationEl.hasAttribute( QStringLiteral("innerColor") ) )
+                innerColor = QColor( annotationEl.attribute( QStringLiteral("innerColor") ) );
+            if ( annotationEl.hasAttribute( QStringLiteral("textColor") ) )
+                textColor = QColor( annotationEl.attribute( QStringLiteral("textColor") ) );
+            if ( annotationEl.hasAttribute( QStringLiteral("icon") ) )
+                icon = annotationEl.attribute( QStringLiteral("icon") );
+        }
     }
 
     QPainter p( &pixmap );
@@ -1182,7 +1193,7 @@ QPixmap PageViewAnnotator::makeToolPixmap( const QDomElement &toolElement )
     }
     else if ( annotType == QLatin1String("note-linked") )
     {
-        QImage overlay( QStandardPaths::locate(QStandardPaths::GenericDataLocation, QString("okular/pics/tool-note-okular-colorizable.png" + imageVariant + ".png") ) );
+        QImage overlay( QStandardPaths::locate(QStandardPaths::GenericDataLocation, QString("okular/pics/tool-note-okular-colorizable" + imageVariant + ".png") ) );
         GuiUtils::colorizeImage( overlay, engineColor );
         p.drawImage( QPoint(0,0), overlay );
     }
@@ -1246,6 +1257,12 @@ QPixmap PageViewAnnotator::makeToolPixmap( const QDomElement &toolElement )
         p.setPen( QPen( engineColor, 1 ) );
         p.drawLine( 1, 13, 16, 13 );
         p.drawLine( 0, 20, 19, 20 );
+    }
+    else if ( annotType == QLatin1String("typewriter") )
+    {
+        QImage overlay( QStandardPaths::locate(QStandardPaths::GenericDataLocation, QString("okular/pics/tool-typewriter-okular-colorizable" + imageVariant + ".png") ) );
+        GuiUtils::colorizeImage( overlay, textColor );
+        p.drawImage( QPoint(-2,2), overlay );
     }
     else
     {

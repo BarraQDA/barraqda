@@ -183,10 +183,10 @@ void MainShellTest::testShell_data()
     file1AndToc << QStringLiteral(KDESRCDIR "data/tocreload.pdf");
     const QString tocReload = QStringLiteral(KDESRCDIR "data/tocreload.pdf");
 
-    const QString optionsPage2 = ShellUtils::serializeOptions(false, false, false, false, QStringLiteral("2"));
-    const QString optionsPage2Presentation = ShellUtils::serializeOptions(true, false, false, false, QStringLiteral("2"));
-    const QString optionsPrint = ShellUtils::serializeOptions(false, true, false, false, QString());
-    const QString optionsUnique = ShellUtils::serializeOptions(false, false, true, false, QString());
+    const QString optionsPage2 = ShellUtils::serializeOptions(false, false, false, false, false, QStringLiteral("2"));
+    const QString optionsPage2Presentation = ShellUtils::serializeOptions(true, false, false, false, false, QStringLiteral("2"));
+    const QString optionsPrint = ShellUtils::serializeOptions(false, true, false, false, false, QString());
+    const QString optionsUnique = ShellUtils::serializeOptions(false, false, false, true, false, QString());
 
     QTest::newRow("just show shell") << QStringList() << QString() << false << QString() << 0u << false << false << false << 0u << false << false;
     QTest::newRow("open file") << file1 << QString() << false << QString() << 0u << false << false << false << 0u << false << false;
@@ -251,7 +251,6 @@ void MainShellTest::testShell()
     {
         if (useTabs)
         {
-            QSet<QString> openUrls;
             Shell *s = findShell();
             QVERIFY(s);
             Okular::Part *part = dynamic_cast<Okular::Part*>(s->m_tabs[0].part);
@@ -406,9 +405,9 @@ void MainShellTest::testFileRemembersPagePosition()
     const QStringList paths = QStringList(QStringLiteral(KDESRCDIR "data/contents.epub"));
     QString serializedOptions;
     if (mode == 1 || mode == 3)
-        serializedOptions = ShellUtils::serializeOptions(false, false, false, false, QString());
+        serializedOptions = ShellUtils::serializeOptions(false, false, false, false, false, QString());
     else
-        serializedOptions = ShellUtils::serializeOptions(false, false, true, false, QString());
+        serializedOptions = ShellUtils::serializeOptions(false, false, false, true, false, QString());
 
     Okular::Settings::self()->setShellOpenFileInTabs(mode == 3);
 
@@ -459,10 +458,10 @@ void MainShellTest::test2FilesError_data()
 {
     QTest::addColumn<QString>("serializedOptions");
 
-    QTest::newRow("startInPresentation") << ShellUtils::serializeOptions(true, false, false, false, QString());
-    QTest::newRow("showPrintDialog") << ShellUtils::serializeOptions(false, true, false, false, QString());
-    QTest::newRow("unique") << ShellUtils::serializeOptions(false, false, true, false, QString());
-    QTest::newRow("pageNumger") << ShellUtils::serializeOptions(false, false, false, false, QStringLiteral("3"));
+    QTest::newRow("startInPresentation") << ShellUtils::serializeOptions(true, false, false, false, false, QString());
+    QTest::newRow("showPrintDialog") << ShellUtils::serializeOptions(false, true, false, false, false, QString());
+    QTest::newRow("unique") << ShellUtils::serializeOptions(false, false, false, true, false, QString());
+    QTest::newRow("pageNumger") << ShellUtils::serializeOptions(false, false, false, false, false, QStringLiteral("3"));
 }
 
 void MainShellTest::test2FilesError()
@@ -474,7 +473,6 @@ void MainShellTest::test2FilesError()
     Okular::Status status = Okular::main(paths, serializedOptions);
     QCOMPARE(status, Okular::Error);
 
-    QSet<QString> openUrls;
     Shell *s = findShell();
     QVERIFY(!s);
 }
@@ -490,7 +488,7 @@ void MainShellTest::testSessionRestore_data()
     QStringList twoDocPaths( oneDocPaths );
     twoDocPaths << QStringLiteral(KDESRCDIR "data/formSamples.pdf");
 
-    const QString options = ShellUtils::serializeOptions(false, false, false, false, QString());
+    const QString options = ShellUtils::serializeOptions(false, false, false, false, false, QString());
 
     QTest::newRow("1 doc, 1 window, tabs")      << oneDocPaths << options << true  << true;
     QTest::newRow("2 docs, 1 window, tabs")     << twoDocPaths << options << true  << true;
@@ -518,7 +516,7 @@ void MainShellTest::testSessionRestore()
     int numDocs = 0;
     foreach( Shell* shell, shells )
     {
-        QTest::qWaitForWindowExposed( shell );
+        QVERIFY( QTest::qWaitForWindowExposed( shell ) );
         numDocs += shell->m_tabs.size();
     }
 
@@ -574,7 +572,7 @@ void MainShellTest::testSessionRestore()
     numDocs = 0;
     foreach( Shell* shell, shells )
     {
-        QTest::qWaitForWindowExposed( shell );
+        QVERIFY( QTest::qWaitForWindowExposed( shell ) );
         numDocs += shell->m_tabs.size();
     }
 

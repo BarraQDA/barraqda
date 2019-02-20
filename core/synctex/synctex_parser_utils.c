@@ -187,8 +187,8 @@ void _synctex_strip_last_path_extension(char * string) {
 		char * last_component = NULL;
 		char * last_extension = NULL;
 #       if defined(SYNCTEX_WINDOWS)
-		last_component = PathFindFileName(string);
-		last_extension = PathFindExtension(string);
+		last_component = PathFindFileNameA(string);
+		last_extension = PathFindExtensionA(string);
 		if(last_extension == NULL)return;
 		if(last_component == NULL)last_component = string;
 		if(last_extension>last_component){/* filter out paths like "my/dir/.hidden" */
@@ -323,7 +323,7 @@ int _synctex_copy_with_quoting_last_path_component(const char * src, char ** des
   if(src && dest_ref) {
       const char * lpc;
 #		define dest (*dest_ref)
-		dest = NULL;	/*	Default behavior: no change and sucess. */
+		dest = NULL;	/*	Default behavior: no change and success. */
 		lpc = _synctex_last_path_component(src);
 		if(strlen(lpc)) {
 			if(strchr(lpc,' ') && lpc[0]!='"' && lpc[strlen(lpc)-1]!='"') {

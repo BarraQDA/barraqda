@@ -7,10 +7,17 @@ ecm_add_test(shelltest.cpp ../shell/shellutils.cpp
     LINK_LIBRARIES Qt5::Test okularcore
 )
 
-ecm_add_test(parttest.cpp
-    TEST_NAME "parttest"
-    LINK_LIBRARIES Qt5::Widgets Qt5::Test Qt5::Xml okularcore okularpart
-)
+if(Poppler_Qt5_FOUND)
+    ecm_add_test(parttest.cpp
+        TEST_NAME "parttest"
+        LINK_LIBRARIES Qt5::Widgets Qt5::Test Qt5::Xml okularcore okularpart
+    )
+
+    ecm_add_test(visibilitytest.cpp
+        TEST_NAME "visibilitytest"
+        LINK_LIBRARIES Qt5::Widgets Qt5::Test okularcore
+    )
+endif()
 
 ecm_add_test(documenttest.cpp
     TEST_NAME "documenttest"
@@ -57,7 +64,12 @@ ecm_add_test(editformstest.cpp
     LINK_LIBRARIES Qt5::Widgets Qt5::Test okularcore
 )
 
-if(NOT WIN32)
+ecm_add_test(calculatetexttest.cpp
+    TEST_NAME "calculatetexttest"
+    LINK_LIBRARIES Qt5::Widgets Qt5::Test okularcore
+)
+
+if(KF5Activities_FOUND)
 	ecm_add_test(mainshelltest.cpp ../shell/okular_main.cpp ../shell/shellutils.cpp ../shell/shell.cpp
 		TEST_NAME "mainshelltest"
 		LINK_LIBRARIES Qt5::Test KF5::Activities okularpart okularcore

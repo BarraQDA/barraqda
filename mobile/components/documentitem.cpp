@@ -19,7 +19,7 @@
 
 #include "documentitem.h"
 
-#include <QtQml>
+#include <QtQml> // krazy:exclude=includes
 #include <QMimeDatabase>
 
 #include <core/document_p.h>
@@ -53,12 +53,15 @@ DocumentItem::~DocumentItem()
     delete m_document;
 }
 
-void DocumentItem::setPath(const QString &path)
+void DocumentItem::setUrl(const QUrl & url)
 {
-    //TODO: remote urls
+    m_document->closeDocument();
     //TODO: password
     QMimeDatabase db;
-    m_document->openDocument(path, QUrl::fromLocalFile(path), db.mimeTypeForUrl(QUrl::fromLocalFile(path)));
+
+    const QString path = url.isLocalFile() ? url.toLocalFile() : QLatin1String("-");
+
+    m_document->openDocument(path, url, db.mimeTypeForUrl(url));
 
     m_tocModel->clear();
     m_tocModel->fill(m_document->documentSynopsis());
@@ -69,7 +72,7 @@ void DocumentItem::setPath(const QString &path)
          m_matchingPages << (int)i;
     }
     emit matchingPagesChanged();
-    emit pathChanged();
+    emit urlChanged();
     emit pageCountChanged();
     emit openedChanged();
     emit supportsSearchingChanged();
@@ -95,9 +98,9 @@ QString DocumentItem::windowTitleForDocument() const
     return title;
 }
 
-QString DocumentItem::path() const
+QUrl DocumentItem::url() const
 {
-    return m_document->currentDocument().toDisplayString();
+    return m_document->currentDocument();
 }
 
 void DocumentItem::setCurrentPage(int page)
