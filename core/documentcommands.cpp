@@ -83,6 +83,7 @@ void AddAnnotationCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performRemovePageAnnotation( m_pageNumber, m_annotation );
     m_done = false;
+    m_docPriv->removeChange();
 }
 
 void AddAnnotationCommand::redo()
@@ -90,6 +91,7 @@ void AddAnnotationCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performAddPageAnnotation( m_pageNumber,  m_annotation );
     m_done = true;
+    m_docPriv->addChange();
 }
 
 bool AddAnnotationCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )
@@ -130,6 +132,7 @@ void RemoveAnnotationCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performAddPageAnnotation( m_pageNumber,  m_annotation );
     m_done = false;
+    m_docPriv->removeChange();
 }
 
 void RemoveAnnotationCommand::redo()
@@ -137,6 +140,7 @@ void RemoveAnnotationCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performRemovePageAnnotation( m_pageNumber, m_annotation );
     m_done = true;
+    m_docPriv->addChange();
 }
 
 bool RemoveAnnotationCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )
@@ -173,6 +177,7 @@ void ModifyAnnotationPropertiesCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_annotation->setAnnotationProperties( m_prevProperties );
     m_docPriv->performModifyPageAnnotation( m_pageNumber,  m_annotation, true );
+    m_docPriv->removeChange();
 }
 
 void ModifyAnnotationPropertiesCommand::redo()
@@ -180,6 +185,7 @@ void ModifyAnnotationPropertiesCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_annotation->setAnnotationProperties( m_newProperties );
     m_docPriv->performModifyPageAnnotation( m_pageNumber,  m_annotation, true );
+    m_docPriv->addChange();
 }
 
 bool ModifyAnnotationPropertiesCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )
@@ -211,6 +217,7 @@ void TranslateAnnotationCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle(  minusDelta() ), m_docPriv, m_pageNumber );
     m_annotation->translate( minusDelta() );
     m_docPriv->performModifyPageAnnotation( m_pageNumber,  m_annotation, true );
+    m_docPriv->removeChange();
 }
 
 void TranslateAnnotationCommand::redo()
@@ -218,6 +225,7 @@ void TranslateAnnotationCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle( m_delta ), m_docPriv, m_pageNumber );
     m_annotation->translate( m_delta );
     m_docPriv->performModifyPageAnnotation( m_pageNumber,  m_annotation, true );
+    m_docPriv->addChange();
 }
 
 int TranslateAnnotationCommand::id() const
@@ -472,6 +480,7 @@ void AdjustAnnotationCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( adjustBoundingRectangle( minusDelta1, minusDelta2 ), m_docPriv, m_pageNumber );
     m_annotation->adjust( minusDelta1, minusDelta2 );
     m_docPriv->performModifyPageAnnotation( m_pageNumber, m_annotation, true );
+    m_docPriv->removeChange();
 }
 
 void AdjustAnnotationCommand::redo()
@@ -479,6 +488,7 @@ void AdjustAnnotationCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( adjustBoundingRectangle( m_delta1, m_delta2 ), m_docPriv, m_pageNumber );
     m_annotation->adjust( m_delta1, m_delta2 );
     m_docPriv->performModifyPageAnnotation( m_pageNumber, m_annotation, true );
+    m_docPriv->addChange();
 }
 
 int AdjustAnnotationCommand::id() const
@@ -648,6 +658,7 @@ void EditAnnotationContentsCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performSetAnnotationContents( m_prevContents, m_annotation, m_pageNumber );
     emit m_docPriv->m_parent->annotationContentsChangedByUndoRedo( m_annotation, m_prevContents, m_prevCursorPos, m_prevAnchorPos );
+    m_docPriv->removeChange();
 }
 
 void EditAnnotationContentsCommand::redo()
@@ -655,6 +666,7 @@ void EditAnnotationContentsCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( m_annotation->boundingRectangle(), m_docPriv, m_pageNumber );
     m_docPriv->performSetAnnotationContents( m_newContents, m_annotation, m_pageNumber );
     emit m_docPriv->m_parent->annotationContentsChangedByUndoRedo( m_annotation, m_newContents, m_newCursorPos, m_newCursorPos );
+    m_docPriv->addChange();
 }
 
 int EditAnnotationContentsCommand::id() const
@@ -764,6 +776,7 @@ void EditFormTextCommand::undo()
     m_form->setText( m_prevContents );
     emit m_docPriv->m_parent->formTextChangedByUndoRedo( m_pageNumber, m_form, m_prevContents, m_prevCursorPos, m_prevAnchorPos );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->removeChange();
 }
 
 void EditFormTextCommand::redo()
@@ -772,6 +785,7 @@ void EditFormTextCommand::redo()
     m_form->setText( m_newContents  );
     emit m_docPriv->m_parent->formTextChangedByUndoRedo( m_pageNumber, m_form, m_newContents, m_newCursorPos, m_newCursorPos );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->addChange();
 }
 
 int EditFormTextCommand::id() const
@@ -821,6 +835,7 @@ void EditFormListCommand::undo()
     m_form->setCurrentChoices( m_prevChoices );
     emit m_docPriv->m_parent->formListChangedByUndoRedo( m_pageNumber, m_form, m_prevChoices );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->removeChange();
 }
 
 void EditFormListCommand::redo()
@@ -829,6 +844,7 @@ void EditFormListCommand::redo()
     m_form->setCurrentChoices( m_newChoices );
     emit m_docPriv->m_parent->formListChangedByUndoRedo( m_pageNumber, m_form, m_newChoices );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->addChange();
 }
 
 bool EditFormListCommand::refreshInternalPageReferences( const QVector< Page * > &newPagesVector )
@@ -884,6 +900,7 @@ void EditFormComboCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( m_form->rect(), m_docPriv, m_pageNumber );
     emit m_docPriv->m_parent->formComboChangedByUndoRedo( m_pageNumber, m_form, m_prevContents, m_prevCursorPos, m_prevAnchorPos );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->removeChange();
 }
 
 void EditFormComboCommand::redo()
@@ -899,6 +916,7 @@ void EditFormComboCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( m_form->rect(), m_docPriv, m_pageNumber );
     emit m_docPriv->m_parent->formComboChangedByUndoRedo( m_pageNumber, m_form, m_newContents, m_newCursorPos, m_newCursorPos );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->addChange();
 }
 
 int EditFormComboCommand::id() const
@@ -964,6 +982,7 @@ void EditFormButtonsCommand::undo()
     moveViewportIfBoundingRectNotFullyVisible( boundingRect, m_docPriv, m_pageNumber );
     emit m_docPriv->m_parent->formButtonsChangedByUndoRedo( m_pageNumber, m_formButtons );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->removeChange();
 }
 
 void EditFormButtonsCommand::redo()
@@ -980,6 +999,7 @@ void EditFormButtonsCommand::redo()
     moveViewportIfBoundingRectNotFullyVisible( boundingRect, m_docPriv, m_pageNumber );
     emit m_docPriv->m_parent->formButtonsChangedByUndoRedo( m_pageNumber, m_formButtons );
     m_docPriv->notifyFormChanges( m_pageNumber );
+    m_docPriv->addChange();
 }
 
 bool EditFormButtonsCommand::refreshInternalPageReferences( const QVector< Okular::Page * > &newPagesVector )

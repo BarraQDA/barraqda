@@ -396,10 +396,10 @@ m_cliPresentation(false), m_cliPrint(false), m_cliPrintAndExit(false), m_embedMo
     connect( m_document, &Document::openUrl, this, &Part::openUrlFromDocument );
     connect( m_document->bookmarkManager(), &BookmarkManager::openUrl, this, &Part::openUrlFromBookmarks );
     connect( m_document, &Document::close, this, &Part::close );
-    connect( m_document, &Document::undoHistoryCleanChanged, this,
-            [this](bool clean)
+    connect( m_document, &Document::undoHistoryIndexChanged, this,
+            [this](int idx)
             {
-                setModified( !clean );
+                setModified( m_document->isChanged() );
                 setWindowTitleFromDocument();
             }
     );

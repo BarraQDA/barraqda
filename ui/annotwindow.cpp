@@ -40,13 +40,13 @@
 #include <core/utils.h>
 #include <KMessageBox>
 
-class CloseButton
+class CloseAnnotButton
   : public QPushButton
 {
     Q_OBJECT
 
 public:
-    CloseButton( QWidget * parent = Q_NULLPTR )
+    CloseAnnotButton( QWidget * parent = Q_NULLPTR )
       : QPushButton( parent )
     {
         setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
@@ -88,7 +88,7 @@ public:
         dateLabel->setFont( f );
         dateLabel->setCursor( Qt::SizeAllCursor );
         buttonlay->addWidget( dateLabel );
-        CloseButton * close = new CloseButton( this );
+        CloseAnnotButton * close = new CloseAnnotButton( this );
         connect( close, &QAbstractButton::clicked, parent, &QWidget::close );
         buttonlay->addWidget( close );
         // option button row

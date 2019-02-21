@@ -1063,7 +1063,8 @@ bool PagePrivate::restoreLocalContents( const QDomNode & pageNode )
                 {
                     m_doc->performAddPageTagging(m_number, tag);
                     qCDebug(OkularCoreDebug) << "restored tag:" << tag->uniqueName();
-                    loadedAnything = true;
+                    //  Don't count tag as 'anything' or else we'll get the migration message.
+                    //  loadedAnything = true;
                 }
                 else
                     qWarning().nospace() << "page (" << m_number << "): can't restore a tagging from XML.";

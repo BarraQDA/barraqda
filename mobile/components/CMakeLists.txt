@@ -22,7 +22,7 @@ set(okular_SRCS
 
 kconfig_add_kcfg_files(okular_SRCS ${CMAKE_SOURCE_DIR}/conf/settings.kcfgc )
 
-add_library(okularplugin SHARED ${okular_SRCS})
+add_library(okularplugin ${okular_SRCS})
 set_target_properties(okularplugin PROPERTIES COMPILE_DEFINITIONS "okularpart_EXPORTS")
 target_link_libraries(okularplugin
         Qt5::Quick

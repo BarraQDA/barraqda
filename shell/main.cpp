@@ -28,6 +28,18 @@
 #include "okular_main.h"
 #include "shellutils.h"
 
+#ifndef BUILD_SHARED_LIBS
+#include <config-okular.h>
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(QSvgIconPlugin)
+#if HAVE_X11
+Q_IMPORT_PLUGIN(QXcbIntegrationPlugin)
+#endif
+#if defined _WIN32 || defined _WIN64
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+#endif
+#endif
+
 int main(int argc, char** argv)
 {
     QGuiApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);

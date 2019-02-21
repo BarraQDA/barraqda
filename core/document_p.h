@@ -124,7 +124,8 @@ class DocumentPrivate
             m_annotationEditingEnabled ( true ),
             m_annotationBeingModified( false ),
             m_docdataMigrationNeeded( false ),
-            m_synctex_scanner( nullptr )
+            m_synctex_scanner( nullptr ),
+            m_changes( 0 )
         {
             calculateMaxTextPages();
         }
@@ -229,6 +230,9 @@ class DocumentPrivate
 
         void clearAndWaitForRequests();
 
+        void addChange();
+        void removeChange();
+
         // member variables
         Document *m_parent;
         QPointer<QWidget> m_widget;
@@ -326,6 +330,8 @@ class DocumentPrivate
         bool m_docdataMigrationNeeded;
 
         synctex_scanner_p m_synctex_scanner;
+        
+        int m_changes;
 
         // generator selection
         static QVector<KPluginMetaData> availableGenerators();

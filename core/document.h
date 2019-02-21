@@ -28,6 +28,10 @@
 #include <QMimeType>
 #include <QUrl>
 
+#ifdef BUILD_SHARED_LIBS
+#include <KPluginFactory>
+#endif
+
 class QPrintDialog;
 class KBookmark;
 class KConfigDialog;
@@ -35,6 +39,9 @@ class KPluginMetaData;
 class KXMLGUIClient;
 class DocumentItem;
 class QAbstractItemModel;
+#ifndef BUILD_SHARED_LIBS
+class KPluginFactory;
+#endif
 
 namespace Okular {
 
@@ -980,6 +987,9 @@ class OKULARCORE_EXPORT Document : public QObject
          * @since 0.24
         */
         QAbstractItemModel * layersModel() const;
+        
+        /** JS **/
+        bool isChanged();
 
     public Q_SLOTS:
         /**
@@ -1193,10 +1203,10 @@ class OKULARCORE_EXPORT Document : public QObject
         void canRedoChanged( bool redoAvailable );
 
         /**
-         * This signal is emitted whenever the undo history is clean (i.e. the same status the last time it was saved)
+         * This signal is emitted whenever the undo index changes
          * @since 1.3
          */
-        void undoHistoryCleanChanged( bool clean );
+        void undoHistoryIndexChanged( int idx );
 
         /**
          * This signal is emitted whenever an rendition action is triggered and the UI should process it.

@@ -7,3 +7,5 @@
 /* Defines if the purpose framework is available */
 #cmakedefine01 HAVE_MALLOC_TRIM
 
+#cmakedefine01 HAVE_X11
+

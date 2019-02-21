@@ -53,6 +53,10 @@
 #include <KActivities/ResourceInstance>
 #endif
 
+#ifndef BUILD_SHARED_LIBS
+#include "../part.h"
+#endif
+
 // local includes
 #include "kdocumentviewer.h"
 #include "../interfaces/viewerinterface.h"
@@ -79,19 +83,31 @@ Shell::Shell( const QString &serializedOptions )
   setXMLFile(QStringLiteral("shell.rc"));
   m_fileformatsscanned = false;
   m_showMenuBarAction = nullptr;
+
+#ifdef BUILD_SHARED_LIBS
   // this routine will find and load our Part.  it finds the Part by
   // name which is a bad idea usually.. but it's alright in this
   // case since our Part is made for this Shell
   KPluginLoader loader(QStringLiteral("okularpart"));
   m_partFactory = loader.factory();
+#else
+  m_partFactory = new KPluginFactory();
+#endif
   if (!m_partFactory)
   {
     // if we couldn't find our Part, we exit since the Shell by
     // itself can't do anything useful
     m_isValid = false;
+#ifdef BUILD_SHARED_LIBS
     KMessageBox::error(this, i18n("Unable to find the Okular component: %1", loader.errorString()));
+#else
+    KMessageBox::error(this, i18n("Unable to find the Okular component"));
+#endif
     return;
   }
+#ifndef BUILD_SHARED_LIBS
+  m_partFactory->registerPlugin<Okular::Part>();
+#endif
 
   // now that the Part plugin is loaded, create the part
   KParts::ReadWritePart* const firstPart = m_partFactory->create< KParts::ReadWritePart >( this );

@@ -119,7 +119,7 @@ int _synctex_log(int level, const char * prompt, const char * reason, ...) {
 			result = _vsnprintf(buff, buffersize - 1, reason, arg);
 		}
 		if(-1 == result) {
-			// could not make the buffer big enough or simply could not write to it
+			/* could not make the buffer big enough or simply could not write to it */
 			free(buff);
 			return -1;
 		}

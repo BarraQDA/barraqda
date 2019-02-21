@@ -32,7 +32,20 @@ ecm_setup_version(${PROJECT_VERSION}
                   VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/core/version.h"
                   PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular5ConfigVersion.cmake")
 
+find_package(X11)
+set(HAVE_X11 ${X11_FOUND})
+
 find_package(Qt5 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core DBus Test Widgets PrintSupport Svg Qml Quick)
+if(NOT BUILD_SHARED_LIBS)
+    find_package(Qt5 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Concurrent)
+    if (X11_FOUND)
+        find_package(Qt5 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS X11Extras)
+    endif()
+    if (WIN32)
+        find_package(Qt5 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS WinExtras)
+    endif()
+endif()
+
 find_package(Qt5 ${QT_REQUIRED_VERSION} OPTIONAL_COMPONENTS TextToSpeech)
 if (NOT Qt5TextToSpeech_FOUND)
     message(STATUS "Qt5TextToSpeech not found, speech features will be disabled")
@@ -71,6 +84,9 @@ find_package(KF5 ${KF5_REQUIRED_VERSION} REQUIRED COMPONENTS
     JS
     Wallet
 )
+if(NOT BUILD_SHARED_LIBS)
+    find_package(KF5 ${KF5_REQUIRED_VERSION} REQUIRED COMPONENTS DBusAddons GuiAddons Attica GlobalAccel)
+endif()
 
 if(KF5Wallet_FOUND)
     add_definitions(-DWITH_KWALLET=1)
@@ -96,7 +112,9 @@ set_package_properties(KF5Kirigami2 PROPERTIES
     TYPE RUNTIME
 )
 find_package(Phonon4Qt5 CONFIG REQUIRED)
-#find_package(KDEExperimentalPurpose)
+if(NOT WIN32)  # Just a guess
+    find_package(KDEExperimentalPurpose)
+endif()
 set_package_properties(KDEExperimentalPurpose PROPERTIES
     DESCRIPTION "A framework for services and actions integration"
     PURPOSE "Required for enabling the share menu in Okular"
@@ -142,8 +160,8 @@ if(BUILD_COVERAGE)
 endif()
 
 add_subdirectory( ui )
+add_subdirectory( generators )	# Static build needs generators to be processed before shell
 add_subdirectory( shell )
-add_subdirectory( generators )
 if(BUILD_TESTING)
    add_subdirectory( autotests )
    add_subdirectory( conf/autotests )
@@ -249,7 +267,12 @@ ki18n_wrap_ui(okularcore_SRCS
 
 kconfig_add_kcfg_files(okularcore_SRCS conf/settings_core.kcfgc)
 
-add_library(okularcore SHARED ${okularcore_SRCS})
+if (NOT BUILD_SHARED_LIBS)
+    file (READ "${CMAKE_BINARY_DIR}/generators_static_list.txt" generators_static)
+else ()
+    set(generators_static "")
+endif ()
+add_library(okularcore ${okularcore_SRCS})
 generate_export_header(okularcore BASE_NAME okularcore EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/core/okularcore_export.h")
 
 if (ANDROID)
@@ -284,6 +307,7 @@ PRIVATE
     Phonon::phonon4qt5
     ${MATH_LIB}
     ${ZLIB_LIBRARIES}
+    ${generators_static}
 PUBLIC  # these are included from the installed headers
     KF5::CoreAddons
     KF5::XmlGui
@@ -291,7 +315,6 @@ PUBLIC  # these are included from the installed headers
     Qt5::PrintSupport
     Qt5::Widgets
 )
-
 
 if (KF5Wallet_FOUND)
     target_link_libraries(okularcore PRIVATE KF5::Wallet)
@@ -405,7 +428,7 @@ ki18n_wrap_ui(okularpart_SRCS
 
 kconfig_add_kcfg_files(okularpart_SRCS conf/settings.kcfgc)
 
-add_library(okularpart SHARED ${okularpart_SRCS})
+add_library(okularpart ${okularpart_SRCS})
 generate_export_header(okularpart BASE_NAME okularpart)
 
 target_link_libraries(okularpart okularcore

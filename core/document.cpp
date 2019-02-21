@@ -45,6 +45,9 @@
 #include <QDesktopServices>
 #include <QPageSize>
 #include <QStandardPaths>
+#ifndef BUILD_SHARED_LIBS
+#include <QJsonDocument>
+#endif
 
 #include <kauthorized.h>
 #include <kconfigdialog.h>
@@ -100,6 +103,11 @@
 
 #if HAVE_MALLOC_TRIM
 #include "malloc.h"
+#endif
+
+#ifndef BUILD_SHARED_LIBS
+static QVector<KPluginMetaData> s_availableGenerators;
+#include "generators_static.h"
 #endif
 
 using namespace Okular;
@@ -2281,9 +2289,16 @@ Document::Document( QWidget *widget )
     connect( SettingsCore::self(), SIGNAL(configChanged()), this, SLOT(_o_configChanged()) );
     connect(d->m_undoStack, &QUndoStack::canUndoChanged, this, &Document::canUndoChanged);
     connect(d->m_undoStack, &QUndoStack::canRedoChanged, this, &Document::canRedoChanged);
-    connect(d->m_undoStack, &QUndoStack::cleanChanged, this, &Document::undoHistoryCleanChanged);
+    connect(d->m_undoStack, &QUndoStack::indexChanged, this, &Document::undoHistoryIndexChanged);
 
     qRegisterMetaType<Okular::FontInfo>();
+
+#ifndef BUILD_SHARED_LIBS
+    KPluginFactory *factory;
+    Generator * plugin;
+    KPluginMetaData service;
+#include "generators_static.i"
+#endif
 }
 
 Document::~Document()
@@ -2350,7 +2365,11 @@ QVector<KPluginMetaData> DocumentPrivate::availableGenerators()
     static QVector<KPluginMetaData> result;
     if (result.isEmpty())
     {
+#ifdef BUILD_SHARED_LIBS
         result = KPluginLoader::findPlugins( QLatin1String ( "okular/generators" ) );
+#else
+        result = s_availableGenerators;
+#endif
     }
     return result;
 }
@@ -5240,6 +5259,23 @@ void Document::docdataMigrationDone()
 QAbstractItemModel * Document::layersModel() const
 {
     return d->m_generator ? d->m_generator->layersModel() : nullptr;
+}
+
+/* Functions to handle non-change history (tagging) */
+
+void DocumentPrivate::addChange()
+{
+    m_changes++;
+}
+
+void DocumentPrivate::removeChange()
+{
+    m_changes--;
+}
+
+bool Document::isChanged()
+{
+    return d->m_changes > 0;
 }
 
 void DocumentPrivate::requestDone( PixmapRequest * req )

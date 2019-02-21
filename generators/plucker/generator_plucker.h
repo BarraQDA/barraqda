@@ -15,7 +15,7 @@
 
 #include <QTextBlock>
 
-#include "qunpluck.h"
+#include "unpluck/qunpluck.h"
 
 class QTextDocument;
 

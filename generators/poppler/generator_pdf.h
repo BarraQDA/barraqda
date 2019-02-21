@@ -16,7 +16,7 @@
 
 //#include "synctex/synctex_parser.h"
 
-#include <poppler-qt5.h>
+#include <poppler/qt5/poppler-qt5.h>
 
 
 #include <qbitarray.h>

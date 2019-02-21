@@ -5,6 +5,25 @@ function(okular_add_generator _target)
     INSTALL_NAMESPACE "okular/generators"
     SOURCES ${ARGN}
   )
+  if(NOT BUILD_SHARED_LIBS)
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static_list.txt "${_target};")
+
+    file(GLOB HEADER "generator_*.h")
+    file(READ ${HEADER} header)
+    string(REGEX REPLACE "^.*class ([^ ]+Generator) .*$" "\\1" class ${header})
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.h "#include \"${HEADER}\"\n")
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "factory = new KPluginFactory();\n")
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "factory->registerPlugin<${class}>();\n")
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "plugin = factory->create<Okular::Generator>();\n")
+    file(READ "lib${_target}.json" json)
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "service = KPluginMetaData(QJsonDocument::fromJson(R\"|(${json})|\").object(), QString(""));\n")
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "GeneratorInfo info_${class}( plugin, service );\n")
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "s_availableGenerators.append( service );\n")
+    file(APPEND ${CMAKE_BINARY_DIR}/generators_static.i "d->m_loadedGenerators.insert( service.pluginId(), info_${class} );\n")
+
+    install(TARGETS ${_target} EXPORT Okular5Targets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+  endif()
+
 endfunction()
 
 set(LIBSPECTRE_MINIMUM_VERSION "0.2")
