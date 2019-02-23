@@ -396,8 +396,8 @@ m_cliPresentation(false), m_cliPrint(false), m_cliPrintAndExit(false), m_embedMo
     connect( m_document, &Document::openUrl, this, &Part::openUrlFromDocument );
     connect( m_document->bookmarkManager(), &BookmarkManager::openUrl, this, &Part::openUrlFromBookmarks );
     connect( m_document, &Document::close, this, &Part::close );
-    connect( m_document, &Document::undoHistoryIndexChanged, this,
-            [this](int idx)
+    connect( m_document, &Document::undoHistoryCleanChanged, this,
+            [this](bool clean)
             {
                 setModified( m_document->isChanged() );
                 setWindowTitleFromDocument();
@@ -1785,6 +1785,7 @@ bool Part::closeUrl(bool promptToSave)
     }
 
     m_document->setHistoryClean( true );
+    m_document->resetChange();
 
     if (!m_temporaryLocalFile.isNull() && m_temporaryLocalFile != localFilePath())
     {
@@ -2743,6 +2744,7 @@ bool Part::saveAs( const QUrl & saveUrl, SaveAsFlags flags )
     }
 
     m_document->setHistoryClean( true );
+    m_document->resetChange();
 
     if ( m_document->isDocdataMigrationNeeded() )
         m_document->docdataMigrationDone();

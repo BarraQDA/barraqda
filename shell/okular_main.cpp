@@ -28,7 +28,7 @@ static bool attachUniqueInstance(const QStringList &paths, const QString &serial
     if (!ShellUtils::unique(serializedOptions) || paths.count() != 1)
         return false;
 
-    QDBusInterface iface(QStringLiteral("org.kde.okular"), QStringLiteral("/okularshell"), QStringLiteral("org.kde.okular"));
+    QDBusInterface iface(QStringLiteral("org.kde.barraqda"), QStringLiteral("/barraqdashell"), QStringLiteral("org.kde.barraqda"));
     if (!iface.isValid())
         return false;
 
@@ -50,7 +50,7 @@ static bool attachExistingInstance(const QStringList &paths, const QString &seri
     const QStringList services = QDBusConnection::sessionBus().interface()->registeredServiceNames().value();
 
     // Don't match the service without trailing "-" (unique instance)
-    const QString pattern = QStringLiteral("org.kde.okular-");
+    const QString pattern = QStringLiteral("org.kde.barraqda-");
     const QString myPid = QString::number( qApp->applicationPid() );
     QScopedPointer<QDBusInterface> bestService;
     const int desktop = KWindowSystem::currentDesktop();
@@ -60,7 +60,7 @@ static bool attachExistingInstance(const QStringList &paths, const QString &seri
     {
         if ( service.startsWith(pattern) && !service.endsWith( myPid ) )
         {
-            bestService.reset( new QDBusInterface(service, QStringLiteral("/okularshell"), QStringLiteral("org.kde.okular")) );
+            bestService.reset( new QDBusInterface(service, QStringLiteral("/barraqdashell"), QStringLiteral("org.kde.barraqda")) );
 
             // Find a window that can handle our documents
             const QDBusReply<bool> reply = bestService->call( QStringLiteral("canOpenDocs"), paths.count(), desktop );

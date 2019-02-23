@@ -990,6 +990,7 @@ class OKULARCORE_EXPORT Document : public QObject
         
         /** JS **/
         bool isChanged();
+        void resetChange();
 
     public Q_SLOTS:
         /**
@@ -1203,10 +1204,10 @@ class OKULARCORE_EXPORT Document : public QObject
         void canRedoChanged( bool redoAvailable );
 
         /**
-         * This signal is emitted whenever the undo index changes
+         * This signal is emitted whenever the undo history is clean (i.e. the same status the last time it was saved)
          * @since 1.3
          */
-        void undoHistoryIndexChanged( int idx );
+        void undoHistoryCleanChanged( bool clean );
 
         /**
          * This signal is emitted whenever an rendition action is triggered and the UI should process it.

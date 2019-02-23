@@ -2289,7 +2289,7 @@ Document::Document( QWidget *widget )
     connect( SettingsCore::self(), SIGNAL(configChanged()), this, SLOT(_o_configChanged()) );
     connect(d->m_undoStack, &QUndoStack::canUndoChanged, this, &Document::canUndoChanged);
     connect(d->m_undoStack, &QUndoStack::canRedoChanged, this, &Document::canRedoChanged);
-    connect(d->m_undoStack, &QUndoStack::indexChanged, this, &Document::undoHistoryIndexChanged);
+    connect(d->m_undoStack, &QUndoStack::cleanChanged, this, &Document::undoHistoryCleanChanged);
 
     qRegisterMetaType<Okular::FontInfo>();
 
@@ -2332,7 +2332,7 @@ QString DocumentPrivate::docDataFileName(const QUrl &url, qint64 document_size)
     QString fn = url.fileName();
     fn = QString::number( document_size ) + QLatin1Char('.') + fn + QStringLiteral(".xml");
     QString docdataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-            + QStringLiteral("/okular/docdata");
+            + QStringLiteral("/barraqda/docdata");
     // make sure that the okular/docdata/ directory exists (probably this used to be handled by KStandardDirs)
     if (!QFileInfo::exists(docdataDir))
     {
@@ -5273,9 +5273,14 @@ void DocumentPrivate::removeChange()
     m_changes--;
 }
 
+void Document::resetChange()
+{
+    d->m_changes = 0;
+}
+
 bool Document::isChanged()
 {
-    return d->m_changes > 0;
+    return d->m_changes == 0;
 }
 
 void DocumentPrivate::requestDone( PixmapRequest * req )

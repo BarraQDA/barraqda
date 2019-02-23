@@ -1,0 +1,14 @@
+[Desktop Entry]
+Terminal=false
+Name=BarraQDA
+GenericName=Document Tagger
+Comment=Universal document tagger
+Exec=barraqda %U
+Icon=barraqda
+Type=Application
+X-DocPath=barraqda/index.html
+InitialPreference=7
+Categories=Qt;KDE;Graphics;Office;Viewer;
+MimeType=application/vnd.kde.okular-archive;
+X-DBUS-ServiceName=org.kde.barraqda
+

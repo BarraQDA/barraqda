@@ -45,12 +45,12 @@ int main(int argc, char** argv)
     QGuiApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 
     QApplication app(argc, argv);
-    KLocalizedString::setApplicationDomain("okular");
+    KLocalizedString::setApplicationDomain("barraqda");
 
     KAboutData aboutData = okularAboutData();
     KAboutData::setApplicationData(aboutData);
     // set icon for shells which do not use desktop file metadata
-    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("okular")));
+    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("barraqda")));
 
     KCrash::initialize();
 

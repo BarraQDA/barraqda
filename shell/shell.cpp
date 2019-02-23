@@ -75,10 +75,10 @@ Shell::Shell( const QString &serializedOptions )
 #endif
     , m_isValid(true)
 {
-  setObjectName( QStringLiteral( "okular::Shell#" ) );
+  setObjectName( QStringLiteral( "barraqda::Shell#" ) );
   setContextMenuPolicy( Qt::NoContextMenu );
   // otherwise .rc file won't be found by unit test
-  setComponentName(QStringLiteral("okular"), QString());
+  setComponentName(QStringLiteral("barraqda"), QString());
   // set the shell's ui resource file
   setXMLFile(QStringLiteral("shell.rc"));
   m_fileformatsscanned = false;
@@ -146,13 +146,13 @@ Shell::Shell( const QString &serializedOptions )
     m_unique = ShellUtils::unique(serializedOptions);
     if (m_unique)
     {
-        m_unique = QDBusConnection::sessionBus().registerService(QStringLiteral("org.kde.okular"));
+        m_unique = QDBusConnection::sessionBus().registerService(QStringLiteral("org.kde.barraqda"));
         if (!m_unique)
             KMessageBox::information(this, i18n("There is already a unique Okular instance running. This instance won't be the unique one."));
     }
     else
     {
-        QString serviceName = QStringLiteral("org.kde.okular-") + QString::number(qApp->applicationPid());
+        QString serviceName = QStringLiteral("org.kde.barraqda-") + QString::number(qApp->applicationPid());
         QDBusConnection::sessionBus().registerService(serviceName);
     }
     if (ShellUtils::noRaise(serializedOptions))
@@ -160,7 +160,7 @@ Shell::Shell( const QString &serializedOptions )
         setAttribute(Qt::WA_ShowWithoutActivating);
     }
 
-    QDBusConnection::sessionBus().registerObject(QStringLiteral("/okularshell"), this, QDBusConnection::ExportScriptableSlots);
+    QDBusConnection::sessionBus().registerObject(QStringLiteral("/barraqdashell"), this, QDBusConnection::ExportScriptableSlots);
   }
   else
   {
@@ -212,7 +212,7 @@ Shell::~Shell()
         m_tabs.clear();
     }
     if (m_unique)
-        QDBusConnection::sessionBus().unregisterService(QStringLiteral("org.kde.okular"));
+        QDBusConnection::sessionBus().unregisterService(QStringLiteral("org.kde.barraqda"));
 
     delete m_tabWidget;
 }

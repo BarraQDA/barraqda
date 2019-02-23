@@ -13,8 +13,8 @@
  *   (at your option) any later version.                                   *
  ***************************************************************************/
 
-#ifndef _OKULAR_SHELL_H_
-#define _OKULAR_SHELL_H_
+#ifndef _BARRAQDA_SHELL_H_
+#define _BARRAQDA_SHELL_H_
 
 #include <kparts/mainwindow.h>
 #include <kparts/readwritepart.h>
@@ -47,7 +47,7 @@ namespace KActivities { class ResourceInstance; }
 class Shell : public KParts::MainWindow
 {
   Q_OBJECT
-  Q_CLASSINFO("D-Bus Interface", "org.kde.okular")
+  Q_CLASSINFO("D-Bus Interface", "org.kde.barraqda")
 
   friend class MainShellTest;
 
