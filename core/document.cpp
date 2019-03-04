@@ -2289,7 +2289,7 @@ Document::Document( QWidget *widget )
     connect( SettingsCore::self(), SIGNAL(configChanged()), this, SLOT(_o_configChanged()) );
     connect(d->m_undoStack, &QUndoStack::canUndoChanged, this, &Document::canUndoChanged);
     connect(d->m_undoStack, &QUndoStack::canRedoChanged, this, &Document::canRedoChanged);
-    connect(d->m_undoStack, &QUndoStack::cleanChanged, this, &Document::undoHistoryCleanChanged);
+    connect(d->m_undoStack, &QUndoStack::indexChanged, this, &Document::undoHistoryIndexChanged);
 
     qRegisterMetaType<Okular::FontInfo>();
 
@@ -5280,7 +5280,7 @@ void Document::resetChange()
 
 bool Document::isChanged()
 {
-    return d->m_changes == 0;
+    return d->m_changes != 0;
 }
 
 void DocumentPrivate::requestDone( PixmapRequest * req )

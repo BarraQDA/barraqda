@@ -1204,10 +1204,10 @@ class OKULARCORE_EXPORT Document : public QObject
         void canRedoChanged( bool redoAvailable );
 
         /**
-         * This signal is emitted whenever the undo history is clean (i.e. the same status the last time it was saved)
+         * This signal is emitted whenever the undo index changes, ie something was done or undone.
          * @since 1.3
          */
-        void undoHistoryCleanChanged( bool clean );
+        void undoHistoryIndexChanged( int idx );
 
         /**
          * This signal is emitted whenever an rendition action is triggered and the UI should process it.
